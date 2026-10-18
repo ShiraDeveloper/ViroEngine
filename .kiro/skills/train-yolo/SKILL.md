@@ -1,0 +1,164 @@
+---
+name: train-yolo
+description: Build the region-detection dataset from Safe Line gold boxes, train YOLOv8n on free Colab or Kaggle GPU, export and quantize to ONNX, and compare it against the rule-based detector. Also covers exporting TrOCR-small to ONNX. Use for Task 16 or when retraining the region detector.
+---
+
+# Train and export the region detector
+
+The rule-based detector finds regions by reading labels. A visual detector does not depend on
+reading the label, which is where the "works on an unseen layout" claim is weakest. This is a
+**measured experiment with a pre-declared decision rule**, not a commitment.
+
+> **Licence.** `ultralytics` is **AGPL-3.0**. It is used **only** here, offline, to train and
+> export. The runtime image imports `onnxruntime` and never `ultralytics`. A test asserts this.
+> The AGPL implication for any future closed-source deployment is disclosed in
+> `docs/limitations.md`.
+
+## Decision rule — declared before training
+
+YOLO replaces the rule-based detector **only if all three** hold on the **held-out** pages:
+
+1. Mean region IoU higher than the rule-based baseline recorded in Task 11.
+2. Adds `< 400 ms` and `< 120 MB` resident memory per page.
+3. End-to-end silent error does **not** increase.
+
+Otherwise `config/models.yaml` keeps `rule_based` and YOLO moves to the cut list. A negative
+result is written up in `docs/decisions/ADR-016-region-detector.md`, not hidden.
+
+Per-class configuration is supported. If YOLO wins only on `receipt_stamp` — likely, it has a
+consistent visual shape — use it for that class alone. This is the most probable good outcome.
+
+## Step 1 — Build the dataset locally
+
+```bash
+python -m eval.build_yolo_dataset --gold eval/gold.csv --out eval/results/yolo
+```
+
+Four classes: `central_sticker`, `receipt_stamp`, `patient_box`, `commitment_label`.
+
+Produces `eval/results/yolo/` with `images/{train,val}`, `labels/{train,val}` and `data.yaml`.
+
+**Two rules the script enforces — verify them before training:**
+- **Split by page, never by variant.** Augmented variants of one page in both train and val leak
+  and produce a meaningless score.
+- **Held-out pages are excluded entirely** from both splits.
+
+```bash
+python -c "
+import pathlib
+tr={p.stem.split('_')[0] for p in pathlib.Path('eval/results/yolo/images/train').glob('*')}
+va={p.stem.split('_')[0] for p in pathlib.Path('eval/results/yolo/images/val').glob('*')}
+ho=set(open('eval/held_out.txt').read().split())
+print('overlap train/val:', tr & va)          # must be empty
+print('held-out leaked:', (tr | va) & ho)     # must be empty
+"
+```
+
+Upload `eval/results/yolo/` to Colab or Kaggle. It contains no personal data — only images of the
+altered sample forms and box coordinates — but keep the notebook private anyway.
+
+## Step 2 — Train on free GPU
+
+Colab or Kaggle. Both give enough free GPU time for this.
+
+```python
+!pip -q install ultralytics==8.3.*
+
+from ultralytics import YOLO
+model = YOLO("yolov8n.pt")
+model.train(
+    data="/content/yolo/data.yaml",
+    imgsz=1024,        # stickers are small relative to an A4 page; 640 loses them
+    epochs=100,
+    patience=20,       # early stopping on val mAP50
+    batch=8,
+    degrees=10,        # rotation IS real in this data, unlike most document sets
+    translate=0.1, scale=0.3, fliplr=0.0,   # never flip: text would mirror
+    project="safeline", name="regions",
+)
+print(model.val().box.map50)
+```
+
+Expect to watch `val/mAP50` per class. `receipt_stamp` and `central_sticker` should learn fastest;
+`commitment_label` is the hardest because it is defined by text, not shape.
+
+## Step 3 — Export and quantize
+
+```python
+model.export(format="onnx", opset=17, simplify=True, imgsz=1024)
+```
+
+```python
+from onnxruntime.quantization import quantize_dynamic, QuantType
+quantize_dynamic("safeline/regions/weights/best.onnx",
+                 "yolov8n_regions_int8.onnx", weight_type=QuantType.QUInt8)
+```
+
+**Target: under 15 MB.** `yolov8n` is ~6 MB at fp32, so this is comfortable. Check before
+downloading:
+
+```python
+import os; print(os.path.getsize("yolov8n_regions_int8.onnx") / 1e6, "MB")
+```
+
+## Step 4 — Install locally
+
+```bash
+mv ~/Downloads/yolov8n_regions_int8.onnx models/
+sha256sum models/yolov8n_regions_int8.onnx   # record this in models/README.md
+```
+
+Record in `models/README.md`: the source model, the dataset commit, the training command, the
+validation mAP50, the file size and the checksum. Weights are git-ignored, so provenance must live
+in the repository.
+
+Enable in `config/models.yaml`:
+```yaml
+region_detector: yolo_onnx        # or: rule_based
+yolo:
+  path: models/yolov8n_regions_int8.onnx
+  conf: 0.35
+  iou: 0.45
+  classes: [central_sticker, receipt_stamp, patient_box, commitment_label]
+```
+
+## Step 5 — Compare and decide
+
+```bash
+# region IoU, latency and memory, on the HELD-OUT pages
+python -m tools.demo regions --detector yolo_onnx --compare rule_based --split heldout
+
+# end-to-end effect on silent error
+python -m eval.run_eval --gold eval/gold.csv --split heldout --detector yolo_onnx
+python -m eval.run_eval --gold eval/gold.csv --split heldout --detector rule_based
+```
+
+Apply the three-part rule. Write `docs/decisions/ADR-016-region-detector.md` with the numbers
+either way, then set `config/models.yaml` accordingly.
+
+## Appendix — Exporting TrOCR-small to ONNX (Task 13)
+
+Same notebook pattern, no training — export only.
+
+```python
+!pip -q install transformers optimum[onnxruntime]
+
+from optimum.onnxruntime import ORTModelForVision2Seq
+m = ORTModelForVision2Seq.from_pretrained("microsoft/trocr-small-handwritten", export=True)
+m.save_pretrained("trocr_small_onnx")
+```
+
+```python
+from onnxruntime.quantization import quantize_dynamic, QuantType
+# quantize the decoder, which dominates the size
+quantize_dynamic("trocr_small_onnx/decoder_model.onnx",
+                 "trocr_small_decoder_int8.onnx", weight_type=QuantType.QUInt8)
+```
+
+**Target: the whole model under 80 MB** so it fits the 512 MB host budget alongside OpenCV and
+Tesseract. Record the checksum in `models/README.md`.
+
+**ASSUMPTION to test, not to trust.** TrOCR-small-handwritten is trained on Latin handwriting.
+Digit glyphs are largely shared with Hebrew handwriting, so it should transfer for **numbers** and
+not for Hebrew letters. This is measured in the Task 17 bake-off; if it loses to simply escalating
+to the vision model, the reader is dropped per the cut list.
