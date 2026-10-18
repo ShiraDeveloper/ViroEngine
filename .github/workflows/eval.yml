@@ -1,0 +1,158 @@
+name: Accuracy evaluation
+
+# Accuracy regression run. Manual, or nightly during the hackathon.
+#
+# The sample PDFs and eval/gold.csv are git-ignored, so this workflow SKIPS
+# gracefully when they are absent. To run it for real, provide them through
+# repository secrets as base64 (optional - see the restore step).
+#
+# Secrets (all optional):
+#   GEMINI_API_KEYS_CI  - to include the cloud escalation stage
+#   SAMPLES_PART1_B64, SAMPLES_PART2_B64, GOLD_CSV_B64
+
+on:
+  workflow_dispatch:
+    inputs:
+      split:
+        description: 'Data split'
+        type: choice
+        options: [dev, heldout, all]
+        default: dev
+      local_only:
+        description: 'Local-only (no provider calls)'
+        type: boolean
+        default: true
+      ablation:
+        description: 'Run the ablation table'
+        type: boolean
+        default: false
+  schedule:
+    - cron: '0 2 * * *'          # 02:00 UTC nightly
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    name: Run evaluation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            tesseract-ocr tesseract-ocr-heb tesseract-ocr-eng libgl1 libglib2.0-0
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Sample forms and gold labels are never committed. Restore them only if
+      # they were provided as secrets; otherwise the run skips.
+      - name: Restore evaluation data (optional)
+        id: restore
+        env:
+          P1: ${{ secrets.SAMPLES_PART1_B64 }}
+          P2: ${{ secrets.SAMPLES_PART2_B64 }}
+          GOLD: ${{ secrets.GOLD_CSV_B64 }}
+        run: |
+          mkdir -p reference eval
+          present=true
+          if [ -n "$P1" ] && [ -n "$P2" ] && [ -n "$GOLD" ]; then
+            printf '%s' "$P1"   | base64 -d > reference/samples_part1.pdf
+            printf '%s' "$P2"   | base64 -d > reference/samples_part2.pdf
+            printf '%s' "$GOLD" | base64 -d > eval/gold.csv
+            echo "evaluation data restored"
+          else
+            present=false
+            echo "::notice::evaluation data not provided - the run will skip"
+          fi
+          echo "present=$present" >> "$GITHUB_OUTPUT"
+
+      - name: Guard - held-out split requires manual dispatch
+        if: ${{ github.event_name == 'schedule' && inputs.split == 'heldout' }}
+        run: |
+          echo "::error::the held-out split is for final reporting only, never on a schedule"
+          exit 1
+
+      - name: Evaluate
+        if: steps.restore.outputs.present == 'true'
+        env:
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS_CI }}
+          LOCAL_ONLY: ${{ inputs.local_only || 'true' }}
+        run: |
+          args="--gold eval/gold.csv --split ${{ inputs.split || 'dev' }} --emit-json"
+          if [ "${{ inputs.local_only || 'true' }}" = "true" ]; then args="$args --local-only"; fi
+          if [ "${{ inputs.ablation }}" = "true" ]; then args="$args --ablation all"; fi
+          echo "running: python -m eval.run_eval $args"
+          python -m eval.run_eval $args | tee eval/results/summary.txt
+
+      - name: Skip notice
+        if: steps.restore.outputs.present != 'true'
+        run: |
+          {
+            echo "### Evaluation skipped"
+            echo ""
+            echo "The sample PDFs and \`eval/gold.csv\` are git-ignored and were not provided"
+            echo "as secrets. This is the expected result for a public fork."
+            echo ""
+            echo "To run locally: see \`.kiro/skills/run-evaluation/SKILL.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Job summary
+        if: steps.restore.outputs.present == 'true'
+        run: |
+          {
+            echo "### Accuracy evaluation - split \`${{ inputs.split || 'dev' }}\`"
+            echo ""
+            echo '```'
+            cat eval/results/summary.txt
+            echo '```'
+            echo ""
+            echo "_Numbers are measured on the stated split. A target is never a result._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on the pull request
+        if: ${{ steps.restore.outputs.present == 'true' && github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = '### Accuracy evaluation (`' + ('${{ inputs.split }}' || 'dev') + '`)\n\n```\n'
+              + fs.readFileSync('eval/results/summary.txt', 'utf8') + '\n```';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
+
+      - name: Upload the report
+        if: steps.restore.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-${{ inputs.split || 'dev' }}-${{ github.run_number }}
+          path: |
+            eval/results/*.json
+            eval/results/summary.txt
+          retention-days: 14
+
+      # Sample forms must never persist in the runner image or an artifact.
+      - name: Scrub evaluation data
+        if: always()
+        run: rm -rf reference eval/gold.csv
