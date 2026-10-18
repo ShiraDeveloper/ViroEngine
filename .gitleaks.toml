@@ -1,0 +1,9 @@
+[extend]
+
+useDefault = true
+
+[allowlist]
+
+description = "Fake demo values in the plan"
+
+regexes = ['''GEMINI_API_KEYS=bad1,bad2''']
