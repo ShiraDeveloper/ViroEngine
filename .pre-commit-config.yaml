@@ -1,0 +1,141 @@
+# Safe Line pre-commit hooks.
+# Install once:  pre-commit install
+# Run on everything:  pre-commit run --all-files
+#
+# These are the same gates CI enforces, so a failure here is a failure that would
+# have blocked the merge anyway.
+
+default_language_version:
+  python: python3.12
+
+fail_fast: false
+
+repos:
+  # ---------------------------------------------------- secrets (runs first)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: gitleaks - block secrets
+
+  # --------------------------------------------------------- hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: check-added-large-files
+        # 512 KB: large enough for a test fixture, small enough to block a scanned page
+        args: [--maxkb=512]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+        exclude: ^(\.vscode/|.*\.jsonc$)
+      - id: check-toml
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: no-commit-to-branch
+        args: [--branch, main]
+
+  # --------------------------------------------------------- Python
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        name: ruff - lint
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+        name: ruff - format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        name: mypy - static types
+        files: ^(backend|tools|eval|scripts)/
+        additional_dependencies:
+          - pydantic>=2.9
+          - pydantic-settings>=2.6
+          - types-requests
+        args: [--ignore-missing-imports]
+
+  # ------------------------------------------------- project-specific guards
+  - repo: local
+    hooks:
+      # Nothing from reference/ may ever be staged. The repo is public and the
+      # folder holds medical sample forms.
+      - id: block-reference-folder
+        name: block reference/ from being committed
+        entry: >-
+          bash -c 'f=$(git diff --cached --name-only | grep -E "^reference/(?!README\.md$)" || true);
+          if [ -n "$f" ]; then echo "BLOCKED - reference/ must never be committed:"; echo "$f"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # gold.csv holds values transcribed from the sample forms.
+      - id: block-gold-csv
+        name: block eval/gold.csv from being committed
+        entry: >-
+          bash -c 'if git diff --cached --name-only | grep -q "^eval/gold\.csv$";
+          then echo "BLOCKED - eval/gold.csv contains transcribed form values"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # Model weights are regenerated from the skills, never committed.
+      - id: block-model-weights
+        name: block model weights from being committed
+        entry: >-
+          bash -c 'f=$(git diff --cached --name-only | grep -E "\.(onnx|pt|pth|safetensors)$" || true);
+          if [ -n "$f" ]; then echo "BLOCKED - weights are git-ignored; record provenance in models/README.md instead:"; echo "$f"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # The compile gate, mirrored from CI, so a syntax error never leaves the machine.
+      - id: compile-check
+        name: python compile check
+        entry: python -m compileall -q
+        language: system
+        types: [python]
+
+      # The domain core must not import frameworks, vendor SDKs or adapters.
+      - id: check-layering
+        name: architecture - core imports nothing external
+        entry: python scripts/check_layering.py
+        language: system
+        pass_filenames: false
+        files: ^backend/core/
+
+      # .env.example must stay a template.
+      - id: check-env-example
+        name: .env.example contains no real values
+        entry: python scripts/check_env_example.py
+        language: system
+        pass_filenames: false
+        files: ^\.env\.example$
+
+      # Hebrew copy belongs in one file, not scattered through components.
+      - id: no-hebrew-literals-in-components
+        name: Hebrew strings live in src/copy/he.ts
+        entry: >-
+          bash -c 'f=$(git diff --cached --name-only --diff-filter=ACM
+          | grep -E "^frontend/src/(components|pages)/.*\.tsx$" || true);
+          if [ -n "$f" ] && grep -lP "[\x{0590}-\x{05FF}]" $f 2>/dev/null; then
+          echo "BLOCKED - move Hebrew text to frontend/src/copy/he.ts"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      # TypeScript type errors must not be committed.
+      - id: tsc-noemit
+        name: typescript typecheck
+        entry: bash -c 'cd frontend && npx --no-install tsc --noEmit'
+        language: system
+        pass_filenames: false
+        files: ^frontend/.*\.(ts|tsx)$
