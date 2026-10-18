@@ -157,12 +157,12 @@ jobs:
         run: |
           set -e
           fail=0
-          for pattern in 'reference/' 'eval/gold.csv' '.env' 'models/.*\.onnx' '.*\.pt'; do
+          for pattern in 'reference/' 'eval/gold.csv' '(^|/)\.env' 'models/.*\.onnx' '.*\.pt'; do
             committed=$(git ls-files | grep -E "$pattern" || true)
             if [ "$pattern" = 'reference/' ]; then
               committed=$(printf '%s\n' "$committed" | grep -Ev '^reference/README\.md$' || true)
-            elif [ "$pattern" = '.env' ]; then
-              committed=$(printf '%s\n' "$committed" | grep -Ev '^\.env\.example$' || true)
+            elif [ "$pattern" = '(^|/)\.env' ]; then
+              committed=$(printf '%s\n' "$committed" | grep -Ev '(^|/)\.env\.example$' || true)
             fi
             if [ -n "$committed" ]; then
               echo "::error::'$pattern' must never be committed"
