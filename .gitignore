@@ -1,0 +1,134 @@
+# ============================================================================
+# Safe Line — .gitignore
+# The repository is PUBLIC and the project handles medical forms.
+# Nothing below may ever be committed. Enforced by pre-commit and by CI.
+# ============================================================================
+
+# --- Source material: medical sample forms --------------------------------
+# The four challenge PDFs live here. Personal details were altered by the
+# laboratory, but they still do not belong in a public repository.
+reference/*
+!reference/README.md
+
+# --- Ground truth: values transcribed from the sample forms ---------------
+eval/gold.csv
+eval/gold_draft.csv
+eval/results/
+# held_out.txt is COMMITTED on purpose: page labels only, no values.
+!eval/held_out.txt
+
+# --- Secrets ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+.secrets/
+
+# --- Model weights (regenerate via .kiro/skills/train-yolo) ----------------
+models/*
+!models/README.md
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.tflite
+
+# --- Runtime data: job directories, crops, page images, learning DB --------
+.tmp/
+tmp/
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+
+# --- Generated output ------------------------------------------------------
+*.xlsx
+*.xls
+!backend/tests/fixtures/*.xlsx
+out/
+output/
+exports/
+
+# --- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Virtual environments --------------------------------------------------
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# --- Testing and type caches -----------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+.tox/
+.nox/
+
+# --- Node / frontend -------------------------------------------------------
+node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/blob-report/
+.vercel/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Editors and OS --------------------------------------------------------
+.vscode/*
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs ------------------------------------------------------------------
+*.log
+logs/
+
+# --- Docker ----------------------------------------------------------------
+.dockerignore.local
+
+# --- Scratch ---------------------------------------------------------------
+scratch/
+_preview/
+notes.local.md
+TODO.local.md
