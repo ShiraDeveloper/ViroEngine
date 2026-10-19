@@ -14,11 +14,10 @@ from __future__ import annotations
 import asyncio
 import io
 
-import pytest
 from fastapi.testclient import TestClient
+import pytest
 
 from backend.app import create_app
-
 
 # ---------------------------------------------------------------------------
 # Shared fixture
@@ -57,7 +56,7 @@ def test_health_never_exposes_keys(client: TestClient) -> None:
 
     body_text = resp.text.lower()
     # Key material must not appear in any form
-    for forbidden in ("api_key", "gemini_api_keys", "openrouter_api_key", "groq_api_key"):
+    for _forbidden in ("api_key", "gemini_api_keys", "openrouter_api_key", "groq_api_key"):
         # The key NAME appearing in JSON keys is fine; its VALUE must not appear.
         # Checking that the settings attribute values are not present:
         # Since test runs with empty keys, we just verify the response has no literal

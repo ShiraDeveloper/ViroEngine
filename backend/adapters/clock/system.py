@@ -5,7 +5,7 @@ Returns the current wall-clock time as an aware datetime (UTC).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 class SystemClock:
@@ -16,4 +16,4 @@ class SystemClock:
 
     def now(self) -> datetime:
         """Return the current UTC datetime."""
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)
