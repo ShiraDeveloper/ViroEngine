@@ -1977,7 +1977,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 3 ✅ | Hexagonal backend skeleton, OpenAPI, Dockerfile | Ahuba | P0 | D1 | 3h | 2 |
 | 4 ✅ | Frontend skeleton and design system | Shira | P0 | D1 | 3h | 2 |
 | 5 ✅ | Page inventory and the barcode question | Ahuba | P1 | D2 | 3h | 3 |
-| 6 | Senders closed list | Shira | P1 | D2 | 2h | 2 |
+| 6 ✅ | Senders closed list | Shira | P1 | D2 | 2h | 2 |
 | 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
 | 8 | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
 | 9 | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
@@ -2439,6 +2439,16 @@ python -c "from backend.adapters.senders.loader import SenderIndex; i=SenderInde
 print(i.match('בית החולים אדית וולפסון').canonical, i.match('כלליח').canonical)"
 # -> וולפסון כללית
 ```
+
+> **✅ Completed — 2026-10-19 (D2)**
+> Verified locally: `ruff check` and `ruff format --check` clean · `mypy backend` and
+> `mypy --strict backend/core` clean · layering 0 violations · `bandit -ll` clean · 31 tests in
+> `test_senders.py` pass. 36 institutions in `config/senders.json`.
+> The build ran on the filtered network and fell back to the seed (`fetch_status: seed_fallback`);
+> the live Wikipedia path is covered by mocked tests only and has not run against the real page.
+> Open: KGI identity and the forensic institute's commitment number (ask organizers); unseen
+> hospitals use generic labels and no hints. `test_inventory_tool.py` was not run locally (no
+> `cv2` in the venv); CI runs it.
 
 ---
 
