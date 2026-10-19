@@ -11,8 +11,12 @@ class SafeLineError(Exception):
     recoverable: bool = False
     http_status: int = 500
 
-    def __init__(self, message: str = "") -> None:
-        super().__init__(message or self.code)
+    def __init__(self, detail: str = "") -> None:
+        super().__init__(detail or self.code)
+        self.detail = detail
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(code={self.code!r}, detail={self.detail!r})"
 
 
 class UnsupportedMedia(SafeLineError):
@@ -97,6 +101,20 @@ class JobPurged(SafeLineError):
     http_status = 404
 
 
+class JobNotFound(SafeLineError):
+    """Job id does not exist."""
+
+    code = "JOB_NOT_FOUND"
+    http_status = 404
+
+
+class EditConflict(SafeLineError):
+    """Attempt to edit a confirmed or purged job."""
+
+    code = "EDIT_CONFLICT"
+    http_status = 409
+
+
 ALL_ERRORS: tuple[type[SafeLineError], ...] = (
     UnsupportedMedia,
     TooLarge,
@@ -109,4 +127,6 @@ ALL_ERRORS: tuple[type[SafeLineError], ...] = (
     ProviderBadResponse,
     ProviderExhausted,
     JobPurged,
+    JobNotFound,
+    EditConflict,
 )

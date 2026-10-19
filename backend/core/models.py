@@ -15,7 +15,7 @@ Box = tuple[float, float, float, float]
 class Strict(BaseModel):
     """Boundary model base: unknown keys are rejected and instances are immutable."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, protected_namespaces=())
 
 
 class FieldKey(StrEnum):
@@ -310,3 +310,63 @@ class SenderSpec(Strict):
     pattern_hints: list[str] = Field(default_factory=list)  # hints only
     barcode_is_commitment: bool | None = None  # None = unknown
     notes: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Port-facing stubs from Task 3 (Ahuba). Kept verbatim from main so the ports and
+# fakes keep working. T18 (providers) and T24 (learning) own their final shapes.
+# ---------------------------------------------------------------------------
+
+
+class VisionRequest(Strict):
+    """Crop + context sent to a cloud vision provider. Clinical regions never appear here."""
+
+    job_id: str
+    page_id: str
+    field: FieldKey
+    crop: ImageRef
+    context_text: str | None = None
+    sender: str | None = None
+    prompt_version: str
+
+
+class VisionResponse(Strict):
+    """Schema-validated provider response. The model never assigns its own confidence."""
+
+    raw_text: str
+    candidates: list[str]
+    provider: ReaderName
+    model_id: str
+    prompt_version: str
+    duration_ms: int
+
+
+class ProviderHealth(Strict):
+    name: str
+    credentials: int  # count, never the key values
+    state: Literal["ok", "open", "half_open", "exhausted"]
+
+
+class LayoutObservation(Strict):
+    """Locations and abstracted shapes only; values are rejected by _assert_pii_free."""
+
+    sender: str
+    field: FieldKey
+    region_kind: RegionKind | None
+    box: Box
+    source: SourceKind
+
+
+class LayoutHint(Strict):
+    """Approximate region location returned by the learning store."""
+
+    region_kind: RegionKind
+    box: Box
+    confidence: float
+
+
+class PatternHint(Strict):
+    """Regex hint returned by the learning store - never a hard gate (§2.1)."""
+
+    pattern: str
+    confidence: float

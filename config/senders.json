@@ -1,0 +1,7 @@
+[
+  {
+    "_comment": "Stub — populated by Task 6 (Shira: build_senders.py from the public hospital list)",
+    "_note": "Each entry is a SenderSpec. See backend/core/models.py for the schema.",
+    "_see": "docs/PLAN.md §2.6 for the seed grammar per sender"
+  }
+]

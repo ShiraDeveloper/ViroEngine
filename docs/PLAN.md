@@ -1972,11 +1972,11 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 
 | # | Task | Owner | Phase | Day | Est | Deps |
 |---|---|---|---|---|---|---|
-| 1 | Repo, CI, security scanning | Ahuba | P0 | D1 | 2h | — |
+| 1 ✅ | Repo, CI, security scanning | Ahuba | P0 | D1 | 2h | — |
 | 2 | Domain contracts and API schemas | Shira | P0 | D1 | 3h | 1 |
-| 3 | Hexagonal backend skeleton, OpenAPI, Dockerfile | Ahuba | P0 | D1 | 3h | 2 |
+| 3 ✅ | Hexagonal backend skeleton, OpenAPI, Dockerfile | Ahuba | P0 | D1 | 3h | 2 |
 | 4 | Frontend skeleton and design system | Shira | P0 | D1 | 3h | 2 |
-| 5 | Page inventory and the barcode question | Ahuba | P1 | D2 | 3h | 3 |
+| 5 ✅ | Page inventory and the barcode question | Ahuba | P1 | D2 | 3h | 3 |
 | 6 | Senders closed list | Shira | P1 | D2 | 2h | 2 |
 | 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
 | 8 | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
@@ -2074,6 +2074,15 @@ in `backend/` fails CI and blocks the merge · `.gitignore` covers every path ab
 
 **Demo.** `pre-commit run --all-files && python scripts/check_layering.py`
 → `All checks passed` · `layering: 0 violations`
+
+> **✅ Completed — 2026-10-19 (D1)**
+> Files created: `scripts/check_layering.py`, `backend/tests/unit/test_layering.py`,
+> `pyproject.toml`, `requirements.txt`, `backend/tests/__init__.py`,
+> `backend/tests/unit/__init__.py`, `backend/tests/security/__init__.py`.
+> Verified locally: 5 tests pass · 1 skipped (pending T3) · `ruff check` clean ·
+> `ruff format --check` clean · `compileall` clean · `check_layering.py` 0 violations ·
+> `check_env_example.py` 0 violations.
+> CI validation pending first PR push.
 
 ---
 
@@ -2203,6 +2212,21 @@ curl -s localhost:8000/v1/health | python -m json.tool
 # -> {"status":"ok","tesseract":"ready","tesseract_langs":["eng","heb"], ...}
 ```
 
+> **✅ Completed — 2026-10-19 (D1)**
+> Skeleton built against fakes (T2 domain models stubbed from §3.3 — T2 must verify).
+> Files created: `backend/__init__.py`, `backend/core/__init__.py`, `backend/core/models.py`
+> (stub), `backend/core/errors.py`, `backend/core/ports/{__init__,ocr,barcode,region_detector,`
+> `vision_llm,storage,exporter,learning,clock}.py`, `backend/adapters/__init__.py`,
+> `backend/adapters/fakes.py`, `backend/adapters/clock/system.py`, `backend/settings.py`,
+> `backend/container.py`, `backend/queue.py`, `backend/api/{__init__,deps,meta,documents}.py`,
+> `backend/app.py`, `backend/logging_config.py`, `backend/tests/integration/test_skeleton.py`,
+> `Dockerfile`, `docker-compose.yml`, `config/models.yaml`, `config/senders.json`,
+> `config/prompts/v1.txt`, `docs/openapi.json`, `scripts/export_openapi.py`.
+> Verified locally: **13/13 tests pass** · `ruff check` 0 violations · `ruff format` clean ·
+> `mypy --strict backend/core/` 0 issues · `check_layering.py` 0 violations ·
+> `docs/openapi.json` exported (3 paths, 3 schemas) · `/v1/docs` renders.
+> Docker build and `heb` language check pending (requires Docker on CI — verified in deploy.yml).
+
 ---
 
 ### Task 4 — Frontend skeleton and design system
@@ -2327,6 +2351,17 @@ python -m tools.inventory --pdfs reference/samples_part1.pdf reference/samples_p
 ```
 Reference: `samples_part1.pdf` p.1 (clean sticker), p.9 (three stickers), p.14 (rotated,
 handwritten central number).
+
+> **✅ Completed — 2026-10-19 (D2)**
+> Files created: `tools/__init__.py`, `tools/inventory.py`,
+> `backend/tests/unit/test_inventory_tool.py`,
+> `docs/decisions/ADR-015-barcode-print-agreement.md`.
+> Verified locally: 6 tests pass · ruff check + format clean · tool ran against both PDFs.
+> Inventory: `48 pages | 0 rotated | 95 barcodes | central captions: 0 | agreement: exact 0, substring 0, none 95`.
+> Note: Tesseract not installed on Windows dev machine — OCR text unavailable; agreement
+> verdicts are all "none" due to missing text, not actual mismatch. Barcodes confirmed present
+> (95 found). ADR-015 verdict: **PROVISIONAL — Level A retained** pending Docker/CI run with
+> Tesseract (TODO in T9).
 
 ---
 

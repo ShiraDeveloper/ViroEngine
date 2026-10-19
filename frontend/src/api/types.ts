@@ -115,6 +115,22 @@ export interface JobView {
   report: RunReport | null;
 }
 
+/** Approximate region location returned by the learning store. */
+export interface LayoutHint {
+  region_kind: RegionKind;
+  box: Box;
+  confidence: number;
+}
+
+/** Locations and abstracted shapes only; values are rejected by _assert_pii_free. */
+export interface LayoutObservation {
+  sender: string;
+  field: FieldKey;
+  region_kind: RegionKind | null;
+  box: Box;
+  source: SourceKind;
+}
+
 export interface NormalizedPage {
   raw: PageRaw;
   measurement: PageMeasurement;
@@ -167,6 +183,18 @@ export interface PageRaw {
   image: ImageRef;
   known_sample?: boolean;
   derived_from?: string | null;
+}
+
+/** Regex hint returned by the learning store - never a hard gate (§2.1). */
+export interface PatternHint {
+  pattern: string;
+  confidence: number;
+}
+
+export interface ProviderHealth {
+  name: string;
+  credentials: number;
+  state: "ok" | "open" | "half_open" | "exhausted";
 }
 
 /** Provider readiness by count and state, never by key. */
@@ -319,6 +347,27 @@ export interface ValidationOutcome {
   passed: boolean;
   detail?: string | null;
   repaired_from?: string | null;
+}
+
+/** Crop + context sent to a cloud vision provider. Clinical regions never appear here. */
+export interface VisionRequest {
+  job_id: string;
+  page_id: string;
+  field: FieldKey;
+  crop: ImageRef;
+  context_text?: string | null;
+  sender?: string | null;
+  prompt_version: string;
+}
+
+/** Schema-validated provider response. The model never assigns its own confidence. */
+export interface VisionResponse {
+  raw_text: string;
+  candidates: string[];
+  provider: ReaderName;
+  model_id: string;
+  prompt_version: string;
+  duration_ms: number;
 }
 
 export type SseEvent = SsePageEvent | SseCountersEvent | SseRowEvent | SseDoneEvent | SseErrorEvent;

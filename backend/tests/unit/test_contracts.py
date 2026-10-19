@@ -207,6 +207,7 @@ def test_error_codes_are_stable_and_unique() -> None:
         "UNSUPPORTED_MEDIA", "TOO_LARGE", "ENCRYPTED_PDF", "ACTIVE_CONTENT_PDF",
         "RENDER_FAILED", "OCR_UNAVAILABLE", "PROVIDER_RATE_LIMITED",
         "PROVIDER_INVALID_KEY", "PROVIDER_BAD_RESPONSE", "PROVIDER_EXHAUSTED", "JOB_PURGED",
+        "JOB_NOT_FOUND", "EDIT_CONFLICT",
     ])
     assert len(set(codes)) == len(codes)
 
