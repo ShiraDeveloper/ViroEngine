@@ -13,7 +13,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import hashlib
+import struct
 from typing import Literal
+import zlib
 
 from backend.core.models import (
     BarcodeHit,
@@ -31,6 +33,8 @@ from backend.core.models import (
     VisionRequest,
     VisionResponse,
 )
+from backend.core.ports.document import EncodedImage
+from backend.core.ports.imaging import PixelMeasurements
 
 # Pinned instant used by FixedClock — one hour after hackathon day 1 opens
 _FIXED_INSTANT = datetime(2026, 10, 18, 9, 0, 0, tzinfo=timezone(timedelta(hours=3)))
@@ -60,6 +64,10 @@ class FakeOcr:
     ) -> OcrResult:
         """Always returns an empty OcrResult. Never raises."""
         return OcrResult(reader=ReaderName.tesseract, words=[], text="", candidates=[])
+
+    def detect_orientation(self, image: ImageRef) -> int | None:
+        """Always abstains: a fake cannot tell which way a page faces."""
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +104,79 @@ class FakeRegionDetector:
     def detect(self, page: NormalizedPage, ocr: OcrResult) -> list[Region]:
         """Always returns an empty list. Never raises."""
         return []
+
+
+# ---------------------------------------------------------------------------
+# DocumentPort and ImagingPort fakes
+# ---------------------------------------------------------------------------
+
+
+def _blank_png(width: int, height: int) -> bytes:
+    """A valid all-white greyscale PNG, built with the standard library only."""
+
+    def chunk(tag: bytes, payload: bytes) -> bytes:
+        body = tag + payload
+        return struct.pack(">I", len(payload)) + body + struct.pack(">I", zlib.crc32(body))
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    rows = (b"\x00" + b"\xff" * width) * height
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )
+
+
+_FAKE_PAGE = EncodedImage(data=_blank_png(8, 8), width=8, height=8)
+
+
+@dataclass
+class FakeDocumentReader:
+    """Every PDF has one page; every page and image is the same blank 8x8 raster."""
+
+    name: str = "fake_documents"
+
+    def inspect_pdf(self, data: bytes) -> int:
+        """Always one page. Never raises."""
+        return 1
+
+    def render_pdf_page(self, data: bytes, index: int, *, dpi: int) -> EncodedImage:
+        """Always the blank raster. Never raises."""
+        return _FAKE_PAGE
+
+    def decode_image(self, data: bytes) -> EncodedImage:
+        """Always the blank raster. Never raises."""
+        return _FAKE_PAGE
+
+
+@dataclass
+class FakeImaging:
+    """Measures a flawless page and leaves every image unchanged."""
+
+    name: str = "fake_imaging"
+
+    def measure_pixels(self, image: bytes) -> PixelMeasurements:
+        """A sharp, straight, evenly lit page: nothing needs correcting."""
+        return PixelMeasurements(
+            skew_deg=0.0,
+            blur_score=1000.0,
+            illumination_cv=0.0,
+            noise_score=0.0,
+            perspective_deviation=0.0,
+        )
+
+    def apply_operation(self, image: bytes, op: str, *, angle_deg: float = 0.0) -> EncodedImage:
+        """Returns the input unchanged, sized from the fake raster."""
+        return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
+
+    def binarize(self, image: bytes) -> EncodedImage:
+        """Returns the input unchanged."""
+        return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
+
+    def thumbnail(self, image: bytes, *, max_side: int) -> EncodedImage:
+        """Returns the input unchanged."""
+        return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
 
 
 # ---------------------------------------------------------------------------

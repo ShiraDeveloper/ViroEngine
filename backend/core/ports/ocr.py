@@ -41,3 +41,11 @@ class OcrPort(Protocol):
         Never raises; returns empty OcrResult.
         """
         ...
+
+    def detect_orientation(self, image: ImageRef) -> int | None:
+        """Orientation-and-script detection (Tesseract `--psm 0`) for S1 voting.
+
+        Returns the clockwise rotation in degrees (0, 90, 180 or 270) that makes the text
+        upright, or None when the page is too sparse to tell. Never raises.
+        """
+        ...

@@ -10,7 +10,9 @@ from dataclasses import dataclass
 
 from backend.core.ports.barcode import BarcodePort
 from backend.core.ports.clock import ClockPort
+from backend.core.ports.document import DocumentPort
 from backend.core.ports.exporter import ExporterPort
+from backend.core.ports.imaging import ImagingPort
 from backend.core.ports.learning import LearningStorePort
 from backend.core.ports.ocr import OcrPort
 from backend.core.ports.region_detector import RegionDetectorPort
@@ -30,6 +32,8 @@ class Container:
     regions: RegionDetectorPort
     vision: VisionLLMPort | None  # None when LOCAL_ONLY=true
     storage: StoragePort
+    documents: DocumentPort
+    imaging: ImagingPort
     learning: LearningStorePort
     clock: ClockPort
     exporters: dict[str, ExporterPort]
@@ -46,7 +50,9 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     if use_fakes:
         from backend.adapters.fakes import (
             FakeBarcode,
+            FakeDocumentReader,
             FakeExporter,
+            FakeImaging,
             FakeLearningStore,
             FakeOcr,
             FakeRegionDetector,
@@ -63,6 +69,8 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
             regions=FakeRegionDetector(),
             vision=None if settings.local_only else FakeVision(),
             storage=FakeStorage(data_dir=settings.data_dir),
+            documents=FakeDocumentReader(),
+            imaging=FakeImaging(),
             learning=FakeLearningStore(),
             clock=FixedClock(),
             exporters={
@@ -82,8 +90,10 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     from backend.adapters.export.csv_exp import CsvExporter  # T19
     from backend.adapters.export.json_exp import JsonExporter  # T19
     from backend.adapters.export.xlsx import XlsxExporter  # T19
+    from backend.adapters.imaging.cv import CvImaging  # T9
+    from backend.adapters.imaging.pdf import DocumentReader  # T9
     from backend.adapters.learning.sqlite_store import SqliteLearningStore  # T24
-    from backend.adapters.ocr.tesseract import TesseractAdapter  # T9
+    from backend.adapters.ocr.tesseract import TesseractAdapter  # T11
     from backend.adapters.ocr.trocr_digits import TrOcrDigitsAdapter  # T13
     from backend.adapters.regions.rule_based import RuleBasedDetector  # T11
     from backend.adapters.storage.tempdir import TmpdirStorage  # T9
@@ -102,6 +112,8 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
         regions=RuleBasedDetector(),
         vision=vision,
         storage=TmpdirStorage(settings=settings),
+        documents=DocumentReader(settings=settings),
+        imaging=CvImaging(settings=settings),
         learning=SqliteLearningStore(settings=settings),
         clock=SystemClock(),
         exporters={
