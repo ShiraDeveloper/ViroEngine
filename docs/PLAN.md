@@ -1955,7 +1955,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 
 | # | Task | Owner | Phase | Day | Est | Deps |
 |---|---|---|---|---|---|---|
-| 1 | Repo, CI, security scanning | Ahuba | P0 | D1 | 2h | — |
+| 1 ✅ | Repo, CI, security scanning | Ahuba | P0 | D1 | 2h | — |
 | 2 | Domain contracts and API schemas | Shira | P0 | D1 | 3h | 1 |
 | 3 | Hexagonal backend skeleton, OpenAPI, Dockerfile | Ahuba | P0 | D1 | 3h | 2 |
 | 4 | Frontend skeleton and design system | Shira | P0 | D1 | 3h | 2 |
@@ -2057,6 +2057,15 @@ in `backend/` fails CI and blocks the merge · `.gitignore` covers every path ab
 
 **Demo.** `pre-commit run --all-files && python scripts/check_layering.py`
 → `All checks passed` · `layering: 0 violations`
+
+> **✅ Completed — 2026-10-19 (D1)**
+> Files created: `scripts/check_layering.py`, `backend/tests/unit/test_layering.py`,
+> `pyproject.toml`, `requirements.txt`, `backend/tests/__init__.py`,
+> `backend/tests/unit/__init__.py`, `backend/tests/security/__init__.py`.
+> Verified locally: 5 tests pass · 1 skipped (pending T3) · `ruff check` clean ·
+> `ruff format --check` clean · `compileall` clean · `check_layering.py` 0 violations ·
+> `check_env_example.py` 0 violations.
+> CI validation pending first PR push.
 
 ---
 
