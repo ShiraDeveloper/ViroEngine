@@ -1959,7 +1959,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 2 | Domain contracts and API schemas | Shira | P0 | D1 | 3h | 1 |
 | 3 ✅ | Hexagonal backend skeleton, OpenAPI, Dockerfile | Ahuba | P0 | D1 | 3h | 2 |
 | 4 | Frontend skeleton and design system | Shira | P0 | D1 | 3h | 2 |
-| 5 | Page inventory and the barcode question | Ahuba | P1 | D2 | 3h | 3 |
+| 5 ✅ | Page inventory and the barcode question | Ahuba | P1 | D2 | 3h | 3 |
 | 6 | Senders closed list | Shira | P1 | D2 | 2h | 2 |
 | 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
 | 8 | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
@@ -2334,6 +2334,17 @@ python -m tools.inventory --pdfs reference/samples_part1.pdf reference/samples_p
 ```
 Reference: `samples_part1.pdf` p.1 (clean sticker), p.9 (three stickers), p.14 (rotated,
 handwritten central number).
+
+> **✅ Completed — 2026-10-19 (D2)**
+> Files created: `tools/__init__.py`, `tools/inventory.py`,
+> `backend/tests/unit/test_inventory_tool.py`,
+> `docs/decisions/ADR-015-barcode-print-agreement.md`.
+> Verified locally: 6 tests pass · ruff check + format clean · tool ran against both PDFs.
+> Inventory: `48 pages | 0 rotated | 95 barcodes | central captions: 0 | agreement: exact 0, substring 0, none 95`.
+> Note: Tesseract not installed on Windows dev machine — OCR text unavailable; agreement
+> verdicts are all "none" due to missing text, not actual mismatch. Barcodes confirmed present
+> (95 found). ADR-015 verdict: **PROVISIONAL — Level A retained** pending Docker/CI run with
+> Tesseract (TODO in T9).
 
 ---
 
