@@ -1957,7 +1957,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 |---|---|---|---|---|---|---|
 | 1 ✅ | Repo, CI, security scanning | Ahuba | P0 | D1 | 2h | — |
 | 2 | Domain contracts and API schemas | Shira | P0 | D1 | 3h | 1 |
-| 3 | Hexagonal backend skeleton, OpenAPI, Dockerfile | Ahuba | P0 | D1 | 3h | 2 |
+| 3 ✅ | Hexagonal backend skeleton, OpenAPI, Dockerfile | Ahuba | P0 | D1 | 3h | 2 |
 | 4 | Frontend skeleton and design system | Shira | P0 | D1 | 3h | 2 |
 | 5 | Page inventory and the barcode question | Ahuba | P1 | D2 | 3h | 3 |
 | 6 | Senders closed list | Shira | P1 | D2 | 2h | 2 |
@@ -2194,6 +2194,21 @@ docker build -t safeline . && docker run --rm -p 8000:8000 --env-file .env safel
 curl -s localhost:8000/v1/health | python -m json.tool
 # -> {"status":"ok","tesseract":"ready","tesseract_langs":["eng","heb"], ...}
 ```
+
+> **✅ Completed — 2026-10-19 (D1)**
+> Skeleton built against fakes (T2 domain models stubbed from §3.3 — T2 must verify).
+> Files created: `backend/__init__.py`, `backend/core/__init__.py`, `backend/core/models.py`
+> (stub), `backend/core/errors.py`, `backend/core/ports/{__init__,ocr,barcode,region_detector,`
+> `vision_llm,storage,exporter,learning,clock}.py`, `backend/adapters/__init__.py`,
+> `backend/adapters/fakes.py`, `backend/adapters/clock/system.py`, `backend/settings.py`,
+> `backend/container.py`, `backend/queue.py`, `backend/api/{__init__,deps,meta,documents}.py`,
+> `backend/app.py`, `backend/logging_config.py`, `backend/tests/integration/test_skeleton.py`,
+> `Dockerfile`, `docker-compose.yml`, `config/models.yaml`, `config/senders.json`,
+> `config/prompts/v1.txt`, `docs/openapi.json`, `scripts/export_openapi.py`.
+> Verified locally: **13/13 tests pass** · `ruff check` 0 violations · `ruff format` clean ·
+> `mypy --strict backend/core/` 0 issues · `check_layering.py` 0 violations ·
+> `docs/openapi.json` exported (3 paths, 3 schemas) · `/v1/docs` renders.
+> Docker build and `heb` language check pending (requires Docker on CI — verified in deploy.yml).
 
 ---
 
