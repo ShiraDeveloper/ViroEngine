@@ -1,0 +1,52 @@
+# Safe Line — local development and demo stack
+#
+# Usage:
+#   docker-compose up --build          # build and start
+#   docker-compose up -d               # detached
+#   docker-compose down                # stop and remove containers
+#
+# Requires .env file (copy from .env.example and fill in keys).
+# The data volume is intentionally NOT persisted between runs —
+# nothing should survive a restart (privacy by design).
+
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: safeline:dev
+    container_name: safeline-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Override DATA_DIR so docker-compose uses a named volume
+      DATA_DIR: /tmp/safeline
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    tmpfs:
+      # Ephemeral storage — purged on container stop (privacy rule §7)
+      - /tmp/safeline:uid=10001,gid=10001
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # Frontend is served separately via Vercel (see docs/PLAN.md §11).
+  # For local dev, run: cd frontend && VITE_USE_MOCK=0 npm run dev
+  # For a self-contained demo run: VITE_USE_MOCK=1 npm run dev
+
+networks:
+  default:
+    name: safeline-net
