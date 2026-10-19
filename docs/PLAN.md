@@ -1139,17 +1139,21 @@ institution has none) · central-number length (unsupported by the data) · **ID
 
 ### 5.4 Confusable-digit repair
 
-Pairs `1↔7 4↔9 0↔6 5↔6 3↔8 2↔7`, max **2** swaps.
+Pairs `1↔7 4↔9 0↔6 5↔6 3↔8 2↔7`, max **1** swap.
 
 1. Already passes the hard rule → stop, no repair.
-2. Generate variants with 1 or 2 swaps; keep those passing the hard rule.
+2. Generate variants with exactly 1 swap; keep those passing the hard rule.
 3. **Exactly one survivor** → accept, record `repaired_from`, **cap the level at C** so a human
    still sees a repair happened.
 4. More than one → level D, `ambiguous_repair`. None → level D, `failed_id_check`.
 
-Max 2 because beyond that too many 9-digit variants satisfy the check digit for uniqueness to mean
-anything. Worked example (unit test): `011223394` → `011223344` uniquely, accepted at C;
-`011228844` yields more than one valid variant, rejected.
+Max 1 because simulation on random valid IDs with injected read errors showed that 2-swap repair
+produces more wrong corrections than correct ones (1.8% wrong vs 0.5% correct), and a
+non-confusable error produces a silently-wrong valid ID in 6.4% of cases — both outcomes are
+level C, which the programme counts as a silent error. Single-swap repair at 2.8% correct is
+also weak, but the result is still shown as orange and never auto-accepted without a second reader.
+Worked example (unit test): `011223394` → `011223344` uniquely, accepted at C;
+`011228844` with a single swap yields no unique valid variant, rejected.
 
 ### 5.5 Calibration (T14)
 
@@ -2458,7 +2462,7 @@ def israeli_id_ok(raw: str) -> bool: ...
 def pad_id(raw: str) -> str | None: ...
 def parse_il_date(raw: str, *, pivot_year: int = 2000) -> date | None: ...
 def date_not_future(d: date, *, now: date) -> bool: ...
-def repair_confusable(read: str, ok: Callable[[str], bool], *, max_swaps: int = 2
+def repair_confusable(read: str, ok: Callable[[str], bool], *, max_swaps: int = 1
                       ) -> tuple[str | None, str]: ...
 def pattern_fit(value: str, hints: Sequence[str]) -> float: ...   # SOFT, never rejects
 def shape_of(value: str) -> str: ...                              # 'X132767' -> 'A######'
@@ -2471,7 +2475,7 @@ def shape_of(value: str) -> str: ...                              # 'X132767' ->
    `(\d{1,2})[-./](\d{1,2})[-./](\d{4}|\d{2})`; two-digit year → `2000+yy`; DD/MM order.
 3. Future dates fail hard — the lab cannot have received a sample it has not received.
 4. **No central-number plausibility rule.** §5.3; it must not reappear.
-5. Repair per §5.4: pairs, max 2 swaps, unique survivor only; caller caps at level C.
+5. Repair per §5.4: pairs, max **1** swap, unique survivor only; caller caps at level C.
 6. `pattern_fit` returns a score, never a verdict; **0.5 with no hints** so an unknown institution
    is not penalised.
 7. Normalization: IDs padded to 9 · names trimmed with final letters normalized · commitment
@@ -4542,15 +4546,16 @@ CONFUSABLE: dict[str, tuple[str, ...]] = {
     "0": ("6",), "6": ("0", "5"), "5": ("6",), "3": ("8",), "8": ("3",), "2": ("7",),
 }
 
-def repair_confusable(read: str, ok: Callable[[str], bool], *, max_swaps: int = 2
+def repair_confusable(read: str, ok: Callable[[str], bool], *, max_swaps: int = 1
                       ) -> tuple[str | None, str]:
     """Returns (value, status) with status in
-    {'as_read','repaired_1','repaired_2','ambiguous','unrepairable'}.
+    {'as_read','repaired_1','ambiguous','unrepairable'}.
 
     Accepts ONLY when exactly one variant validates; more than one means we
-    cannot know which is correct, so we refuse and let a human decide. Beyond
-    two swaps too many 9-digit variants satisfy the check digit for uniqueness
-    to mean anything.
+    cannot know which is correct, so we refuse and let a human decide. Limited
+    to a single swap: simulation on random valid IDs showed that 2-swap repair
+    produces more wrong corrections than correct ones (level C counts as a
+    silent error).
 
     >>> repair_confusable("011223394", israeli_id_ok)
     ('011223344', 'repaired_1')
