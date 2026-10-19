@@ -1979,7 +1979,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 5 ✅ | Page inventory and the barcode question | Ahuba | P1 | D2 | 3h | 3 |
 | 6 ✅ | Senders closed list | Shira | P1 | D2 | 2h | 2 |
 | 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
-| 8 | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
+| 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
 | 9 | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
 | 10 | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
 | 11 | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
