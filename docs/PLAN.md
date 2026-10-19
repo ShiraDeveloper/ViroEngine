@@ -8,13 +8,14 @@ unresolved crops go to a free cloud model. An empty flagged field beats a guess.
 | | |
 |---|---|
 | Challenge | מטפסי התחייבות לאקסל — Central Virology Laboratory, MoH |
-| Team | Ahuba, Shira — 51 h each (45 h tasks + 4 h reviews + 2 h buffer) |
+| Team | Ahuba, Shira — 51 h capacity each (8 days × 6 h + Fri 3 h). Committed task hours: Ahuba 44.5 h, Shira 47 h; ~4 h reviews each on top (§13 Totals) |
 | Days | 8.5 working days: D1 = Sun 18.10 … D9 = Tue 27.10. No work Shabbat 24.10. Final night 28.10 |
-| Plan version | 2.2 · 2026-10-19 |
+| Plan version | 2.3 · 2026-10-19 |
 | Cost target | $0 — free tiers only |
 
 **In five lines.** The system takes one form or a pile, reads every page on the local machine
-first, and sends only the crops it could not resolve to a free cloud vision model. Order of
+first, and sends only the crops it could not resolve to a free cloud vision model (a redacted full
+page is a second tier, allowed only for the provided sample forms — §6.4). Order of
 authority: **deterministic code → local OCR → cloud → human**, and a field that cannot be verified
 is left empty and flagged with a reason rather than guessed. The product is an API; the Excel file
 is one export adapter for the demo. **Start at Tasks 1–4, all four on Day 1, both developers
@@ -140,7 +141,7 @@ demo access code and API key.
 | FR-4 | Full local read (Hebrew + English) + barcode sweep, any type/length |
 | FR-5 | Sender from a closed list; never return the destination |
 | FR-6 | 7 fields, each with value, source, box, candidates, score, reason |
-| FR-7 | Escalate only low-score fields; send crops only |
+| FR-7 | Escalate only low-score fields. Tier 1 sends crops only; tier 2 (redacted full page) only for known sample pages (§6.4) |
 | FR-8 | Never crash a run: rotate credentials → fall through providers → flag |
 | FR-9 | Group pages into forms; expose orphans |
 | FR-10 | One row per commitment; keep all central numbers; unknown fields empty |
@@ -159,8 +160,9 @@ demo access code and API key.
 | Flag rate | level-D ÷ all fields | ≤ 15% |
 | Local close rate | closed in S0–S7 ÷ all fields | measured, displayed |
 | Throughput | 30 forms end to end | < 4 min |
-| Page latency | p50, Render free tier | < 8 s |
-| Memory | backend RSS | < 450 MB |
+| Page latency | p50 on the **primary host** (Railway trial; **assumed ≥ 1 shared vCPU — VERIFY**, measured on the D3 skeleton and recorded in ADR-014) | < 8 s |
+| Page latency, backup | p50 on Render Free (0.1 CPU) | **measured, no target** — expected far above 8 s; the runbook sets expectations (§11) |
+| Memory | backend peak RSS, 30-page batch | < 450 MB — kept so the 512 MB Render backup still fits |
 
 All of the above are **targets**, not results. §10.8 forbids publishing a target as an
 achievement.
@@ -352,7 +354,7 @@ flowchart TB
         LAB["Future: Lab SAP / LIMS"]
         CLI["tools/ · eval/"]
     end
-    subgraph AP["API · FastAPI /v1 · Render"]
+    subgraph AP["API · FastAPI /v1 · Railway (backup: Render)"]
         AUTH["Auth: access code + X-API-Key"] --> RL["Rate limit · slowapi"]
         RL --> RT["Routers"] --> QUEUE["Job queue · bounded concurrency"]
     end
@@ -364,7 +366,7 @@ flowchart TB
         P["OcrPort · BarcodePort · RegionDetectorPort · VisionLLMPort<br/>StoragePort · ExporterPort · LearningStorePort · ClockPort"]
     end
     subgraph AD["Adapters"]
-        A["Tesseract · TrOCR-ONNX · zxing-cpp · rule detector · YOLOv8n-ONNX<br/>Gemini → OpenRouter → Groq · tempdir+TTL · xlsx/csv/json · SQLite · clock"]
+        A["Tesseract · zxing-cpp · rule detector · stretch: TrOCR-ONNX, YOLOv8n-ONNX<br/>Gemini → OpenRouter → Groq · tempdir+TTL · xlsx/csv/json · SQLite + seed · clock"]
     end
     UI --> AUTH
     LAB -.-> AUTH
@@ -431,13 +433,13 @@ class ClockPort(Protocol):
 
 | Port | Adapters |
 |---|---|
-| `OcrPort` | `tesseract.py` (heb+eng, primary) · `trocr_digits.py` (handwritten digits, ONNX) · `surya.py` (bake-off only) |
+| `OcrPort` | `tesseract.py` (heb+eng, primary) · **stretch, only after M3:** `trocr_digits.py` (handwritten digits, ONNX) · `surya.py` (bake-off only) |
 | `BarcodePort` | `zxing.py` |
-| `RegionDetectorPort` | `rule_based.py` · `yolo_onnx.py` (experimental) |
+| `RegionDetectorPort` | `rule_based.py` · **stretch, only after M3:** `yolo_onnx.py` |
 | `VisionLLMPort` | `gemini.py` (credential rotation) · `openrouter.py` · `groq.py` · `chain.py` (composes + breaker) |
 | `StoragePort` | `tempdir.py` (per-job dir, TTL purge) |
 | `ExporterPort` | `xlsx.py` · `csv.py` · `json.py` |
-| `LearningStorePort` | `sqlite_store.py` |
+| `LearningStorePort` | `sqlite_store.py` (loads `config/learning_seed.json` at boot, §7.4) |
 | `ClockPort` | `system.py` |
 
 ### 3.3 Domain models
@@ -478,6 +480,9 @@ class ImageRef(Strict):
 class PageRaw(Strict):
     page_id: str; label: str | None = None
     source_file: str; page_index: int; sha256: str; image: ImageRef
+    known_sample: bool = False      # sha256 in config/sample_hashes.json (§8.5); gates tier 2
+    derived_from: str | None = None # sha256 of the origin page for Stress Mode / augmented
+                                    # variants; such a page inherits known_sample from its origin
 
 class PageMeasurement(Strict):
     """Output of S1. Measurement only."""
@@ -529,6 +534,8 @@ class ReadingTrailStep(Strict):
     outcome: Literal["value","no_value","rejected","skipped"]
     value: str | None; reader_confidence: float | None
     duration_ms: int; cloud: bool   # True when data left the machine
+    tier: Literal[1, 2] | None = None   # escalation tier; None for local steps
+    page_sent: bool = False             # True only for a tier-2 (redacted full page) call
 
 class ValidationOutcome(Strict):
     name: str; kind: Literal["hard","soft"]; passed: bool
@@ -582,6 +589,7 @@ class RunReport(Strict):
     page_count: int; row_count: int
     fields_total: int; fields_closed_local: int
     fields_escalated: int; fields_flagged: int
+    tier1_calls: int; tier2_calls: int     # provider requests per tier (§6.4, §6.6)
     local_close_rate: float
     level_histogram: dict[str,int]
     stage_durations_ms: dict[str,int]
@@ -620,6 +628,7 @@ class SenderSpec(Strict):
 | POST | `/v1/jobs/{id}/stress` | Re-run with degraded inputs as a new job |
 | GET | `/v1/senders` | Closed list for the UI |
 | GET | `/v1/metrics`, `/v1/metrics/eval`, `/v1/metrics/learning` | Counters, no PII |
+| GET | `/v1/learning/seed` | Export the learning store as `learning_seed.json` (boxes + shapes only, `_assert_pii_free` on every entry) so a developer can commit it (§7.4) |
 | GET | `/v1/health` | Liveness + adapter readiness; providers by **label**, never key |
 
 **Headers:** `X-API-Key` on every `/v1` route except `/health` · `X-Access-Code` on uploads ·
@@ -673,7 +682,8 @@ counters only · `/v1/metrics` for process aggregates · `job_id` echoed in the 
 **Config.** `.env` → `backend/settings.py` (pydantic-settings, validated at import) ·
 `config/models.yaml` (active adapters, model ids, ONNX paths, bake-off winner, tuned weights) ·
 `config/senders.json` (closed list + grammar) · `config/prompts/v1.txt` (version is part of the
-cache key). **No literal threshold in business code** — every one comes from settings or
+cache key) · `config/sample_hashes.json` (SHA-256 of the 48 rendered sample pages, hashes only,
+§8.5) · `config/learning_seed.json` (PII-free layout seed, §7.4). **No literal threshold in business code** — every one comes from settings or
 `models.yaml` so `calibrate.py` can sweep it.
 
 ### 3.6 Repository tree
@@ -683,9 +693,11 @@ ViroEngine/
 ├─ README.md                      Entry point, points at docs/PLAN.md
 ├─ LICENSE  .gitignore  .env.example  .pre-commit-config.yaml
 ├─ Dockerfile  docker-compose.yml  pyproject.toml  requirements.txt
+├─ railway.json                   primary backend host config (§11)
+├─ render.yaml                    backup backend host config (§11)
 ├─ .github/workflows/
 │  ├─ ci.yml                      BLOCKS merge: compile/typecheck, lint, tests, security, secrets, docker
-│  ├─ deploy.yml                  Render hook + Vercel, gated on CI, post-deploy smoke test
+│  ├─ deploy.yml                  Railway + Vercel, gated on CI, post-deploy smoke test (Render backup by manual dispatch)
 │  └─ eval.yml                    Manual/nightly accuracy regression; skips without reference/
 ├─ .kiro/
 │  ├─ steering/
@@ -695,7 +707,7 @@ ViroEngine/
 │  └─ skills/
 │     ├─ run-evaluation/SKILL.md  run the accuracy evaluation, read the metrics
 │     ├─ add-sender/SKILL.md      add an institution to the closed list
-│     └─ train-yolo/SKILL.md      dataset → Colab training → ONNX export
+│     └─ train-yolo/SKILL.md      dataset → Colab training → ONNX export (stretch, T16)
 ├─ docs/
 │  ├─ PLAN.md                     THIS FILE
 │  ├─ ARCHITECTURE.md  privacy.md  limitations.md  demo_script.md
@@ -705,7 +717,8 @@ ViroEngine/
 │  └─ README.md                   the only committed file here
 ├─ config/
 │  ├─ senders.json  senders.seed.json  models.yaml
-│  └─ prompts/v1.txt  prompts/CHANGELOG.md
+│  ├─ sample_hashes.json  learning_seed.json
+│  └─ prompts/v1.txt  prompts/fullpage_v1.txt  prompts/CHANGELOG.md
 ├─ backend/
 │  ├─ app.py  settings.py  container.py  queue.py  logging.py
 │  ├─ api/      deps documents jobs review export senders stress meta
@@ -1126,17 +1139,21 @@ institution has none) · central-number length (unsupported by the data) · **ID
 
 ### 5.4 Confusable-digit repair
 
-Pairs `1↔7 4↔9 0↔6 5↔6 3↔8 2↔7`, max **2** swaps.
+Pairs `1↔7 4↔9 0↔6 5↔6 3↔8 2↔7`, max **1** swap.
 
 1. Already passes the hard rule → stop, no repair.
-2. Generate variants with 1 or 2 swaps; keep those passing the hard rule.
+2. Generate variants with exactly 1 swap; keep those passing the hard rule.
 3. **Exactly one survivor** → accept, record `repaired_from`, **cap the level at C** so a human
    still sees a repair happened.
 4. More than one → level D, `ambiguous_repair`. None → level D, `failed_id_check`.
 
-Max 2 because beyond that too many 9-digit variants satisfy the check digit for uniqueness to mean
-anything. Worked example (unit test): `011223394` → `011223344` uniquely, accepted at C;
-`011228844` yields more than one valid variant, rejected.
+Max 1 because simulation on random valid IDs with injected read errors showed that 2-swap repair
+produces more wrong corrections than correct ones (1.8% wrong vs 0.5% correct), and a
+non-confusable error produces a silently-wrong valid ID in 6.4% of cases — both outcomes are
+level C, which the programme counts as a silent error. Single-swap repair at 2.8% correct is
+also weak, but the result is still shown as orange and never auto-accepted without a second reader.
+Worked example (unit test): `011223394` → `011223344` uniquely, accepted at C;
+`011228844` with a single swap yields no unique valid variant, rejected.
 
 ### 5.5 Calibration (T14)
 
@@ -2480,7 +2497,7 @@ def israeli_id_ok(raw: str) -> bool: ...
 def pad_id(raw: str) -> str | None: ...
 def parse_il_date(raw: str, *, pivot_year: int = 2000) -> date | None: ...
 def date_not_future(d: date, *, now: date) -> bool: ...
-def repair_confusable(read: str, ok: Callable[[str], bool], *, max_swaps: int = 2
+def repair_confusable(read: str, ok: Callable[[str], bool], *, max_swaps: int = 1
                       ) -> tuple[str | None, str]: ...
 def pattern_fit(value: str, hints: Sequence[str]) -> float: ...   # SOFT, never rejects
 def shape_of(value: str) -> str: ...                              # 'X132767' -> 'A######'
@@ -2493,7 +2510,7 @@ def shape_of(value: str) -> str: ...                              # 'X132767' ->
    `(\d{1,2})[-./](\d{1,2})[-./](\d{4}|\d{2})`; two-digit year → `2000+yy`; DD/MM order.
 3. Future dates fail hard — the lab cannot have received a sample it has not received.
 4. **No central-number plausibility rule.** §5.3; it must not reappear.
-5. Repair per §5.4: pairs, max 2 swaps, unique survivor only; caller caps at level C.
+5. Repair per §5.4: pairs, max **1** swap, unique survivor only; caller caps at level C.
 6. `pattern_fit` returns a score, never a verdict; **0.5 with no hints** so an unknown institution
    is not penalised.
 7. Normalization: IDs padded to 9 · names trimmed with final letters normalized · commitment
@@ -4374,6 +4391,7 @@ Generated at `/v1/openapi.json`, committed as `docs/openapi.json` so drift shows
 | POST | `/v1/jobs/{id}/stress` | key | `{"ops":[...]}` | 201 `UploadResponse` | 401 404 422 |
 | GET | `/v1/senders` | key | — | 200 `list[SenderSpec]` | 401 |
 | GET | `/v1/metrics` · `/metrics/eval` · `/metrics/learning` | key | — | 200 counters | 401 |
+| GET | `/v1/learning/seed` | key | — | 200 `application/json` (seed, no values) | 401 |
 | GET | `/v1/health` | none | — | 200 `Health` | — |
 
 ---
@@ -4563,15 +4581,16 @@ CONFUSABLE: dict[str, tuple[str, ...]] = {
     "0": ("6",), "6": ("0", "5"), "5": ("6",), "3": ("8",), "8": ("3",), "2": ("7",),
 }
 
-def repair_confusable(read: str, ok: Callable[[str], bool], *, max_swaps: int = 2
+def repair_confusable(read: str, ok: Callable[[str], bool], *, max_swaps: int = 1
                       ) -> tuple[str | None, str]:
     """Returns (value, status) with status in
-    {'as_read','repaired_1','repaired_2','ambiguous','unrepairable'}.
+    {'as_read','repaired_1','ambiguous','unrepairable'}.
 
     Accepts ONLY when exactly one variant validates; more than one means we
-    cannot know which is correct, so we refuse and let a human decide. Beyond
-    two swaps too many 9-digit variants satisfy the check digit for uniqueness
-    to mean anything.
+    cannot know which is correct, so we refuse and let a human decide. Limited
+    to a single swap: simulation on random valid IDs showed that 2-swap repair
+    produces more wrong corrections than correct ones (level C counts as a
+    silent error).
 
     >>> repair_confusable("011223394", israeli_id_ok)
     ('011223344', 'repaired_1')
