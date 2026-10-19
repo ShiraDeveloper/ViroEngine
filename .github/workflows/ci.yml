@@ -235,7 +235,7 @@ jobs:
           import json, sys
           h = json.load(open('/tmp/health.json'))
           assert h.get('status') == 'ok', h
-          assert 'heb' in h.get('tesseract_langs', []), f"Hebrew Tesseract missing: {h}"
+          assert 'heb' in h.get('ocr_langs', []), f"Hebrew Tesseract missing: {h}"
           print('health ok, Hebrew Tesseract present')
           PY
 

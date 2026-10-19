@@ -24,9 +24,7 @@ _DEFAULT_OUT = _REPO_ROOT / "docs" / "openapi.json"
 
 def main(argv: list[str] | None = None) -> int:
     """Generate the OpenAPI schema and write it to the output path."""
-    parser = argparse.ArgumentParser(
-        description="Export the FastAPI OpenAPI schema to JSON."
-    )
+    parser = argparse.ArgumentParser(description="Export the FastAPI OpenAPI schema to JSON.")
     parser.add_argument(
         "--out",
         type=Path,
