@@ -395,7 +395,8 @@ class OcrPort(Protocol):
     def read_page(self, image: ImageRef, langs: str = "heb+eng") -> OcrResult: ...
     def read_crop(self, image: ImageRef, *, whitelist: str | None = None,
                   psm: int = 7) -> OcrResult: ...
-    # Never raises on unreadable input; returns an empty OcrResult.
+    def detect_orientation(self, image: ImageRef) -> int | None: ...   # OSD vote for S1 (T9)
+    # Never raises on unreadable input; returns an empty OcrResult / None.
 
 class BarcodePort(Protocol):
     name: str
@@ -418,6 +419,19 @@ class StoragePort(Protocol):
     def get(self, ref: ImageRef) -> bytes: ...
     def purge_job(self, job_id: str) -> int: ...
 
+class DocumentPort(Protocol):                       # added in T9: keeps S0 free of PDF/imaging libs
+    name: str
+    def inspect_pdf(self, data: bytes) -> int: ...  # page count; raises EncryptedPdf/ActiveContentPdf
+    def render_pdf_page(self, data: bytes, index: int, *, dpi: int) -> EncodedImage: ...
+    def decode_image(self, data: bytes) -> EncodedImage: ...
+
+class ImagingPort(Protocol):                        # added in T9: S1 measurement, S2 corrections
+    name: str
+    def measure_pixels(self, image: bytes) -> PixelMeasurements: ...
+    def apply_operation(self, image: bytes, op: str, *, angle_deg: float = 0.0) -> EncodedImage: ...
+    def binarize(self, image: bytes) -> EncodedImage: ...
+    def thumbnail(self, image: bytes, *, max_side: int) -> EncodedImage: ...
+
 class ExporterPort(Protocol):
     fmt: str; media_type: str
     def render(self, report: RunReport, rows: list[CommitmentRow]) -> bytes: ...
@@ -438,6 +452,8 @@ class ClockPort(Protocol):
 | `RegionDetectorPort` | `rule_based.py` · **stretch, only after M3:** `yolo_onnx.py` |
 | `VisionLLMPort` | `gemini.py` (credential rotation) · `openrouter.py` · `groq.py` · `chain.py` (composes + breaker) |
 | `StoragePort` | `tempdir.py` (per-job dir, TTL purge) |
+| `DocumentPort` | `imaging/pdf.py` (pypdf safety scan · pypdfium2 render · Pillow decode) |
+| `ImagingPort` | `imaging/cv.py` (OpenCV measurement and corrections) |
 | `ExporterPort` | `xlsx.py` · `csv.py` · `json.py` |
 | `LearningStorePort` | `sqlite_store.py` (loads `config/learning_seed.json` at boot, §7.4) |
 | `ClockPort` | `system.py` |
@@ -724,11 +740,11 @@ ViroEngine/
 │  ├─ api/      deps documents jobs review export senders stress meta
 │  ├─ core/
 │  │  ├─ models.py  errors.py  validators.py  scoring.py  normalize.py  learning.py
-│  │  ├─ ports/    ocr barcode region_detector vision_llm storage exporter learning clock
+│  │  ├─ ports/    ocr barcode region_detector vision_llm storage document imaging exporter learning clock
 │  │  └─ pipeline/ s0_intake s1_measure s2_correct s3_read_page s4_regions s5_classify
 │  │               s6_candidates s7_second_read s8_score s9_escalate s10_rows
 │  │               s11_finalize orchestrator
-│  ├─ adapters/  ocr/ barcode/ regions/ vision/ storage/ export/ learning/ clock/ fakes.py
+│  ├─ adapters/  ocr/ barcode/ regions/ imaging/ vision/ storage/ export/ learning/ clock/ fakes.py
 │  └─ tests/     unit/ integration/ resilience/ security/ fixtures/
 ├─ frontend/
 │  ├─ index.html (dir="rtl" lang="he")  vite.config.ts  tailwind.config.ts
@@ -834,14 +850,19 @@ flowchart TD
 
 ### S0 Intake — T9
 
-In: uploads + settings. Out: `list[PageRaw]`. Raises `UnsupportedMedia` / `TooLarge` /
-`EncryptedPdf` / `ActiveContentPdf`; a single bad page raises `RenderFailed` for that page only.
+In: uploads + settings. Out: `IntakeResult(pages: list[PageRaw], failures: list[PageFailure])`.
+Raises `UnsupportedMedia` / `TooLarge` / `EncryptedPdf` / `ActiveContentPdf` for a safety violation,
+which refuses the whole upload; a file or page that is merely unreadable (corrupt image, a page larger
+than the pixel budget) is reported in `failures` with its stable code and the batch continues.
 
-1. `filetype.guess` on the first 4 KB. Accept `application/pdf`, `image/png`, `image/jpeg`,
-   `application/zip`. **Reject on content, never on extension.**
+1. Magic bytes of the first 4 KB (stdlib signatures; `filetype` is not used). Accept PDF, PNG, JPEG
+   and ZIP. **Reject on content, never on extension** — the extension is only a tripwire: one that
+   claims a different type than the bytes prove (a PNG named `.pdf`) is refused.
 2. Reject total `> MAX_UPLOAD_MB` (50). Largest sample PDF is ~8 MB/26 pages, so 50 covers a real
    batch and bounds memory on a 512 MB host.
-3. ZIP: refuse absolute paths and `..`; refuse compression ratio `> 100:1`; cap at `MAX_PAGES`.
+3. ZIP: refuse absolute paths, drive letters and `..`; refuse compression ratio `> 100:1`; cap at
+   `MAX_PAGES` entries; cap total uncompressed size at the upload limit; refuse encrypted, symlink
+   and nested-archive members; skip `__MACOSX/`, dotfiles and `Thumbs.db`.
 4. PDF via `pypdf`: reject `is_encrypted`; reject catalog containing `/JavaScript`, `/JS`,
    `/Launch`, `/EmbeddedFile`, `/OpenAction`.
 5. Reject page count `> MAX_PAGES` (200).
@@ -850,8 +871,9 @@ In: uploads + settings. Out: `list[PageRaw]`. Raises `UnsupportedMedia` / `TooLa
 7. SHA-256 of rendered bytes → cache key + duplicate detector. Write via `StoragePort`.
 
 ```python
-def intake(uploads: Sequence[UploadedBlob], *, settings: Settings,
-           storage: StoragePort, job_id: str) -> list[PageRaw]: ...
+def intake(uploads: Sequence[UploadedBlob], *, settings: Settings, documents: DocumentPort,
+           storage: StoragePort, job_id: str,
+           known_hashes: frozenset[str] = frozenset()) -> IntakeResult: ...
 ```
 
 ### S1 Measure — T9
@@ -869,13 +891,19 @@ is what makes processing dynamic; a clean page yields `needs == []`.
    clean scans > 300.
 4. **Illumination** — background coefficient of variation. Flag `clahe` when `> 0.18`, where
    phone-photo shadows start costing accuracy.
-5. **Noise** — isolated-foreground ratio after a 3×3 opening. Flag `denoise` when `> 0.12`, where
-   fax grain produces spurious tokens.
+5. **Noise** — share of ink pixels that lie in isolated specks (8-connected blobs of at most 4 px).
+   Flag `denoise` when `> 0.05`, where fax grain produces spurious tokens. *(T9 measured the
+   original definition — ratio removed by a 3×3 opening, threshold 0.12 — on the 48 real pages: it
+   also erases thin real strokes and scored 0.03–0.29 on clean pages, so about half would have
+   been flagged. The speck share scores clean pages ≤ 0.03 and synthetic fax grain 0.08.)*
 6. **Photo** — page quadrilateral deviates from a rectangle by `> 2%` of the diagonal → `is_photo`
    + flag `perspective`.
 
 ```python
-def measure(page: PageRaw, *, ocr: OcrPort, barcode: BarcodePort) -> PageMeasurement: ...
+def measure(page: PageRaw, *, settings: Settings, ocr: OcrPort, barcode: BarcodePort,
+            imaging: ImagingPort, storage: StoragePort) -> PageMeasurement: ...
+def correct(page: PageRaw, measurement: PageMeasurement, *, settings: Settings,
+            imaging: ImagingPort, storage: StoragePort) -> NormalizedPage: ...   # S2
 ```
 
 ### S2 Targeted correction — T9
@@ -1980,7 +2008,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 6 | Senders closed list | Shira | P1 | D2 | 2h | 2 |
 | 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
 | 8 | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
-| 9 | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
+| 9 ✅ | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
 | 10 | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
 | 11 | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
 | 12 | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
@@ -2571,7 +2599,7 @@ applying **only** the flagged corrections.
 | Skew | > 0.5° | Below that a resample costs quality for nothing |
 | Blur | Laplacian var < 100 | Fax pages 60–90, clean scans > 300 |
 | Illumination | background CV > 0.18 | Where phone shadows start costing accuracy |
-| Noise | isolated ratio > 0.12 | Where fax grain produces spurious tokens |
+| Noise | speck share (blobs ≤ 4 px) > 0.05 | Real pages ≤ 0.03, fax-grade grain 0.08 — measured on the 48 pages (T9); the original 3×3-opening ratio at 0.12 flagged half the clean pages |
 | Perspective | corner deviation > 2% of diagonal | Separates photo from scan on the sample set |
 | Sharpen upscale | ×1.5 | Enough for fax text; beyond that artefacts dominate |
 | Binarization | Sauvola w=25 k=0.2 | Handles uneven illumination far better than Otsu here |
@@ -2607,6 +2635,53 @@ python -m tools.demo measure A3 A1 --pdf reference/samples_part1.pdf
 # -> A3: rotation=90 skew=0.8 blur=412 needs=['rotate'] applied=['rotate']
 # -> A1: rotation=0  skew=0.2 blur=388 needs=[]        applied=[]
 ```
+
+> **✅ Completed — 2026-10-20 (D3)**
+> Files created: `backend/core/pipeline/{__init__,s0_intake,s1_measure,s2_correct}.py`,
+> `backend/core/ports/{document,imaging}.py`, `backend/adapters/storage/{__init__,tempdir}.py`,
+> `backend/adapters/imaging/{__init__,codec,pdf,cv}.py`, `tools/demo.py`,
+> `backend/tests/unit/{conftest,test_intake,test_measure,test_correct,test_tempdir_storage}.py`,
+> `backend/tests/fixtures/synthetic/{pages,files,doubles}.py` (all generated by code, no `reference/`).
+> Changed: `settings.py` (18 S0–S2 thresholds, none hard-coded), `.env.example`, `container.py`
+> (`documents`, `imaging`), `adapters/fakes.py` (`FakeDocumentReader`, `FakeImaging`,
+> `FakeOcr.detect_orientation`), `core/ports/{ocr,__init__}.py`.
+> Verified locally: **80 new tests (79 pass, 1 POSIX-permission test skipped on Windows)**, all 17 named
+> tests present and passing; full suite 227 tests green · `ruff check` + `ruff format --check` clean ·
+> `mypy backend` and `mypy --strict backend/core` clean · `check_layering.py` 0 violations ·
+> `bandit -r backend -ll` 0 findings · core coverage 97% (gate 80%) · tests also pass on the
+> CI-pinned versions (OpenCV 4.10, NumPy 2.1.3, Pillow 11, pypdf 5.1, pypdfium2 4.30).
+> **Real 48 pages (S0→S2, 300 DPI):** 0 render failures · **45 of 48 `needs == []`** (target ≥ 15) ·
+> only `deskew` was flagged, on 3 pages (A17, A18, B12; skew −0.6° to −1.0°) · **peak RSS 225 MB**
+> for the whole 48-page run (limit 450 MB) · ~2.7 s/page for render + measure + correct.
+> **Decisions and deviations — read before building on this:**
+> 1. *Noise definition changed.* The planned "3×3 opening" ratio at 0.12 flagged half the clean real
+>    pages (0.03–0.29), so noise is now the share of ink in blobs ≤ 4 px, threshold **0.05**
+>    (clean ≤ 0.03, fax grain 0.08). The same specks are painted out before the blur measure, so grain
+>    cannot masquerade as sharpness. Real pages measure 108–910 on blur, all above the 100 threshold.
+> 2. *`intake` returns `IntakeResult`* (pages + failures), not a bare list, so a failed page is
+>    visible to the orchestrator (T15) and the job error list (T22) instead of silently missing.
+> 3. *New ports `DocumentPort` and `ImagingPort`* keep PDF/OpenCV code out of the core; `OcrPort`
+>    gained `detect_orientation` for the OSD vote. T11's Tesseract adapter must implement it
+>    (`--psm 0`, clockwise degrees to make the text upright, `None` when too sparse).
+> 4. *Rotation needs 2 agreeing votes* (`ROTATION_MIN_VOTES`): a single sideways barcode sticker on an
+>    upright page must not rotate it. The costly Hebrew-word probe (4 OCR passes) runs only when the
+>    barcode and OSD votes do not already agree.
+> 5. *Skew* is the mean of a Hough estimate and a min-area-rectangle estimate, 0.0 if they disagree by
+>    > 1° or exceed 15°; it is folded mod 90°, so a page rotated by any quarter turn reads the same skew.
+> 6. *Extension tripwire:* a recognised extension that contradicts the content is refused (the
+>    `test_rejects_png_renamed_to_pdf` case); unknown extensions are judged by content alone.
+> 7. `known_sample` stays `False` unless the caller passes `known_hashes`; generating
+>    `config/sample_hashes.json` (§8.5) is left to T27.
+> 8. Image-correction failures reuse `RenderFailed` rather than a new error code, because adding to
+>    `ALL_ERRORS` would change Shira's frozen T2 error contract.
+> **Not verified here — pending Tesseract (Docker/CI), same blocker as ADR-015:** the Done-when
+> criterion "detected rotations across the 48 pages match `inventory.csv`, including the ~10 rotated"
+> and the demo's `A3: rotation=90`. Rotation voting is fully tested end to end on synthetic pages
+> (all four orientations, ties, abstentions), and measured skew/blur/noise/illumination/perspective
+> are verified on the real pages, but the OSD and Hebrew-word votes need the real Tesseract adapter
+> (T11). `inventory.csv` itself recorded 0 rotated pages for the same reason, so the comparison
+> cannot be made until that run exists. `python -m tools.demo measure` reports `rotation=0` and says
+> so until T11 lands.
 
 ---
 

@@ -45,6 +45,37 @@ class Settings(BaseSettings):
     max_concurrency: int = Field(default=2, ge=1, le=16)
     escalation_score_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
 
+    # --- S0 intake safety (T9) --------------------------------------------
+    # Largest allowed uncompressed/compressed size ratio of a ZIP entry; real archives of
+    # scans are near 1:1, a bomb exceeds this immediately.
+    zip_max_ratio: float = Field(default=100.0, ge=1.0, le=10_000.0)
+    # Pixel budget of one rendered or decoded page (megapixels). A4 at 300 DPI is ~8.7 MP,
+    # A3 ~17.4 MP; the cap bounds memory on a 512 MB host against hostile page sizes.
+    max_render_megapixels: float = Field(default=30.0, gt=0.0, le=200.0)
+
+    # --- S1 measurement thresholds (T9) -----------------------------------
+    # A correction is flagged only when its measurement crosses its threshold.
+    skew_threshold_deg: float = Field(default=0.5, ge=0.0, le=45.0)  # deskew above
+    skew_max_deg: float = Field(default=15.0, gt=0.0, le=45.0)  # beyond: unreliable, report 0
+    blur_threshold: float = Field(default=100.0, ge=0.0)  # Laplacian variance; sharpen below
+    illumination_cv_threshold: float = Field(default=0.18, ge=0.0)  # clahe above
+    # Share of ink in specks of <=4 px; denoise above. Measured: real sample pages <=0.03,
+    # synthetic fax grain 0.08. (The plan's 0.12 belonged to a different noise definition.)
+    noise_threshold: float = Field(default=0.05, ge=0.0, le=1.0)
+    perspective_threshold: float = Field(default=0.02, ge=0.0, le=1.0)  # of page diagonal
+    # Orientation: signals voting for one angle needed before a page is rotated.
+    rotation_min_votes: int = Field(default=2, ge=1, le=3)
+    ocr_probe_max_side: int = Field(default=1200, ge=300, le=4000)  # px, low-res orientation pass
+    ocr_probe_min_words: int = Field(default=5, ge=1)  # Hebrew words needed to cast a vote
+    ocr_probe_min_ratio: float = Field(default=1.5, ge=1.0)  # winner vs runner-up word count
+    ocr_min_word_confidence: float = Field(default=0.30, ge=0.0, le=1.0)  # 0..1, Tesseract/100
+
+    # --- S2 correction (T9) -----------------------------------------------
+    sharpen_scale: float = Field(default=1.5, ge=1.0, le=3.0)  # cubic upscale before unsharp
+    sauvola_window: int = Field(default=25, ge=3, le=201)  # px, odd
+    sauvola_k: float = Field(default=0.2, ge=0.0, le=1.0)
+    thumb_max_side: int = Field(default=512, ge=64, le=2048)  # px, longest side of `thumb`
+
     # --- Paths ------------------------------------------------------------
     tesseract_cmd: str = "/usr/bin/tesseract"
     models_dir: str = "./models"
@@ -64,6 +95,13 @@ class Settings(BaseSettings):
     def origins_list(self) -> list[str]:
         """Split comma-separated CORS origins."""
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    @field_validator("sauvola_window")
+    @classmethod
+    def _validate_sauvola_window(cls, v: int) -> int:
+        if v % 2 == 0:
+            raise ValueError(f"sauvola_window must be odd, got {v}")
+        return v
 
     @field_validator("log_level")
     @classmethod
