@@ -144,7 +144,7 @@ class FakeStorage:
         job_id: str,
         page_id: str,
         data: bytes,
-        kind: Literal["color", "gray_bin", "thumb", "crop"],  # type: ignore[override]
+        kind: Literal["color", "gray_bin", "thumb", "crop"],
     ) -> ImageRef:
         """Store bytes in memory and return a reference."""
         path = f"{job_id}/{page_id}/{kind}"

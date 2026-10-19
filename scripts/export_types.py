@@ -82,8 +82,7 @@ def _schema_to_ts(schema: dict[str, Any]) -> str:
         required = set(schema.get("required", []))
         # Inline anonymous object — single line
         fields = "; ".join(
-            f"{n}{'?' if n not in required else ''}: {_schema_to_ts(ps)}"
-            for n, ps in props.items()
+            f"{n}{'?' if n not in required else ''}: {_schema_to_ts(ps)}" for n, ps in props.items()
         )
         return f"{{ {fields} }}"
 
@@ -123,9 +122,7 @@ def generate(openapi: dict[str, Any]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point — exit 0 on success, 1 on error."""
-    parser = argparse.ArgumentParser(
-        description="Generate TypeScript types from docs/openapi.json"
-    )
+    parser = argparse.ArgumentParser(description="Generate TypeScript types from docs/openapi.json")
     parser.add_argument(
         "--out",
         type=Path,

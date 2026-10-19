@@ -12,6 +12,7 @@ test_container_with_local_only_has_no_vision — LOCAL_ONLY=true → vision is N
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Generator
 import io
 
 from fastapi.testclient import TestClient
@@ -25,11 +26,11 @@ from backend.app import create_app
 
 
 @pytest.fixture(scope="module")
-def client() -> TestClient:
+def client() -> Generator[TestClient, None, None]:
     """TestClient with fake adapters. Triggers lifespan (start/stop workers)."""
     app = create_app(use_fakes=True)
     with TestClient(app) as c:
-        yield c  # type: ignore[misc]
+        yield c
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +86,7 @@ def test_queue_backpressure_returns_429(monkeypatch: pytest.MonkeyPatch) -> None
 
     with TestClient(app) as c:
         # Monkey-patch the queue's enqueue method to simulate a full queue
-        original_queue = c.app.state.job_queue
+        original_queue = c.app.state.job_queue  # type: ignore[attr-defined]
 
         async def _always_full(job_id: str) -> None:
             raise asyncio.QueueFull()
@@ -141,6 +142,6 @@ def test_container_with_local_only_has_no_vision(monkeypatch: pytest.MonkeyPatch
     app = create_app(use_fakes=True)
 
     with TestClient(app) as c:
-        container = c.app.state.container
+        container = c.app.state.container  # type: ignore[attr-defined]
 
     assert container.vision is None, "Expected vision=None when LOCAL_ONLY=true"

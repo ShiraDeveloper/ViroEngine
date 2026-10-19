@@ -100,46 +100,68 @@ jobs:
   # --------------------------------------------------------------- frontend
   frontend:
     name: Frontend (typecheck, lint, tests, build)
-    # Skip gracefully until the frontend scaffold is committed.
-    # Once frontend/package.json exists this job is mandatory.
-    if: hashFiles('frontend/package.json') != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
 
+      # Detect whether the frontend scaffold has been committed yet.
+      # All subsequent steps gate on this output so the job passes
+      # (not skips) when the frontend does not yet exist.
+      - name: Detect frontend scaffold
+        id: detect
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Frontend scaffold not committed yet — frontend CI steps skipped"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-node@v4
+        if: steps.detect.outputs.present == 'true'
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
         run: npm ci
 
       # GATE 1 - compilation / types. Blocks the merge.
       - name: TypeScript typecheck
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
         run: npx tsc --noEmit
 
       # GATE 2 - lint (includes the no-literal-hex rule)
       - name: ESLint
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
         run: npx eslint . --max-warnings 0
 
       # GATE 3 - unit tests
       - name: Vitest
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
         run: npx vitest run --reporter=dot
 
       # GATE 4 - production build must succeed
       - name: Build
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
         run: npm run build
 
       # GATE 5 - accessibility
       - name: Install Playwright browsers
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
         run: npx playwright install --with-deps chromium
       - name: Accessibility (axe)
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
         run: npx playwright test tests/a11y --reporter=line
 
   # ---------------------------------------------------------------- secrets

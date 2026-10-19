@@ -3,6 +3,7 @@
 Run: python scripts/check_docs.py
 Exit 0 on success, 1 on any failure.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -39,9 +40,7 @@ def check_adr_headings() -> list[str]:
     for adr_file in sorted(ADR_DIR.glob("ADR-*.md")):
         text = adr_file.read_text(encoding="utf-8").lstrip()
         if not text.startswith("# "):
-            errors.append(
-                f"ADR file missing top-level heading: {adr_file.relative_to(REPO_ROOT)}"
-            )
+            errors.append(f"ADR file missing top-level heading: {adr_file.relative_to(REPO_ROOT)}")
     return errors
 
 

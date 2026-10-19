@@ -12,6 +12,7 @@ of forbidden keys. Full redaction hardening is in Task 27.
 
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 import logging
 import sys
 from typing import Any
@@ -42,8 +43,8 @@ _REDACTED = "[REDACTED]"
 def _pii_redaction_processor(
     logger: Any,
     method: str,
-    event_dict: dict[str, Any],
-) -> dict[str, Any]:
+    event_dict: MutableMapping[str, Any],
+) -> MutableMapping[str, Any]:
     """Remove PII keys from the event dict before rendering.
 
     Safety net — callers must never log field values in the first place.

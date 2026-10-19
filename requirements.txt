@@ -40,6 +40,8 @@ httpx==0.27.2
 filetype==1.2.0
 pypdf==5.1.0
 structlog==24.4.0
+# urllib3 pinned here to avoid CVEs in the transitive version pulled by httpx
+urllib3==2.8.0
 
 # --- Dev / CI (not installed on the production image) ---
 # Install via: pip install -r requirements.txt && pip install ruff mypy bandit pip-audit pytest pytest-cov pytest-asyncio

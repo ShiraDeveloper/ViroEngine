@@ -15,8 +15,8 @@ Only stdlib + httpx are used — matches the deploy workflow pip install.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 import sys
-from typing import Callable
 
 import httpx
 
@@ -44,9 +44,7 @@ def check_auth_required(api_url: str) -> None:
     url = f"{api_url.rstrip('/')}/v1/senders"
     resp = httpx.get(url, timeout=10)
     if resp.status_code != 401:
-        raise ValueError(
-            f"/v1/senders without auth key: expected 401, got {resp.status_code}"
-        )
+        raise ValueError(f"/v1/senders without auth key: expected 401, got {resp.status_code}")
     print(f"✓ auth guard: {url}")
 
 
@@ -57,9 +55,7 @@ def check_web(web_url: str) -> None:
     """
     resp = httpx.get(web_url, timeout=30, follow_redirects=True)
     if resp.status_code >= 400:
-        raise ValueError(
-            f"web URL returned {resp.status_code}: {web_url}"
-        )
+        raise ValueError(f"web URL returned {resp.status_code}: {web_url}")
     print(f"✓ web: {web_url}")
 
 
