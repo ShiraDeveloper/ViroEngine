@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "README Update Check",
+      "trigger": "PostTaskExec",
+      "description": "After each task completes, checks if README.md needs updating to reflect changes made in the task.",
+      "action": {
+        "type": "agent",
+        "prompt": "After completing this task, review the project README.md and check whether it needs to be updated to reflect the changes made. Consider:\n- New features, components, or modules added\n- Changed APIs, interfaces, or configuration\n- New environment variables or dependencies\n- Updated setup or usage instructions\n- New scripts or commands\n\nIf the README is missing or outdated documentation for anything that was changed or added in this task, update it now so the project always has complete, accurate documentation."
+      }
+    }
+  ]
+}
