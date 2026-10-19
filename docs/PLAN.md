@@ -1973,9 +1973,9 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | # | Task | Owner | Phase | Day | Est | Deps |
 |---|---|---|---|---|---|---|
 | 1 ✅ | Repo, CI, security scanning | Ahuba | P0 | D1 | 2h | — |
-| 2 | Domain contracts and API schemas | Shira | P0 | D1 | 3h | 1 |
+| 2 ✅ | Domain contracts and API schemas | Shira | P0 | D1 | 3h | 1 |
 | 3 ✅ | Hexagonal backend skeleton, OpenAPI, Dockerfile | Ahuba | P0 | D1 | 3h | 2 |
-| 4 | Frontend skeleton and design system | Shira | P0 | D1 | 3h | 2 |
+| 4 ✅ | Frontend skeleton and design system | Shira | P0 | D1 | 3h | 2 |
 | 5 ✅ | Page inventory and the barcode question | Ahuba | P1 | D2 | 3h | 3 |
 | 6 | Senders closed list | Shira | P1 | D2 | 2h | 2 |
 | 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
@@ -2149,6 +2149,9 @@ print(JobView.model_validate(json.load(open('fixtures/sample_job.json'))).rows[2
 # -> D
 ```
 
+> **✅ Completed — 2026-10-19 (D1)**
+> Marked complete at the owner's request.
+
 ---
 
 ### Task 3 — Hexagonal backend skeleton, OpenAPI, Dockerfile
@@ -2289,6 +2292,14 @@ axe clean on all six routes · `VITE_USE_MOCK=0` targets the real API with no co
 
 **Demo.** `cd frontend && VITE_USE_MOCK=1 npm run dev` → open `/jobs/demo/review` → RTL table,
 4 rows, one orange date cell, ribbon on the right edge.
+
+> **✅ Completed — 2026-10-19 (D1)**
+> Verified locally: `eslint --max-warnings 0` clean · `tsc --noEmit` clean · 20 Vitest tests pass ·
+> `npm run build` succeeds · axe: 6 routes + RTL table check pass (Playwright on Edge).
+> Known gaps for later tasks: `cropUrl`/`exportUrl` are plain URLs, and a browser `<img>`/`<a>`
+> cannot send `X-API-Key` (T22/T23 must use a fetch-to-blob or a signed URL). The API has no login
+> route, so the access code is stored for the session and checked on upload. Bundled Chromium could
+> not be downloaded here; CI installs it.
 
 ---
 
