@@ -1,11 +1,4 @@
-"""Safe Line domain models — frozen data contracts.
-
-CONTRACT STUB: This file was created as a dependency for Task 3 (Ahuba).
-Task 2 (Shira) must verify every definition here against §3.3 and the
-fixture sample_job.json, and owns this file going forward.
-Any change to this file requires regenerating fixtures/sample_job.json
-and frontend/src/api/types.ts (see §0.5 rule 6).
-"""
+"""Frozen domain contracts (PLAN §3.3). Any change: regenerate the fixture and the TS types."""
 
 from __future__ import annotations
 
@@ -13,30 +6,16 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-# ---------------------------------------------------------------------------
-# Foundational types
-# ---------------------------------------------------------------------------
-
+# Normalized y_min, x_min, y_max, x_max, origin top-left, 0.0-1.0.
 Box = tuple[float, float, float, float]
-"""Normalised bounding box: (y_min, x_min, y_max, x_max), origin top-left, range 0.0-1.0."""
 
 
 class Strict(BaseModel):
-    """Base class for all boundary models.
-
-    extra='forbid' + frozen=True: validated at the boundary, trusted inside the core.
-    protected_namespaces=(): suppress Pydantic's model_ prefix warning on field names
-    like model_id which are legitimate domain fields.
-    """
+    """Boundary model base: unknown keys are rejected and instances are immutable."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, protected_namespaces=())
-
-
-# ---------------------------------------------------------------------------
-# Enumerations
-# ---------------------------------------------------------------------------
 
 
 class FieldKey(StrEnum):
@@ -82,7 +61,7 @@ class RegionKind(StrEnum):
     commitment_label = "commitment_label"
     table = "table"
     letterhead = "letterhead"
-    clinical = "clinical"  # NEVER sent to a cloud provider
+    clinical = "clinical"  # never sent to a provider
 
 
 class JobStatus(StrEnum):
@@ -94,14 +73,25 @@ class JobStatus(StrEnum):
     purged = "purged"
 
 
-# ---------------------------------------------------------------------------
-# Page-level models
-# ---------------------------------------------------------------------------
+# Closed set of level-D reasons (PLAN §5.2): code -> Hebrew UI text.
+# A reason is never free text and is never built at a call site.
+REASON_TEXT: dict[str, str] = {
+    "not_found": "לא נמצא בטופס",
+    "readers_disagree": "שני הקוראים לא הסכימו",
+    "failed_id_check": 'ספרת הביקורת של ת"ז לא תקינה',
+    "date_impossible": "תאריך לא קיים בלוח השנה",
+    "date_future": "התאריך עתידי",
+    "ambiguous_repair": "יש יותר מתיקון אפשרי אחד",
+    "handwriting_unverified": "כתב יד שלא אומת",
+    "sender_not_in_list": "הגורם לא ברשימה הסגורה",
+    "stamp_and_handwritten_differ": "החותמת והתאריך בכתב יד שונים",
+    "low_quality_region": "איכות התמונה באזור נמוכה",
+    "providers_exhausted": "לא ניתן לאמת — נדרשת בדיקה",
+    "multiple_candidates": "נמצאו כמה אפשרויות",
+}
 
 
 class ImageRef(Strict):
-    """Pointer to a stored image; carries no pixel data."""
-
     job_id: str
     page_id: str
     kind: Literal["color", "gray_bin", "thumb", "crop"]
@@ -112,39 +102,33 @@ class ImageRef(Strict):
 
 
 class PageRaw(Strict):
-    """Output of S0 (intake) — one rendered page before any correction."""
-
     page_id: str
     label: str | None = None
     source_file: str
     page_index: int
     sha256: str
     image: ImageRef
+    # sha256 is in config/sample_hashes.json (§8.5); gates tier-2 escalation.
+    known_sample: bool = False
+    # sha256 of the origin page for Stress Mode / augmented variants; such a page
+    # inherits known_sample from its origin.
+    derived_from: str | None = None
 
 
 class PageMeasurement(Strict):
-    """Output of S1. Measurement only; no modification.
-
-    rotation_deg: degrees clockwise to make the page upright.
-    blur_score: Laplacian variance — higher is sharper.
-    illumination_cv: background coefficient of variation.
-    noise_score: isolated-foreground ratio after morphological opening, 0-1.
-    Never raises; an uncomputable measurement reports its neutral value.
-    """
+    """Output of S1. Measurement only."""
 
     rotation_deg: Literal[0, 90, 180, 270]
     rotation_votes: dict[str, int]
-    skew_deg: float
-    blur_score: float
-    illumination_cv: float
-    noise_score: float
+    skew_deg: float  # degrees, -15..15
+    blur_score: float  # Laplacian variance, higher = sharper
+    illumination_cv: float  # background coefficient of variation
+    noise_score: float  # 0..1
     is_photo: bool
-    needs: list[str]  # e.g. ["rotate", "deskew", "clahe"]
+    needs: list[str]  # ["rotate", "deskew", "clahe", ...]
 
 
 class NormalizedPage(Strict):
-    """Output of S2 — page after targeted correction."""
-
     raw: PageRaw
     measurement: PageMeasurement
     corrections_applied: list[str]
@@ -153,82 +137,56 @@ class NormalizedPage(Strict):
     thumb: ImageRef
 
 
-# ---------------------------------------------------------------------------
-# OCR + barcode models
-# ---------------------------------------------------------------------------
-
-
 class OcrWord(Strict):
     text: str
     box: Box
-    confidence: float  # 0.0-1.0 as reported by the reader
+    confidence: float
 
 
 class OcrResult(Strict):
-    """Output of OcrPort.read_page / read_crop."""
-
     reader: ReaderName
     words: list[OcrWord]
-    text: str  # reading-order concatenation
+    text: str
     candidates: list[str] = Field(default_factory=list)
 
 
 class BarcodeHit(Strict):
-    """One decoded barcode.
-
-    payload: any symbology, any length — NEVER filtered by length (§2.1).
-    """
-
-    payload: str
+    payload: str  # any length, never filtered
     symbology: str
     box: Box
-    orientation_deg: int  # working orientation from the sweep
-    nearby_text: list[str]  # OCR words within 0.06 x page diagonal
-
-
-# ---------------------------------------------------------------------------
-# Region models
-# ---------------------------------------------------------------------------
+    orientation_deg: int
+    nearby_text: list[str]
 
 
 class Region(Strict):
-    """A labelled bounding box on the page, output of S4."""
-
     kind: RegionKind
     box: Box
-    detector: str  # "rule-based" | "yolov8n-onnx" | "learned"
+    detector: str
     score: float
     label_text: str | None = None
 
 
-# ---------------------------------------------------------------------------
-# Extraction models
-# ---------------------------------------------------------------------------
-
-
 class Candidate(Strict):
-    """One candidate value for a field, from one reader."""
-
     value: str
     reader: ReaderName
     source: SourceKind
     box: Box | None
-    reader_confidence: float  # as reported — NOT the final combined score
+    reader_confidence: float  # as reported - NOT the final score
     label_distance: float | None
     region: RegionKind | None
     notes: list[str] = Field(default_factory=list)
 
 
 class ReadingTrailStep(Strict):
-    """Audit record for one step in the reading pipeline."""
-
     stage: str
     reader: ReaderName
     outcome: Literal["value", "no_value", "rejected", "skipped"]
     value: str | None
     reader_confidence: float | None
     duration_ms: int
-    cloud: bool  # True when any data left the machine
+    cloud: bool  # True when data left the machine
+    tier: Literal[1, 2] | None = None  # escalation tier; None for local steps
+    page_sent: bool = False  # True only for a tier-2 (redacted full page) call
 
 
 class ValidationOutcome(Strict):
@@ -240,14 +198,8 @@ class ValidationOutcome(Strict):
 
 
 class FieldResult(Strict):
-    """Complete extraction result for one field on one page.
-
-    value=None means 'not found', never 'error'.
-    level=D with a reason from the closed set in §5.2 when the value is uncertain.
-    """
-
     field: FieldKey
-    value: str | None  # None = not found. Never a guess.
+    value: str | None  # None = not found. Never a guess
     display_value: str | None
     level: ConfidenceLevel
     score: float
@@ -256,24 +208,25 @@ class FieldResult(Strict):
     candidates: list[Candidate]
     validations: list[ValidationOutcome]
     trail: list[ReadingTrailStep]
-    reason: str | None  # Hebrew text when level == D; from the closed set in §5.2
+    reason: str | None  # Hebrew text from REASON_TEXT when level == D
     escalated: bool
 
-
-# ---------------------------------------------------------------------------
-# Row + job models
-# ---------------------------------------------------------------------------
+    @model_validator(mode="after")
+    def _level_d_has_closed_set_reason(self) -> FieldResult:
+        """A level-D field must carry a reason from the closed set (§2, §5.2)."""
+        if self.level is ConfidenceLevel.D and self.reason not in REASON_TEXT.values():
+            raise ValueError("level D requires a reason from the closed set REASON_TEXT")
+        return self
 
 
 class CommitmentRow(Strict):
-    """One commitment extracted from a group of pages."""
-
     row_id: str
     group_id: str
     page_ids: list[str]
-    fields: dict[str, FieldResult]  # FieldKey → FieldResult
+    # "x-key-type" lets the TS generator emit Partial<Record<FieldKey, FieldResult>>.
+    fields: dict[FieldKey, FieldResult] = Field(json_schema_extra={"x-key-type": "FieldKey"})
     central_numbers: list[str]  # joined with "; " on export
-    row_level: ConfidenceLevel  # worst level among critical fields
+    row_level: ConfidenceLevel  # worst among critical fields
     status: Literal["auto", "confirmed", "edited"]
 
 
@@ -283,30 +236,21 @@ class PageGroup(Strict):
     sender: str | None
     family: str | None
     is_orphan: bool
-    grouped_by: list[str]  # e.g. ["sequence", "central_number", "stamp_date"]
-
-
-class ReviewEdit(Strict):
-    edit_id: str
-    job_id: str
-    row_id: str
-    field: FieldKey
-    old_value: str | None
-    new_value: str | None
-    actor: str
-    action: Literal["edit", "pick_candidate", "clear", "confirm", "undo"]
-    at: datetime
+    grouped_by: list[str]  # ["sequence", "central_number", "stamp_date"]
 
 
 class CostCounters(Strict):
-    cloud_calls: int = 0
-    crops_sent: int = 0
-    tokens_used: int = 0
-    estimated_cost_usd: float = 0.0
+    """Counters only. The PLAN names this type but does not define it (see T2 notes)."""
+
+    provider_calls: int
+    cache_hits: int
+    input_tokens: int
+    output_tokens: int
+    estimated_usd: float
 
 
 class RunReport(Strict):
-    """run_report.json — counters only, no values, no PII."""
+    """run_report.json - counters only, no values, no PII."""
 
     job_id: str
     started_at: datetime
@@ -317,6 +261,8 @@ class RunReport(Strict):
     fields_closed_local: int
     fields_escalated: int
     fields_flagged: int
+    tier1_calls: int  # provider requests per tier (§6.4, §6.6)
+    tier2_calls: int
     local_close_rate: float
     level_histogram: dict[str, int]
     stage_durations_ms: dict[str, int]
@@ -342,9 +288,16 @@ class JobRecord(Strict):
     errors: list[str]
 
 
-# ---------------------------------------------------------------------------
-# Sender spec
-# ---------------------------------------------------------------------------
+class ReviewEdit(Strict):
+    edit_id: str
+    job_id: str
+    row_id: str
+    field: FieldKey
+    old_value: str | None
+    new_value: str | None
+    actor: str
+    action: Literal["edit", "pick_candidate", "clear", "confirm", "undo"]
+    at: datetime
 
 
 class SenderSpec(Strict):
@@ -354,22 +307,19 @@ class SenderSpec(Strict):
     keywords: list[str]
     commitment_labels: list[str]
     commitment_deny: list[str] = Field(default_factory=list)
-    pattern_hints: list[str] = Field(default_factory=list)  # hints only — never a hard gate
+    pattern_hints: list[str] = Field(default_factory=list)  # hints only
     barcode_is_commitment: bool | None = None  # None = unknown
     notes: str | None = None
 
 
 # ---------------------------------------------------------------------------
-# Vision LLM models
+# Port-facing stubs from Task 3 (Ahuba). Kept verbatim from main so the ports and
+# fakes keep working. T18 (providers) and T24 (learning) own their final shapes.
 # ---------------------------------------------------------------------------
 
 
 class VisionRequest(Strict):
-    """Crop + context sent to a cloud vision provider.
-
-    Only crops leave the machine, never a full page (§5).
-    clinical regions must never appear here — enforced by assertion in S9.
-    """
+    """Crop + context sent to a cloud vision provider. Clinical regions never appear here."""
 
     job_id: str
     page_id: str
@@ -381,10 +331,7 @@ class VisionRequest(Strict):
 
 
 class VisionResponse(Strict):
-    """Schema-validated response from a cloud vision provider.
-
-    The model never assigns its own confidence — S8 does.
-    """
+    """Schema-validated provider response. The model never assigns its own confidence."""
 
     raw_text: str
     candidates: list[str]
@@ -400,17 +347,8 @@ class ProviderHealth(Strict):
     state: Literal["ok", "open", "half_open", "exhausted"]
 
 
-# ---------------------------------------------------------------------------
-# Learning store models
-# ---------------------------------------------------------------------------
-
-
 class LayoutObservation(Strict):
-    """Observation recorded by the learning store.
-
-    Holds locations and abstracted shapes only.
-    Names, IDs, dates, form values and images are rejected by _assert_pii_free.
-    """
+    """Locations and abstracted shapes only; values are rejected by _assert_pii_free."""
 
     sender: str
     field: FieldKey
@@ -428,7 +366,7 @@ class LayoutHint(Strict):
 
 
 class PatternHint(Strict):
-    """Regex hint returned by the learning store — never a hard gate (§2.1)."""
+    """Regex hint returned by the learning store - never a hard gate (§2.1)."""
 
     pattern: str
     confidence: float

@@ -93,6 +93,12 @@ module = "backend.core.*"
 strict = true
 
 [[tool.mypy.overrides]]
+# The inventory tool depends on optional native image/barcode libraries and is
+# exercised by its own focused tests; it is not part of backend type checking.
+module = "tools.inventory"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
 # Adapters are checked strictly but not for missing stubs of vendor libs.
 module = "backend.adapters.*"
 strict = true

@@ -6,12 +6,12 @@ Run: python scripts/export_openapi.py
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
+import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from backend.app import create_app  # noqa: E402
+from backend.app import create_app
 
 app = create_app(use_fakes=True)
 schema = app.openapi()

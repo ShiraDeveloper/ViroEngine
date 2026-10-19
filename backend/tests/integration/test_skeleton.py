@@ -12,13 +12,14 @@ test_container_with_local_only_has_no_vision — LOCAL_ONLY=true → vision is N
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Generator
 import io
+from typing import Any, cast
 
-import pytest
 from fastapi.testclient import TestClient
+import pytest
 
 from backend.app import create_app
-
 
 # ---------------------------------------------------------------------------
 # Shared fixture
@@ -26,11 +27,11 @@ from backend.app import create_app
 
 
 @pytest.fixture(scope="module")
-def client() -> TestClient:
+def client() -> Generator[TestClient, None, None]:
     """TestClient with fake adapters. Triggers lifespan (start/stop workers)."""
     app = create_app(use_fakes=True)
     with TestClient(app) as c:
-        yield c  # type: ignore[misc]
+        yield c
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +58,7 @@ def test_health_never_exposes_keys(client: TestClient) -> None:
 
     body_text = resp.text.lower()
     # Key material must not appear in any form
-    for forbidden in ("api_key", "gemini_api_keys", "openrouter_api_key", "groq_api_key"):
+    for _forbidden in ("api_key", "gemini_api_keys", "openrouter_api_key", "groq_api_key"):
         # The key NAME appearing in JSON keys is fine; its VALUE must not appear.
         # Checking that the settings attribute values are not present:
         # Since test runs with empty keys, we just verify the response has no literal
@@ -86,12 +87,11 @@ def test_queue_backpressure_returns_429(monkeypatch: pytest.MonkeyPatch) -> None
 
     with TestClient(app) as c:
         # Monkey-patch the queue's enqueue method to simulate a full queue
-        original_queue = c.app.state.job_queue
-
         async def _always_full(job_id: str) -> None:
             raise asyncio.QueueFull()
 
-        monkeypatch.setattr(original_queue, "enqueue", _always_full)
+        app = cast(Any, c.app)
+        monkeypatch.setattr(app.state.job_queue, "enqueue", _always_full)
 
         resp = c.post(
             "/v1/documents",
@@ -142,6 +142,6 @@ def test_container_with_local_only_has_no_vision(monkeypatch: pytest.MonkeyPatch
     app = create_app(use_fakes=True)
 
     with TestClient(app) as c:
-        container = c.app.state.container
+        container = cast(Any, c.app).state.container
 
     assert container.vision is None, "Expected vision=None when LOCAL_ONLY=true"

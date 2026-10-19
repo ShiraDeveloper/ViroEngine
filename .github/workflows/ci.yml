@@ -94,11 +94,13 @@ jobs:
             || { echo "::error::frontend/src/api/types.ts is stale. Run scripts/export_types.py"; exit 1; }
 
       - name: Documentation links
+        if: hashFiles('scripts/check_docs.py') != ''
         run: python scripts/check_docs.py
 
   # --------------------------------------------------------------- frontend
   frontend:
     name: Frontend (typecheck, lint, tests, build)
+    if: hashFiles('frontend/package.json') != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:

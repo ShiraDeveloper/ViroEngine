@@ -1,140 +1,101 @@
-"""Safe Line error hierarchy.
-
-Each subclass carries a stable `code` (used in JSON responses and logs)
-and an `http_status`. Add a new subclass rather than overloading an existing one.
-
-A single-page failure must never abort a batch — callers catch the specific
-subclass rather than the base class.
-"""
+"""SafeLineError hierarchy (PLAN §3.5). Each subclass has a stable `code`; add a new
+subclass rather than overloading an existing one."""
 
 from __future__ import annotations
 
 
 class SafeLineError(Exception):
-    """Base class for all domain errors.
+    """Base class. `code` is stable and appears in logs, SSE and API errors."""
 
-    Never raises — callers catch subclasses or this base class.
-    """
-
-    code: str = "SAFELINE_ERROR"
+    code: str = "INTERNAL"
     recoverable: bool = False
     http_status: int = 500
 
     def __init__(self, detail: str = "") -> None:
-        super().__init__(detail)
+        super().__init__(detail or self.code)
         self.detail = detail
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(code={self.code!r}, detail={self.detail!r})"
 
 
-# ---------------------------------------------------------------------------
-# Upload / intake errors (S0)
-# ---------------------------------------------------------------------------
-
-
 class UnsupportedMedia(SafeLineError):
-    """Content type is not application/pdf, image/png, image/jpeg, or application/zip."""
+    """Upload content is not PDF/PNG/JPEG/ZIP (judged on content, never extension)."""
 
     code = "UNSUPPORTED_MEDIA"
     http_status = 415
 
 
 class TooLarge(SafeLineError):
-    """Upload exceeds MAX_UPLOAD_MB or page count exceeds MAX_PAGES."""
+    """Upload exceeds MAX_UPLOAD_MB or MAX_PAGES."""
 
     code = "TOO_LARGE"
     http_status = 413
 
 
 class EncryptedPdf(SafeLineError):
-    """PDF is encrypted and cannot be rendered."""
+    """PDF is encrypted (T-3)."""
 
     code = "ENCRYPTED_PDF"
-    http_status = 422
+    http_status = 415
 
 
 class ActiveContentPdf(SafeLineError):
-    """PDF contains JavaScript, embedded files, or other active content."""
+    """PDF catalog holds JavaScript or an auto-launch action (T-2)."""
 
     code = "ACTIVE_CONTENT_PDF"
-    http_status = 422
+    http_status = 415
 
 
 class RenderFailed(SafeLineError):
-    """A single page could not be rendered. Recoverable: the batch continues."""
+    """One page failed to render; that page is marked failed and the batch continues."""
 
     code = "RENDER_FAILED"
-    http_status = 422
     recoverable = True
-
-
-# ---------------------------------------------------------------------------
-# OCR errors
-# ---------------------------------------------------------------------------
+    http_status = 422
 
 
 class OcrUnavailable(SafeLineError):
-    """Tesseract binary not found or Hebrew language pack missing.
-
-    This is a startup failure — /v1/health will report unready and no jobs
-    will be accepted until the binary is available.
-    """
+    """Startup failure: Tesseract or its Hebrew data is missing. No jobs are accepted."""
 
     code = "OCR_UNAVAILABLE"
     http_status = 503
 
 
-# ---------------------------------------------------------------------------
-# Provider errors (S9)
-# ---------------------------------------------------------------------------
-
-
 class ProviderRateLimited(SafeLineError):
-    """A cloud provider returned 429. Rotate to the next credential."""
+    """429 from a provider: rotate the credential, then the provider."""
 
     code = "PROVIDER_RATE_LIMITED"
-    http_status = 429
     recoverable = True
+    http_status = 502
 
 
 class ProviderInvalidKey(SafeLineError):
-    """A credential was rejected (401/403). Mark dead for this process."""
+    """401/403 from a provider: credential is dead for this process."""
 
     code = "PROVIDER_INVALID_KEY"
-    http_status = 401
+    recoverable = True
+    http_status = 502
 
 
 class ProviderBadResponse(SafeLineError):
-    """A provider returned a response that fails schema validation.
-
-    Retry once with a schema reminder; if it fails again the field is unresolved.
-    """
+    """Response failed schema validation; one retry, then the field stays unresolved."""
 
     code = "PROVIDER_BAD_RESPONSE"
-    http_status = 422
     recoverable = True
+    http_status = 502
 
 
 class ProviderExhausted(SafeLineError):
-    """All credentials and all providers failed.
-
-    Never fails the run — affected fields move to level D with reason
-    'providers_exhausted'.
-    """
+    """Every credential and provider failed. Fields become level D; the run continues."""
 
     code = "PROVIDER_EXHAUSTED"
-    http_status = 503
-    recoverable = False
-
-
-# ---------------------------------------------------------------------------
-# Job lifecycle errors
-# ---------------------------------------------------------------------------
+    recoverable = True
+    http_status = 502
 
 
 class JobPurged(SafeLineError):
-    """Job was purged (TTL expired or explicit DELETE)."""
+    """The job's artefacts were purged after JOB_TTL_MINUTES or by DELETE."""
 
     code = "JOB_PURGED"
     http_status = 404
@@ -152,3 +113,20 @@ class EditConflict(SafeLineError):
 
     code = "EDIT_CONFLICT"
     http_status = 409
+
+
+ALL_ERRORS: tuple[type[SafeLineError], ...] = (
+    UnsupportedMedia,
+    TooLarge,
+    EncryptedPdf,
+    ActiveContentPdf,
+    RenderFailed,
+    OcrUnavailable,
+    ProviderRateLimited,
+    ProviderInvalidKey,
+    ProviderBadResponse,
+    ProviderExhausted,
+    JobPurged,
+    JobNotFound,
+    EditConflict,
+)
