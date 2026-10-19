@@ -88,6 +88,7 @@ jobs:
           diff -q /tmp/openapi.json docs/openapi.json \
             || { echo "::error::docs/openapi.json is stale. Run scripts/export_openapi.py"; exit 1; }
       - name: Generated TypeScript types are up to date
+        if: hashFiles('frontend/src/api/types.ts') != ''
         run: |
           python scripts/export_types.py --out /tmp/types.ts
           diff -q /tmp/types.ts frontend/src/api/types.ts \
@@ -99,6 +100,9 @@ jobs:
   # --------------------------------------------------------------- frontend
   frontend:
     name: Frontend (typecheck, lint, tests, build)
+    # Skip gracefully until the frontend scaffold is committed.
+    # Once frontend/package.json exists this job is mandatory.
+    if: hashFiles('frontend/package.json') != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
