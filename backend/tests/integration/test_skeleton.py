@@ -90,8 +90,8 @@ def test_queue_backpressure_returns_429(monkeypatch: pytest.MonkeyPatch) -> None
         async def _always_full(job_id: str) -> None:
             raise asyncio.QueueFull()
 
-        app = cast(Any, c.app)
-        monkeypatch.setattr(app.state.job_queue, "enqueue", _always_full)
+        app_cast = cast(Any, c.app)
+        monkeypatch.setattr(app_cast.state.job_queue, "enqueue", _always_full)
 
         resp = c.post(
             "/v1/documents",
