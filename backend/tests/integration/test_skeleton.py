@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Generator
 import io
+from typing import Any, cast
 
 from fastapi.testclient import TestClient
 import pytest
@@ -86,12 +87,11 @@ def test_queue_backpressure_returns_429(monkeypatch: pytest.MonkeyPatch) -> None
 
     with TestClient(app) as c:
         # Monkey-patch the queue's enqueue method to simulate a full queue
-        original_queue = c.app.state.job_queue  # type: ignore[attr-defined]
-
         async def _always_full(job_id: str) -> None:
             raise asyncio.QueueFull()
 
-        monkeypatch.setattr(original_queue, "enqueue", _always_full)
+        app_cast = cast(Any, c.app)
+        monkeypatch.setattr(app_cast.state.job_queue, "enqueue", _always_full)
 
         resp = c.post(
             "/v1/documents",
@@ -142,6 +142,6 @@ def test_container_with_local_only_has_no_vision(monkeypatch: pytest.MonkeyPatch
     app = create_app(use_fakes=True)
 
     with TestClient(app) as c:
-        container = c.app.state.container  # type: ignore[attr-defined]
+        container = cast(Any, c.app).state.container
 
     assert container.vision is None, "Expected vision=None when LOCAL_ONLY=true"

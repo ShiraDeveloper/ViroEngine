@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, cast
 import uuid
 
 from fastapi import FastAPI, Request
@@ -107,7 +107,7 @@ def create_app(*, use_fakes: bool = False) -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(
         RateLimitExceeded,
-        _rate_limit_exceeded_handler,  # type: ignore[arg-type]
+        cast(Any, _rate_limit_exceeded_handler),
     )
 
     # --- Security headers middleware ----------------------------------------
