@@ -81,9 +81,9 @@ def test_checker_detects_backend_adapters_import(tmp_path: Path) -> None:
 
     assert len(violations) >= 1, "backend.adapters import must be detected"
     found_imports = {v[2] for v in violations}
-    assert "backend.adapters" in found_imports, (
-        f"Expected 'backend.adapters' in detected imports, got: {found_imports}"
-    )
+    assert (
+        "backend.adapters" in found_imports
+    ), f"Expected 'backend.adapters' in detected imports, got: {found_imports}"
 
 
 def test_checker_ignores_clean_file(tmp_path: Path) -> None:
@@ -128,6 +128,6 @@ def test_checker_handles_dotted_submodule(tmp_path: Path) -> None:
     )
 
     violations = find_violations(fake_core, FORBIDDEN)
-    assert any("cv2" in imp for _, _, imp in violations), (
-        "cv2.version must be caught as a cv2 violation"
-    )
+    assert any(
+        "cv2" in imp for _, _, imp in violations
+    ), "cv2.version must be caught as a cv2 violation"

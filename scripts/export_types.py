@@ -9,9 +9,9 @@ from __future__ import annotations
 import argparse
 import inspect
 import json
-import sys
 from pathlib import Path
-from typing import Any
+import sys
+from typing import Any, Literal
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -74,9 +74,11 @@ def ts_type(s: dict[str, Any]) -> str:
     if t == "object":
         if "properties" in s:
             return _inline_object(s)
-        value = ts_type(s["additionalProperties"]) if isinstance(
-            s.get("additionalProperties"), dict
-        ) else "unknown"
+        value = (
+            ts_type(s["additionalProperties"])
+            if isinstance(s.get("additionalProperties"), dict)
+            else "unknown"
+        )
         if "x-key-type" in s:
             return f"Partial<Record<{s['x-key-type']}, {value}>>"
         if "propertyNames" in s:
@@ -125,7 +127,9 @@ def build_registry() -> dict[str, dict[str, Any]]:
     registry: dict[str, dict[str, Any]] = {}
     nested: list[dict[str, Any]] = []
     for cls in _root_models():
-        mode = "validation" if cls.__name__ in REQUEST_MODELS else "serialization"
+        mode: Literal["validation", "serialization"] = (
+            "validation" if cls.__name__ in REQUEST_MODELS else "serialization"
+        )
         schema = cls.model_json_schema(mode=mode)
         nested.append(schema.pop("$defs", {}))
         schema.pop("title", None)

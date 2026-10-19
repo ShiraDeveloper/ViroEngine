@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import inspect
 import json
-import re
 from pathlib import Path
+import re
 from typing import Any
 
-import pytest
 from pydantic import BaseModel, ValidationError
+import pytest
 
 from backend.api import schemas
 from backend.api.schemas import FieldEditRequest, JobView
@@ -28,8 +28,17 @@ TYPES_TS = ROOT / "frontend" / "src" / "api" / "types.ts"
 
 # Keys that may never appear in a counters-only structure (PLAN §7.1).
 FORBIDDEN_KEYS = {
-    "value", "values", "text", "payload", "first_name", "last_name", "national_id",
-    "central_number", "commitment_number", "receipt_date", "image",
+    "value",
+    "values",
+    "text",
+    "payload",
+    "first_name",
+    "last_name",
+    "national_id",
+    "central_number",
+    "commitment_number",
+    "receipt_date",
+    "image",
 }
 
 
@@ -49,9 +58,17 @@ def _load_fixture() -> dict[str, Any]:
 
 def _field_dict(**overrides: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
-        "field": "commitment_number", "value": None, "display_value": None,
-        "level": "C", "score": 0.5, "source": "printed", "box": None,
-        "candidates": [], "validations": [], "trail": [], "reason": None,
+        "field": "commitment_number",
+        "value": None,
+        "display_value": None,
+        "level": "C",
+        "score": 0.5,
+        "source": "printed",
+        "box": None,
+        "candidates": [],
+        "validations": [],
+        "trail": [],
+        "reason": None,
         "escalated": False,
     }
     base.update(overrides)
@@ -104,7 +121,7 @@ def test_strict_models_reject_unknown_keys() -> None:
 def test_strict_models_are_immutable() -> None:
     resp = schemas.UploadResponse(job_id="j", status=models.JobStatus.queued, page_count=1)
     with pytest.raises(ValidationError):
-        resp.page_count = 2  # type: ignore[misc]
+        resp.page_count = 2
 
 
 def test_field_result_allows_none_value() -> None:
@@ -203,12 +220,23 @@ def test_fixture_round_trips_through_json() -> None:
 
 def test_error_codes_are_stable_and_unique() -> None:
     codes = [e.code for e in errors.ALL_ERRORS]
-    assert sorted(codes) == sorted([
-        "UNSUPPORTED_MEDIA", "TOO_LARGE", "ENCRYPTED_PDF", "ACTIVE_CONTENT_PDF",
-        "RENDER_FAILED", "OCR_UNAVAILABLE", "PROVIDER_RATE_LIMITED",
-        "PROVIDER_INVALID_KEY", "PROVIDER_BAD_RESPONSE", "PROVIDER_EXHAUSTED", "JOB_PURGED",
-        "JOB_NOT_FOUND", "EDIT_CONFLICT",
-    ])
+    assert sorted(codes) == sorted(
+        [
+            "UNSUPPORTED_MEDIA",
+            "TOO_LARGE",
+            "ENCRYPTED_PDF",
+            "ACTIVE_CONTENT_PDF",
+            "RENDER_FAILED",
+            "OCR_UNAVAILABLE",
+            "PROVIDER_RATE_LIMITED",
+            "PROVIDER_INVALID_KEY",
+            "PROVIDER_BAD_RESPONSE",
+            "PROVIDER_EXHAUSTED",
+            "JOB_PURGED",
+            "JOB_NOT_FOUND",
+            "EDIT_CONFLICT",
+        ]
+    )
     assert len(set(codes)) == len(codes)
 
 
@@ -234,20 +262,43 @@ def test_every_error_subclasses_safelinerror() -> None:
 @pytest.mark.parametrize(
     "payload",
     [
-        {"event": "page", "data": {"page_id": "scan#3", "label": "A3", "stage": "S4",
-                                   "status": "running", "pct": 42}},
-        {"event": "counters", "data": {"pages_done": 7, "pages_total": 30,
-                                       "fields_closed_local": 41, "crops_sent": 9}},
-        {"event": "row", "data": {"row_id": "r-004", "row_level": "D",
-                                  "flagged_fields": ["receipt_date"]}},
+        {
+            "event": "page",
+            "data": {
+                "page_id": "scan#3",
+                "label": "A3",
+                "stage": "S4",
+                "status": "running",
+                "pct": 42,
+            },
+        },
+        {
+            "event": "counters",
+            "data": {
+                "pages_done": 7,
+                "pages_total": 30,
+                "fields_closed_local": 41,
+                "crops_sent": 9,
+            },
+        },
+        {
+            "event": "row",
+            "data": {"row_id": "r-004", "row_level": "D", "flagged_fields": ["receipt_date"]},
+        },
         {"event": "done", "data": {"status": "needs_review", "flagged": 3, "duration_ms": 168000}},
-        {"event": "error", "data": {"code": "PROVIDER_EXHAUSTED", "page_id": "scan#12",
-                                    "recoverable": True}},
+        {
+            "event": "error",
+            "data": {"code": "PROVIDER_EXHAUSTED", "page_id": "scan#12", "recoverable": True},
+        },
     ],
 )
 def test_plan_sse_examples_validate(payload: dict[str, Any]) -> None:
-    matches = [t for t in schemas.SSE_EVENT_TYPES if t.model_fields["event"].annotation
-               and payload["event"] in str(t.model_fields["event"].annotation)]
+    matches = [
+        t
+        for t in schemas.SSE_EVENT_TYPES
+        if t.model_fields["event"].annotation
+        and payload["event"] in str(t.model_fields["event"].annotation)
+    ]
     assert len(matches) == 1
     matches[0].model_validate(payload)
 
@@ -259,6 +310,11 @@ def test_generated_typescript_is_current() -> None:
 
 def test_generated_typescript_exports_key_contracts() -> None:
     ts = export_types.render()
-    for name in ("export interface JobView", "export interface FieldResult",
-                 "export type ConfidenceLevel", "export type SseEvent", "export type Box"):
+    for name in (
+        "export interface JobView",
+        "export interface FieldResult",
+        "export type ConfidenceLevel",
+        "export type SseEvent",
+        "export type Box",
+    ):
         assert name in ts
