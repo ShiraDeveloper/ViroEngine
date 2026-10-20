@@ -98,6 +98,7 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     from backend.adapters.regions.rule_based import RuleBasedDetector  # T11
     from backend.adapters.storage.tempdir import TmpdirStorage  # T9
 
+    storage = TmpdirStorage(settings=settings)
     vision: VisionLLMPort | None = None
     if not settings.local_only:
         from backend.adapters.vision.chain import VisionChainAdapter  # T18
@@ -106,12 +107,12 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
 
     return Container(
         settings=settings,
-        ocr_printed=TesseractAdapter(settings=settings),
+        ocr_printed=TesseractAdapter(settings=settings, storage=storage),
         ocr_digits=TrOcrDigitsAdapter(settings=settings),
-        barcode=ZxingAdapter(),
-        regions=RuleBasedDetector(),
+        barcode=ZxingAdapter(settings=settings, storage=storage),
+        regions=RuleBasedDetector(settings=settings, storage=storage),
         vision=vision,
-        storage=TmpdirStorage(settings=settings),
+        storage=storage,
         documents=DocumentReader(settings=settings),
         imaging=CvImaging(settings=settings),
         learning=SqliteLearningStore(settings=settings),
