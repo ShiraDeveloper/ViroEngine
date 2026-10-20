@@ -33,11 +33,14 @@ class OcrPort(Protocol):
         *,
         whitelist: str | None = None,
         psm: int = 7,
+        langs: str | None = None,
     ) -> OcrResult:
         """Read a cropped region.
 
         psm=7 (single line) is the default for field crops.
         whitelist: Tesseract character whitelist (digits only for ID fields).
+        langs: Tesseract language string; None = the configured default (a whitelisted
+        crop reads with English alone, since the whitelist already fixes the alphabet).
         Never raises; returns empty OcrResult.
         """
         ...

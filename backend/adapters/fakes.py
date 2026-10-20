@@ -10,6 +10,7 @@ are deterministic regardless of when CI runs.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import hashlib
@@ -19,6 +20,7 @@ import zlib
 
 from backend.core.models import (
     BarcodeHit,
+    Box,
     CommitmentRow,
     ImageRef,
     LayoutHint,
@@ -61,6 +63,7 @@ class FakeOcr:
         *,
         whitelist: str | None = None,
         psm: int = 7,
+        langs: str | None = None,
     ) -> OcrResult:
         """Always returns an empty OcrResult. Never raises."""
         return OcrResult(reader=ReaderName.tesseract, words=[], text="", candidates=[])
@@ -101,7 +104,14 @@ class FakeRegionDetector:
 
     name: str = "fake_region_detector"
 
-    def detect(self, page: NormalizedPage, ocr: OcrResult) -> list[Region]:
+    def detect(
+        self,
+        page: NormalizedPage,
+        ocr: OcrResult,
+        barcodes: Sequence[BarcodeHit],
+        *,
+        commitment_labels: Sequence[str] = (),
+    ) -> list[Region]:
         """Always returns an empty list. Never raises."""
         return []
 
@@ -175,6 +185,10 @@ class FakeImaging:
         return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
 
     def thumbnail(self, image: bytes, *, max_side: int) -> EncodedImage:
+        """Returns the input unchanged."""
+        return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
+
+    def crop(self, image: bytes, box: Box, *, rotate_deg: int = 0) -> EncodedImage:
         """Returns the input unchanged."""
         return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
 

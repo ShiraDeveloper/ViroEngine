@@ -74,7 +74,12 @@ class MarkerOcr:
         )
 
     def read_crop(
-        self, image: ImageRef, *, whitelist: str | None = None, psm: int = 7
+        self,
+        image: ImageRef,
+        *,
+        whitelist: str | None = None,
+        psm: int = 7,
+        langs: str | None = None,
     ) -> OcrResult:
         return OcrResult(reader=ReaderName.tesseract, words=[], text="")
 
@@ -100,3 +105,48 @@ class FailingImaging(CvImaging):
         if "binarize" in self._fail:
             raise RenderFailed("binarize failed on purpose")
         return super().binarize(image)
+
+
+@dataclass
+class ScriptedOcr:
+    """OcrPort that returns the words it was given, and one scripted answer per crop read.
+
+    crop_script[i] is what the i-th read_crop call returns; later calls return nothing. Every
+    call's psm and langs are recorded so a test can check how the stage asked."""
+
+    words: list[OcrWord] = field(default_factory=list)
+    crop_script: list[list[OcrWord]] = field(default_factory=list)
+    crop_calls: list[dict[str, object]] = field(default_factory=list)
+    name: str = "scripted-ocr"
+
+    def read_page(self, image: ImageRef, langs: str = "heb+eng") -> OcrResult:
+        return OcrResult(reader=ReaderName.tesseract, words=list(self.words), text="")
+
+    def read_crop(
+        self,
+        image: ImageRef,
+        *,
+        whitelist: str | None = None,
+        psm: int = 7,
+        langs: str | None = None,
+    ) -> OcrResult:
+        index = len(self.crop_calls)
+        self.crop_calls.append({"psm": psm, "langs": langs})
+        words = self.crop_script[index] if index < len(self.crop_script) else []
+        return OcrResult(reader=ReaderName.tesseract, words=list(words), text="")
+
+    def detect_orientation(self, image: ImageRef) -> int | None:
+        return None
+
+
+@dataclass
+class ScriptedBarcode:
+    """BarcodePort that returns the hits it was given, whatever the image."""
+
+    hits: list[BarcodeHit] = field(default_factory=list)
+    name: str = "scripted-barcode"
+
+    def sweep(
+        self, image: ImageRef, orientations: tuple[int, ...] = (0, 90, 180, 270)
+    ) -> list[BarcodeHit]:
+        return list(self.hits)

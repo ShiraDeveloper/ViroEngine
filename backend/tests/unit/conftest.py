@@ -10,7 +10,8 @@ import pytest
 from backend.adapters.imaging.cv import CvImaging
 from backend.adapters.imaging.pdf import DocumentReader
 from backend.adapters.storage.tempdir import TmpdirStorage
-from backend.core.models import PageRaw
+from backend.core.models import NormalizedPage, PageMeasurement, PageRaw
+from backend.core.pipeline.s2_correct import correct
 from backend.settings import Settings
 from backend.tests.fixtures.synthetic.files import png_bytes
 from backend.tests.fixtures.synthetic.pages import Pixels
@@ -52,6 +53,33 @@ def make_page(storage: TmpdirStorage) -> Callable[[Pixels], PageRaw]:
             page_index=0,
             sha256=ref.sha256,
             image=ref,
+        )
+
+    return _make
+
+
+@pytest.fixture
+def make_normalized(
+    make_page: Callable[[Pixels], PageRaw],
+    settings: Settings,
+    storage: TmpdirStorage,
+    imaging: CvImaging,
+) -> Callable[[Pixels], NormalizedPage]:
+    """Store a synthetic image and run it through S2 untouched, as a page that needs nothing."""
+
+    def _make(image: Pixels) -> NormalizedPage:
+        measurement = PageMeasurement(
+            rotation_deg=0,
+            rotation_votes={"0": 0, "90": 0, "180": 0, "270": 0},
+            skew_deg=0.0,
+            blur_score=1000.0,
+            illumination_cv=0.0,
+            noise_score=0.0,
+            is_photo=False,
+            needs=[],
+        )
+        return correct(
+            make_page(image), measurement, settings=settings, imaging=imaging, storage=storage
         )
 
     return _make
