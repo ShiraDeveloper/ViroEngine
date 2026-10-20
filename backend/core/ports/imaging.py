@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final, Protocol, runtime_checkable
 
+from backend.core.models import Box
 from backend.core.ports.document import EncodedImage
 
 # The corrections S2 knows, in the only order they may be applied (PLAN §4 S2).
@@ -90,4 +91,12 @@ class ImagingPort(Protocol):
         """Downscale so the longest side is at most `max_side` px; never upscales.
 
         Raises RenderFailed when the image cannot be decoded."""
+        ...
+
+    def crop(self, image: bytes, box: Box, *, rotate_deg: int = 0) -> EncodedImage:
+        """Cut `box` (normalized y_min, x_min, y_max, x_max) out of the image, then turn the
+        piece `rotate_deg` degrees clockwise (0, 90, 180 or 270).
+
+        Raises RenderFailed when the image cannot be decoded or the box holds no pixels, and
+        ValueError for any other angle."""
         ...

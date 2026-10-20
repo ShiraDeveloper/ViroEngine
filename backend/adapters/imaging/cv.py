@@ -18,6 +18,7 @@ import structlog
 
 from backend.adapters.imaging.codec import Pixels, decode_bgr, encode_png
 from backend.core.errors import RenderFailed
+from backend.core.models import Box
 from backend.core.ports.document import EncodedImage
 from backend.core.ports.imaging import CORRECTION_OPS, PixelMeasurements
 from backend.settings import Settings
@@ -69,6 +70,12 @@ _SAUVOLA_R: Final = 128.0
 # Rows binarized at a time, so a 300 DPI page never needs several float32 full-size planes.
 _BAND_ROWS: Final = 512
 _WHITE: Final = (255, 255, 255)
+_CROP_ROTATIONS: Final = {
+    0: None,
+    90: cv2.ROTATE_90_CLOCKWISE,
+    180: cv2.ROTATE_180,
+    270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+}
 
 
 class CvImaging:
@@ -140,6 +147,20 @@ class CvImaging:
             return encode_png(_downscale(decode_bgr(image), max_side))
         except cv2.error as exc:
             raise RenderFailed("thumbnail failed") from exc
+
+    def crop(self, image: bytes, box: Box, *, rotate_deg: int = 0) -> EncodedImage:
+        """Cut the normalized `box` out and turn it `rotate_deg` clockwise."""
+        if rotate_deg not in _CROP_ROTATIONS:
+            raise ValueError(f"rotate_deg must be 0, 90, 180 or 270, got {rotate_deg}")
+        pixels = decode_bgr(image)
+        height, width = pixels.shape[:2]
+        y0, x0 = max(int(box[0] * height), 0), max(int(box[1] * width), 0)
+        y1, x1 = min(math.ceil(box[2] * height), height), min(math.ceil(box[3] * width), width)
+        if y1 <= y0 or x1 <= x0:
+            raise RenderFailed("crop box holds no pixels")
+        piece = pixels[y0:y1, x0:x1]
+        code = _CROP_ROTATIONS[rotate_deg]
+        return encode_png(piece if code is None else _u8(cv2.rotate(piece, code)))
 
     # ------------------------------------------------------------------ operations
 
