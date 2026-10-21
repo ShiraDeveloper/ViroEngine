@@ -50,3 +50,15 @@ providers:
     base_delay_seconds: 0.5
     max_delay_seconds: 8.0
     jitter_factor: 0.25
+
+# --- S5 sender + page-role classification (T10) -----------------------------
+# ClassifyConfig defaults in backend/core/pipeline/s5_classify.py must equal these.
+classify:
+  sender_min_ratio: null            # null -> min_ratio of config/senders.json (88)
+  logo_min_inlier: 0.35             # ORB inlier ratio
+  letterhead_top_fraction: 0.22     # letterhead band when no region was detected
+  blank_max_words: 15
+  destination_follow_tokens: 4      # tokens removed after the אל: / לכבוד markers
+  field_line_tolerance: 0.015       # normalised y distance for a label's value
+  field_value_max_tokens: 6
+  prompt_version: v1
