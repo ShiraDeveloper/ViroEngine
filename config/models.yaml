@@ -39,6 +39,16 @@ scoring:
     image: 0.08
   # END calibrated
 
+# --- Pipeline layers (T15) ---------------------------------------------------
+# Switches the ablation table (PLAN §10.5) turns off one at a time:
+#   python -m eval.run_eval --split dev --ablation no_second_read
+# PipelineLayers defaults in backend/core/pipeline/orchestrator.py must equal these.
+layers:
+  second_read: true                 # S7 independent re-read of risky candidates
+  digit_reader: true                # S7 reader 2b (TrOCR); has no effect without second_read
+  learning: true                    # learned layout hints in S4
+  logo: true                        # ORB logo fallback in S5
+
 # --- Readers ---------------------------------------------------------------
 readers:
   primary_ocr: tesseract             # "tesseract" | "surya" — bake-off decides (T17)

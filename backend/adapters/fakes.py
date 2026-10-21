@@ -32,6 +32,7 @@ from backend.core.models import (
     ReaderName,
     Region,
     RunReport,
+    SenderSpec,
     VisionRequest,
     VisionResponse,
 )
@@ -286,6 +287,27 @@ class FakeLearningStore:
     def pattern_hints(self, sender: str, field: str) -> list[PatternHint]:
         """Always returns an empty list."""
         return []
+
+
+# ---------------------------------------------------------------------------
+# SenderIndexPort fake
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FakeSenders:
+    """An empty closed list: nothing ever matches, so every sender is reported as unlisted."""
+
+    min_ratio: int = 88
+    specs: tuple[SenderSpec, ...] = ()
+
+    def get(self, canonical: str) -> SenderSpec | None:
+        """Always None: the list is empty."""
+        return None
+
+    def match(self, text: str, *, min_ratio: int | None = None) -> None:
+        """Always None: nothing in an empty list can match. Never raises."""
+        return None
 
 
 # ---------------------------------------------------------------------------

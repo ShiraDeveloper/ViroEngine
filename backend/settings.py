@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     render_dpi: int = Field(default=300, ge=100, le=600)
     max_concurrency: int = Field(default=2, ge=1, le=16)
     escalation_score_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
+    # Orchestrator (T15): pages between forced garbage collections. One page is held in memory
+    # at a time; collecting every 10 keeps the 512 MB host budget (PLAN §13 T15 step 3).
+    gc_interval_pages: int = Field(default=10, ge=1, le=1000)
 
     # --- S0 intake safety (T9) --------------------------------------------
     # Largest allowed uncompressed/compressed size ratio of a ZIP entry; real archives of
