@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --motion-fast: theme('transitionDuration.fast');
+    --motion-base: theme('transitionDuration.base');
+    --motion-slow: theme('transitionDuration.slow');
+  }
+
+  html {
+    @apply font-sans text-base text-ink-base;
+    background-color: theme('colors.surface.base');
+  }
+
+  body {
+    @apply min-h-screen;
+  }
+
+  h1 {
+    @apply text-3xl font-bold text-ink-strong;
+  }
+
+  h2 {
+    @apply text-2xl font-semibold text-ink-strong;
+  }
+
+  /* Visible focus for keyboard users. The transparent outline keeps a ring in forced-colors mode. */
+  :focus-visible {
+    box-shadow: theme('boxShadow.focus');
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+}
+
+/* Motion collapses to 0ms when the user asks for reduced motion (PLAN §9.2). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -12,8 +12,10 @@ from backend.core.ports.document import DocumentPort
 from backend.core.ports.exporter import ExporterPort
 from backend.core.ports.imaging import ImagingPort
 from backend.core.ports.learning import LearningStorePort
+from backend.core.ports.logo import LogoMatcherPort
 from backend.core.ports.ocr import OcrPort
 from backend.core.ports.region_detector import RegionDetectorPort
+from backend.core.ports.senders import SenderIndexPort
 from backend.core.ports.storage import StoragePort
 from backend.core.ports.vision_llm import VisionLLMPort
 
@@ -24,8 +26,10 @@ __all__ = [
     "ExporterPort",
     "ImagingPort",
     "LearningStorePort",
+    "LogoMatcherPort",
     "OcrPort",
     "RegionDetectorPort",
+    "SenderIndexPort",
     "StoragePort",
     "VisionLLMPort",
 ]
