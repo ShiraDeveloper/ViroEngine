@@ -1985,7 +1985,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 11 | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
 | 12 ✅ | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
 | 13 | S6–S7 central number, receipt date, TrOCR | Ahuba | P3 | D4 | 4h | 8,11 |
-| 14 | S8 scoring, ladder, calibration | Shira | P3 | D4 | 3h | 8 · **12,13 at runtime only** |
+| 14 ✅ | S8 scoring, ladder, calibration | Shira | P3 | D4 | 3h | 8 · **12,13 at runtime only** |
 | 15 | Orchestrator and evaluation runner — **M3** | Shira | P3 | D4–5 | 3h | 9–14 |
 | 16 | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
 | 17 | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
