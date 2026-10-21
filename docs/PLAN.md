@@ -2019,7 +2019,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 12 | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
 | 13 | S6–S7 central number, receipt date, TrOCR | Ahuba | P3 | D4 | 4h | 8,11 |
 | 14 ✅ | S8 scoring, ladder, calibration | Shira | P3 | D4 | 3h | 8 · **12,13 at runtime only** |
-| 15 | Orchestrator and evaluation runner — **M3** | Shira | P3 | D4–5 | 3h | 9–14 |
+| 15 ✅ | Orchestrator and evaluation runner — **M3** | Shira | P3 | D4–5 | 3h | 9–14 |
 | 16 | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
 | 17 | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
 | 18 | S9 provider layer with failover | Ahuba | P4 | D5–6 | 4h | 14,15,17 |
@@ -3193,6 +3193,13 @@ python -m eval.run_eval --gold eval/gold.csv --split dev --local-only
 # -> silent error 0.0xx | flag recall 0.9xx | flag rate 0.1xx
 # -> local close rate 1.000 | cloud calls 0
 ```
+
+> **✅ Completed — 2026-10-22 (D5)**
+> Marked complete at the owner's request.
+> Verified locally (commit `2c592d6`, Python 3.12.10): `ruff check .` clean · `mypy --strict
+> backend/core` clean (36 files) · 504 tests pass, 1 skipped.
+> Not verified in this entry: the real-sample `--split dev --local-only` baseline, the 48-page run,
+> peak memory and p50 latency, and the ablation-table row. Record them before declaring M3.
 
 ---
 
