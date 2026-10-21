@@ -2023,7 +2023,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 16 | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
 | 17 | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
 | 18 | S9 provider layer with failover | Ahuba | P4 | D5–6 | 4h | 14,15,17 |
-| 19 | Export adapters: Excel, CSV, JSON | Shira | P4 | D5–6 | **4h** | 2 · **15 at runtime only** |
+| 19 ✅ | Export adapters: Excel, CSV, JSON | Shira | P4 | D5–6 | **4h** | 2 · **15 at runtime only** |
 | 20 | S10 grouping and rows — **M4** | Ahuba | P4 | D6–7 | 3h | 15,18 |
 | 21 | Screens: login, upload, processing, export | Shira | P5 | D6–7 | 3h | 4 · **22 at runtime only** |
 | 22 | Full API: SSE, edits, audit, TTL | Ahuba | P5 | D7–8 | **6h** | 3,20 |
@@ -3479,6 +3479,9 @@ python -c "import openpyxl as x; w=x.load_workbook('out.xlsx'); s=w['התחיי�
 print(s.sheet_view.rightToLeft, s['C2'].value, type(s['E2'].value).__name__, s['E2'].number_format)"
 # -> True 011223344 date DD/MM/YYYY
 ```
+
+> **✅ Completed — 2026-10-22 (D5)**
+> Marked complete at the owner's request.
 
 ---
 
