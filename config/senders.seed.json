@@ -1,0 +1,288 @@
+{
+  "version": 1,
+  "source_url": "https://he.wikipedia.org/wiki/בתי_חולים_בישראל",
+  "match": { "min_ratio": 88, "algorithm": "rapidfuzz.token_set_ratio" },
+  "destination_suppress": [
+    "המרכז הרפואי שיבא",
+    "המרכז הרפואי תל השומר",
+    "המעבדה המרכזית לנגיפים",
+    "מעבדת נגיפים",
+    "תל השומר",
+    "שיבא",
+    "אל:",
+    "לכבוד"
+  ],
+  "generic_tokens": [
+    "בית", "חולים", "החולים", "המרכז", "מרכז", "הרפואי", "רפואי", "הרפואית", "רפואית",
+    "שירותי", "בריאות", "כללי", "ממשלתי", "ע\"ש", "hospital", "medical", "center", "centre", "health", "services"
+  ],
+  "global_commitment_deny": [
+    "מקרה", "מס' מקרה", "מס' ביקור", "מספר ביקור", "מס' קליטה",
+    "מספר קליטה", "מספר מבחנה", "פקס", "טלפון", "ת.ז"
+  ],
+  "closed_list_policy": "fuzzy>=88 else 'לא ברשימה' + needs_review",
+  "senders": [
+    {
+      "canonical": "מאוחדת", "family": "hmo", "source": "constant",
+      "aliases": ["מאוחדת", "meuhedet", "מאוחדת שירותי בריאות"],
+      "keywords": ["מאוחדת", "רמה אחרת"],
+      "commitment_labels": ["התחייבות מספר", "מספר התחייבות"],
+      "pattern_hints": ["^\\d{8,10}$"], "barcode_is_commitment": false,
+      "notes": "Service provider in the header; validity date at the bottom. A1."
+    },
+    {
+      "canonical": "כללית", "family": "hmo", "source": "constant",
+      "aliases": ["כללית", "clalit", "שירותי בריאות כללית"],
+      "keywords": ["כללית", "שירותי בריאות כללית"],
+      "commitment_labels": ["מספר ההתחייבות", "התחייבות לתשלום", "מספר התחייבות", "דרישה", "מספר"],
+      "pattern_hints": ["^\\d{6,10}$"], "barcode_is_commitment": false,
+      "notes": "Form 17 printed (A5); form 293/17 handwritten in numbered cells (B10, B11). LabOS A6: the sample number may serve as the commitment - VERIFY. SAP page A4."
+    },
+    {
+      "canonical": "מכבי שירותי בריאות", "family": "hmo", "source": "constant",
+      "aliases": ["מכבי", "maccabi", "מכבי שירותי בריאות"],
+      "keywords": ["מכבי", "מכבי שירותי בריאות"],
+      "commitment_labels": ["מספר ההתחייבות", "התחייבות", "דרישה"],
+      "pattern_hints": ["^\\d{8,10}$"], "barcode_is_commitment": true,
+      "notes": "Three barcodes on the online form; ID also a barcode. A9 (LabOS, 'דרישה'), A10."
+    },
+    {
+      "canonical": "לאומית שירותי בריאות", "family": "hmo", "source": "constant",
+      "aliases": ["לאומית", "leumit", "לאומית שירותי בריאות"],
+      "keywords": ["לאומית", "לאומית שירותי בריאות"],
+      "commitment_labels": ["דגימה", "מספר ההתחייבות", "דרישה"],
+      "pattern_hints": ["^\\d{8,10}$"], "barcode_is_commitment": false,
+      "notes": "Work-list report uses 'דגימה' as the commitment. A8. A25 is a Leumit SAP page with several commitment rows."
+    },
+    {
+      "canonical": "אסף הרופא", "family": "hospital", "source": "seed",
+      "aliases": ["שמיר", "אסף הרופא", "המרכז הרפואי שמיר", "asaf harofe", "shamir"],
+      "keywords": ["שמיר", "אסף הרופא", "אגף המעבדות"],
+      "commitment_labels": ["מספר התחייבות"], "pattern_hints": ["^\\d{4,6}$"],
+      "notes": "Boxed commitment number (2646 / 2657). A26, B1."
+    },
+    {
+      "canonical": "רמב\"ם", "family": "hospital", "source": "seed",
+      "aliases": ["רמבם", "רמב\"ם", "rambam", "הקריה הרפואית לבריאות האדם"],
+      "keywords": ["רמב\"ם", "הקריה הרפואית"],
+      "commitment_labels": ["מספר דגימה", "מספר התחייבות"],
+      "pattern_hints": ["^944\\d{6}$", "^\\d{6}$"],
+      "notes": "VERIFY: printed '000351/2026' + handwritten '944' -> 944000351. LabOS report: sample number serves as commitment. A15, A16, A19."
+    },
+    {
+      "canonical": "לניאדו", "family": "hospital", "source": "seed",
+      "aliases": ["לניאדו", "laniado"],
+      "keywords": ["לניאדו"],
+      "commitment_labels": ["מספר התחייבות"], "pattern_hints": ["^[A-Z]\\d{4,8}$"],
+      "notes": "COMMITMENT CONTAINS A LETTER: X132767. Pages rotated 90deg. B14, B15."
+    },
+    {
+      "canonical": "וולפסון", "family": "hospital", "source": "seed",
+      "aliases": ["וולפסון", "אדית וולפסון", "wolfson"],
+      "keywords": ["וולפסון", "אדית וולפסון"],
+      "commitment_labels": ["מספר התחייבות"], "pattern_hints": ["^\\d{6,8}$"],
+      "barcode_is_commitment": null,
+      "notes": "VERIFY: highlighted vertical barcode (7254627) may be the commitment, but 7254627 is also listed as a central-number decoy in §2.5. B12, B13."
+    },
+    {
+      "canonical": "קפלן", "family": "hospital", "source": "seed",
+      "aliases": ["קפלן", "kaplan", "המרכז הרפואי קפלן"],
+      "keywords": ["קפלן"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"], "pattern_hints": ["^\\d{8}$"],
+      "barcode_is_commitment": null,
+      "notes": "CONFIRM: barcode 66608446 / 66608489 (also a central-number decoy in §2.5). Labels are the generic default until the form is read. B18, B19."
+    },
+    {
+      "canonical": "מאיר", "family": "hospital", "source": "seed",
+      "aliases": ["מאיר", "meir", "המרכז הרפואי מאיר"],
+      "keywords": ["מאיר", "המרכז הרפואי מאיר"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"], "pattern_hints": ["^\\d{4,6}$"],
+      "barcode_is_commitment": null,
+      "notes": "CONFIRM: 82857 / 82853 on the sticker. 'מאיר' is also a common personal name - a physician's name can match; prefer the letterhead region. B16, B17."
+    },
+    {
+      "canonical": "הלל יפה", "family": "hospital", "source": "seed",
+      "aliases": ["הלל יפה", "hillel yaffe", "המרכז הרפואי הלל יפה"],
+      "keywords": ["הלל יפה"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"], "pattern_hints": ["^\\d{4}\\s?\\d{5}$"],
+      "barcode_is_commitment": null,
+      "notes": "CONFIRM: '2648 00879' on a barcode; §2.5 lists the same value as a central-number decoy. B8, B9."
+    },
+    {
+      "canonical": "בני ציון", "family": "hospital", "source": "seed",
+      "aliases": ["בני ציון", "bnei zion", "המרכז הרפואי בני ציון", "רוטשילד בני ציון"],
+      "keywords": ["בני ציון"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"], "pattern_hints": ["^\\d{6}$"],
+      "notes": "436702 / 436703. B4, B5."
+    },
+    {
+      "canonical": "שניידר", "family": "hospital", "source": "seed",
+      "aliases": ["שניידר", "schneider", "המרכז הרפואי שניידר לילדים"],
+      "keywords": ["שניידר"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"], "pattern_hints": ["^\\d{6}$"],
+      "notes": "107646. B2."
+    },
+    {
+      "canonical": "אסותא אשדוד", "family": "hospital", "source": "seed",
+      "aliases": ["אסותא אשדוד", "אסותא", "assuta ashdod", "assuta"],
+      "keywords": ["אסותא", "אסותא אשדוד"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"], "pattern_hints": ["^\\d{9}$"],
+      "notes": "141046589. B3. A private hospital; Assuta Ramat HaHayal is a separate entry."
+    },
+    {
+      "canonical": "ברזילי", "family": "hospital", "source": "seed",
+      "aliases": ["ברזילי", "barzilai", "המרכז הרפואי ברזילי"],
+      "keywords": ["ברזילי"],
+      "commitment_labels": ["מס' התחייבות", "מספר התחייבות"], "pattern_hints": ["^\\d{5}$"],
+      "notes": "HANDWRITTEN after 'מס' התחייבות' (11001, 11024). B6, B7."
+    },
+    {
+      "canonical": "כרמל", "family": "hospital", "source": "seed",
+      "aliases": ["כרמל", "carmel", "המרכז הרפואי כרמל"],
+      "keywords": ["כרמל"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"], "pattern_hints": ["^\\d{8}$"],
+      "notes": "11118052. A12 (also a Clalit LabOS page - check the letterhead). Not the same as Maccabi Karmiel (A9)."
+    },
+    {
+      "canonical": "שערי צדק", "family": "hospital", "source": "seed",
+      "aliases": ["שערי צדק", "shaare zedek", "המרכז הרפואי שערי צדק"],
+      "keywords": ["שערי צדק"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"], "pattern_hints": ["^\\d{6}$"],
+      "notes": "251493. A13."
+    },
+    {
+      "canonical": "מעבדת רוזנבלט", "family": "private_lab", "source": "seed",
+      "aliases": ["רוזנבלט", "rosenblatt", "מעבדת רוזנבלט"],
+      "keywords": ["רוזנבלט", "פרופיל רוזנבלט"],
+      "commitment_labels": [], "commitment_deny": ["מס' קליטה", "מספר קליטה"],
+      "notes": "NO commitment number exists. 'מס' קליטה' is a trap. A17, A18, A21."
+    },
+    {
+      "canonical": "צה\"ל - חיל הרפואה", "family": "military", "source": "seed",
+      "aliases": ["צהל", "צה\"ל", "חיל הרפואה", "meditik"],
+      "keywords": ["חיל הרפואה", "MediTik", "אסמכתא תקציבית"],
+      "commitment_labels": ["אסמכתא תקציבית מספר", "אסמכתא"],
+      "pattern_hints": ["^\\d{9}$"],
+      "notes": "109982530. A20."
+    },
+    {
+      "canonical": "המכון לרפואה משפטית", "family": "state_institute", "source": "seed",
+      "aliases": ["רפואה משפטית", "המכון הלאומי לרפואה משפטית", "forensic medicine"],
+      "keywords": ["המרכז הלאומי לרפואה משפטית", "National Center of Forensic Medicine"],
+      "commitment_labels": [],
+      "notes": "ASK ORGANIZERS which number is the commitment (open question). English form. A24. Empty labels mean the field stays empty and flagged."
+    },
+    {
+      "canonical": "KGI", "family": "private_lab", "source": "seed",
+      "aliases": ["KGI", "קי ג'י איי"],
+      "keywords": ["KGI"],
+      "commitment_labels": [],
+      "notes": "VERIFY: identity, family and commitment label unknown - ASK ORGANIZERS. A14."
+    },
+    {
+      "canonical": "הדסה עין כרם", "family": "hospital", "source": "seed",
+      "aliases": ["הדסה עין כרם", "hadassah ein kerem", "הדסה"],
+      "keywords": ["הדסה עין כרם"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels. The bare alias 'הדסה' ties with Har HaTsofim and then returns no match."
+    },
+    {
+      "canonical": "הדסה הר הצופים", "family": "hospital", "source": "seed",
+      "aliases": ["הדסה הר הצופים", "hadassah mount scopus", "הדסה"],
+      "keywords": ["הדסה הר הצופים"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels."
+    },
+    {
+      "canonical": "סורוקה", "family": "hospital", "source": "seed",
+      "aliases": ["סורוקה", "soroka", "המרכז הרפואי סורוקה"],
+      "keywords": ["סורוקה"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels."
+    },
+    {
+      "canonical": "איכילוב", "family": "hospital", "source": "seed",
+      "aliases": ["איכילוב", "ichilov", "סוראסקי", "המרכז הרפואי תל אביב"],
+      "keywords": ["איכילוב", "סוראסקי"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels."
+    },
+    {
+      "canonical": "רבין", "family": "hospital", "source": "seed",
+      "aliases": ["רבין", "rabin", "בילינסון", "בלינסון", "השרון", "beilinson"],
+      "keywords": ["רבין", "בילינסון"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels. Covers Beilinson and HaSharon campuses."
+    },
+    {
+      "canonical": "פוריה", "family": "hospital", "source": "seed",
+      "aliases": ["פוריה", "poriya"],
+      "keywords": ["פוריה"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels."
+    },
+    {
+      "canonical": "זיו", "family": "hospital", "source": "seed",
+      "aliases": ["זיו", "ziv", "המרכז הרפואי זיו"],
+      "keywords": ["זיו"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels. Short name - prefer the letterhead region."
+    },
+    {
+      "canonical": "העמק", "family": "hospital", "source": "seed",
+      "aliases": ["העמק", "emek", "המרכז הרפואי העמק"],
+      "keywords": ["העמק"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels."
+    },
+    {
+      "canonical": "הגליל המערבי", "family": "hospital", "source": "seed",
+      "aliases": ["הגליל המערבי", "גליל מערבי", "נהריה", "galilee medical center"],
+      "keywords": ["הגליל המערבי", "נהריה"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels."
+    },
+    {
+      "canonical": "יוספטל", "family": "hospital", "source": "seed",
+      "aliases": ["יוספטל", "yoseftal"],
+      "keywords": ["יוספטל"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels."
+    },
+    {
+      "canonical": "מעיני הישועה", "family": "hospital", "source": "seed",
+      "aliases": ["מעיני הישועה", "maayanei hayeshua"],
+      "keywords": ["מעיני הישועה"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels."
+    },
+    {
+      "canonical": "אסותא רמת החייל", "family": "hospital", "source": "seed",
+      "aliases": ["אסותא רמת החייל", "assuta ramat hahayal"],
+      "keywords": ["אסותא רמת החייל"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels. The bare word 'אסותא' belongs to Assuta Ashdod."
+    },
+    {
+      "canonical": "הרצליה מדיקל סנטר", "family": "hospital", "source": "seed",
+      "aliases": ["הרצליה מדיקל סנטר", "herzliya medical center"],
+      "keywords": ["הרצליה מדיקל סנטר"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels."
+    },
+    {
+      "canonical": "אלישע", "family": "hospital", "source": "seed",
+      "aliases": ["אלישע", "elisha"],
+      "keywords": ["אלישע"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels."
+    },
+    {
+      "canonical": "לין", "family": "hospital", "source": "seed",
+      "aliases": ["לין", "lin medical center"],
+      "keywords": ["לין"],
+      "commitment_labels": ["מספר התחייבות", "התחייבות"],
+      "notes": "Grammar not yet observed; generic labels. Short name - prefer the letterhead region."
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+# Sender closed-list adapter
