@@ -49,6 +49,15 @@ testing with a screen reader (NVDA or VoiceOver) and expert review, which was ou
 8.5 days.** We do not claim conformance; we claim the automated checks pass and the design
 decisions were made with AA in mind.
 
+### CSV export and leading zeros
+
+The CSV file stores `011223344` correctly, but a CSV carries no cell types. If a technician
+double-clicks it, Excel reads the column as a number and drops the leading zero (and may show long
+numbers in scientific notation). The `.xlsx` export is not affected: identifier cells are written
+as text. For Excel use the workbook; to read a CSV in Excel use Data > From Text/CSV and set the ID,
+central and commitment columns to Text. We do not wrap values in `="..."` because that would
+corrupt the data for every other consumer.
+
 ### The learning layer is not autonomous
 
 It learns only from human confirmations, needs three of them before a hint affects scoring, and
