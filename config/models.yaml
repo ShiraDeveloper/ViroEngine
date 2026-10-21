@@ -62,3 +62,30 @@ classify:
   field_line_tolerance: 0.015       # normalised y distance for a label's value
   field_value_max_tokens: 6
   prompt_version: v1
+
+# --- S6 identity candidates: ID, names, commitment (T12) ----------------------
+# IdentityConfig defaults in backend/core/pipeline/s6_candidates_identity.py must equal these.
+# Distances are normalised page fractions.
+identity:
+  id_label_radius: 0.12             # of page width, from the ID label to its first digit
+  id_min_digits: 7                  # a lost leading zero is padded in normalization
+  id_max_digits: 10                 # a surplus leading zero is stripped in normalization
+  id_max_tokens: 4
+  name_radius: 0.25                 # ASSUMPTION: a name runs to the end of its line
+  name_max_tokens: 4
+  commitment_radius: 0.18           # of page width, in the reading direction
+  commitment_max_tokens: 3
+  chain_gap: 0.05                   # largest gap between tokens of one value
+  line_tolerance: 0.015             # y distance that still counts as the same line
+  below_gap: 0.05                   # label-to-value vertical gap when the value is below
+  column_margin: 0.03               # SAP commitment column slack around its header
+  barcode_confidence: 0.95          # reported confidence of a decoded symbol
+
+# --- S7 second local read (T12) ----------------------------------------------
+# SecondReadConfig defaults in backend/core/pipeline/s7_second_read.py must equal these.
+second_read:
+  risky_confidence: 0.75            # reader confidence below this triggers a second read
+  pad_fraction: 0.02                # crop padding, fraction of the image diagonal
+  upscale: 2.5                      # cubic; below 2 the gain disappears, above 3 only cost grows
+  psm: 7                            # Tesseract single-line mode
+  digit_candidates: 5               # most alternatives taken from the digit reader

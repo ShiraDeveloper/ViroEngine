@@ -1983,7 +1983,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 9 | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
 | 10 ✅ | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
 | 11 | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
-| 12 | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
+| 12 ✅ | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
 | 13 | S6–S7 central number, receipt date, TrOCR | Ahuba | P3 | D4 | 4h | 8,11 |
 | 14 | S8 scoring, ladder, calibration | Shira | P3 | D4 | 3h | 8 · **12,13 at runtime only** |
 | 15 | Orchestrator and evaluation runner — **M3** | Shira | P3 | D4–5 | 3h | 9–14 |
@@ -2850,6 +2850,14 @@ python -m tools.demo candidates A1 B14 A17 --fields commitment_number,national_i
 ```
 A1's ID is read with ten digits (**VERIFY**); the surplus leading zero is stripped before the check
 digit runs, so length alone never rejects it (§5.3).
+
+> **✅ Completed — 2026-10-21 (D4)**
+> Verified locally: `ruff check` and `ruff format --check` clean · `mypy backend` and
+> `mypy --strict backend/core` clean · layering 0 violations · `bandit -ll` clean (0 medium/high) ·
+> 73 tests pass across `test_candidates_identity.py`, `test_candidates_commitment.py` and
+> `test_second_read.py` (the nineteen named tests plus extras), inside a green 329-test suite.
+> **Not measured, so not claimed:** candidate recall ≥ 95% for ID and commitment on the dev split —
+> that run depends on the gold set from T7, which is still pending joint labelling.
 
 ---
 
