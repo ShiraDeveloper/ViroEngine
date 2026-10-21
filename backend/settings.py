@@ -45,6 +45,69 @@ class Settings(BaseSettings):
     max_concurrency: int = Field(default=2, ge=1, le=16)
     escalation_score_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
 
+    # --- S0 intake safety (T9) --------------------------------------------
+    # Largest allowed uncompressed/compressed size ratio of a ZIP entry; real archives of
+    # scans are near 1:1, a bomb exceeds this immediately.
+    zip_max_ratio: float = Field(default=100.0, ge=1.0, le=10_000.0)
+    # Pixel budget of one rendered or decoded page (megapixels). A4 at 300 DPI is ~8.7 MP,
+    # A3 ~17.4 MP; the cap bounds memory on a 512 MB host against hostile page sizes.
+    max_render_megapixels: float = Field(default=30.0, gt=0.0, le=200.0)
+
+    # --- S1 measurement thresholds (T9) -----------------------------------
+    # A correction is flagged only when its measurement crosses its threshold.
+    skew_threshold_deg: float = Field(default=0.5, ge=0.0, le=45.0)  # deskew above
+    skew_max_deg: float = Field(default=15.0, gt=0.0, le=45.0)  # beyond: unreliable, report 0
+    blur_threshold: float = Field(default=100.0, ge=0.0)  # Laplacian variance; sharpen below
+    illumination_cv_threshold: float = Field(default=0.18, ge=0.0)  # clahe above
+    # Share of ink in specks of <=4 px; denoise above. Measured: real sample pages <=0.03,
+    # synthetic fax grain 0.08. (The plan's 0.12 belonged to a different noise definition.)
+    noise_threshold: float = Field(default=0.05, ge=0.0, le=1.0)
+    perspective_threshold: float = Field(default=0.02, ge=0.0, le=1.0)  # of page diagonal
+    # Orientation: signals voting for one angle needed before a page is rotated.
+    rotation_min_votes: int = Field(default=2, ge=1, le=3)
+    ocr_probe_max_side: int = Field(default=1200, ge=300, le=4000)  # px, low-res orientation pass
+    ocr_probe_min_words: int = Field(default=5, ge=1)  # Hebrew words needed to cast a vote
+    ocr_probe_min_ratio: float = Field(default=1.5, ge=1.0)  # winner vs runner-up word count
+    ocr_min_word_confidence: float = Field(default=0.30, ge=0.0, le=1.0)  # 0..1, Tesseract/100
+
+    # --- S2 correction (T9) -----------------------------------------------
+    sharpen_scale: float = Field(default=1.5, ge=1.0, le=3.0)  # cubic upscale before unsharp
+    sauvola_window: int = Field(default=25, ge=3, le=201)  # px, odd
+    sauvola_k: float = Field(default=0.2, ge=0.0, le=1.0)
+    thumb_max_side: int = Field(default=512, ge=64, le=2048)  # px, longest side of `thumb`
+
+    # --- S3 page OCR and barcode sweep (T11) ------------------------------
+    ocr_langs: str = "heb+eng"  # Hebrew letterheads carry English test names on the same page
+    tesseract_oem: int = Field(default=1, ge=0, le=3)  # 1 = LSTM engine
+    # 3 = fully automatic, mixed blocks. psm 6 (one block) loses the stickers and the sideways
+    # "מרכזי" caption.
+    tesseract_psm: int = Field(default=3, ge=0, le=13)
+    ocr_timeout_seconds: int = Field(default=120, ge=1, le=600)  # bounds a hostile page
+    # Tesseract's orientation confidence below which OSD abstains from the S1 vote.
+    osd_min_confidence: float = Field(default=2.0, ge=0.0)
+    # Width of the y window that puts words on one line, in median word heights.
+    line_height_tolerance: float = Field(default=1.2, gt=0.0, le=5.0)
+    # Neighbourhood of a sticker, a caption or a label, as a share of the page diagonal. The
+    # sideways caption sits this close to its barcode; the next unrelated label does not.
+    proximity_radius: float = Field(default=0.06, gt=0.0, le=1.0)
+    bars_retry_scale: float = Field(default=2.0, ge=1.0, le=4.0)  # retry of an undecoded barcode
+
+    # --- S4 regions (T11) -------------------------------------------------
+    # Printed sideways, so OCR is imperfect: one wrong letter of five scores 80. Measured on the
+    # 48 sample pages (41 central stickers, 97 barcodes): 80 finds 33 stickers and 85 finds 30,
+    # with no false caption at either (S4 additionally requires a sideways caption to be tall).
+    central_caption_fuzz: int = Field(default=80, ge=0, le=100)
+    # The plan's value, for the caption on a page with no barcode: ordinary horizontal text,
+    # where 80 admits "המרכזית" and "ומרכז" (both seen on the sample SAP pages).
+    upright_caption_fuzz: int = Field(default=85, ge=0, le=100)
+    receipt_stamp_fuzz: int = Field(default=80, ge=0, le=100)  # faint and overprinted
+    label_fuzz: int = Field(default=85, ge=0, le=100)  # patient, commitment and clinical labels
+    # How far a label's value extends past the label, in page widths (reading direction).
+    label_value_expand: float = Field(default=0.18, gt=0.0, le=1.0)
+    letterhead_fraction: float = Field(default=0.22, gt=0.0, le=1.0)  # top share of the page
+    # Learned layout hints compete with detections instead of overriding them.
+    learned_region_score: float = Field(default=0.40, ge=0.0, le=1.0)
+
     # --- Paths ------------------------------------------------------------
     tesseract_cmd: str = "/usr/bin/tesseract"
     models_dir: str = "./models"
@@ -64,6 +127,13 @@ class Settings(BaseSettings):
     def origins_list(self) -> list[str]:
         """Split comma-separated CORS origins."""
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    @field_validator("sauvola_window")
+    @classmethod
+    def _validate_sauvola_window(cls, v: int) -> int:
+        if v % 2 == 0:
+            raise ValueError(f"sauvola_window must be odd, got {v}")
+        return v
 
     @field_validator("log_level")
     @classmethod

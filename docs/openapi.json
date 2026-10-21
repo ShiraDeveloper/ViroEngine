@@ -94,6 +94,30 @@
           }
         }
       }
+    },
+    "/v1/senders": {
+      "get": {
+        "tags": [
+          "senders"
+        ],
+        "summary": "List Senders",
+        "description": "Return the closed list of known sender institutions.\n\nRequires X-API-Key header when API_KEY is configured.\nReturns an empty list until Task 6 populates config/senders.json.",
+        "operationId": "list_senders_v1_senders_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {},
+                  "type": "array",
+                  "title": "Response List Senders V1 Senders Get"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

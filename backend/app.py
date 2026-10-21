@@ -152,9 +152,11 @@ def create_app(*, use_fakes: bool = False) -> FastAPI:
     # --- Routers -----------------------------------------------------------
     from backend.api.documents import router as documents_router
     from backend.api.meta import router as meta_router
+    from backend.api.senders import router as senders_router
 
     app.include_router(meta_router, prefix="/v1")
     app.include_router(documents_router, prefix="/v1")
+    app.include_router(senders_router, prefix="/v1")
 
     return app
 

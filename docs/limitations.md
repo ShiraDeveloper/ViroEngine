@@ -30,6 +30,17 @@ The rule-based detector finds regions by reading the labels around them. If the 
 unreadable, or the layout is unfamiliar, it has nothing to work from. The YOLOv8n experiment
 (Task 16) addresses this, under a decision rule declared in advance. _Outcome: to be filled._
 
+Measured by Task 11 on the 48 sample pages (ground truth counted by eye; dev data, not held-out):
+
+- **Central stickers with a barcode: 36 of 41 found.** The misses are two tilted stickers, one whose
+  caption the scan cuts off, and two whose caption the strip read did not return.
+- **Handwritten central numbers on SAP screens: none found.** Tesseract cannot read the handwritten
+  caption, so there is nothing to anchor a region to. These fields fall to the cloud reader or the
+  technician.
+- **Receipt stamps: 1 page of 48 gets a correct region.** The stamp's large, tilted lettering is not
+  read by the page pass. Target was ≥ 90%.
+- Mean region IoU is not reported: there are no gold boxes yet.
+
 ### Accessibility
 
 Automated `axe-core` checks run on all six screens in CI and are green. Automated tooling catches

@@ -33,11 +33,22 @@ class OcrPort(Protocol):
         *,
         whitelist: str | None = None,
         psm: int = 7,
+        langs: str | None = None,
     ) -> OcrResult:
         """Read a cropped region.
 
         psm=7 (single line) is the default for field crops.
         whitelist: Tesseract character whitelist (digits only for ID fields).
+        langs: Tesseract language string; None = the configured default (a whitelisted
+        crop reads with English alone, since the whitelist already fixes the alphabet).
         Never raises; returns empty OcrResult.
+        """
+        ...
+
+    def detect_orientation(self, image: ImageRef) -> int | None:
+        """Orientation-and-script detection (Tesseract `--psm 0`) for S1 voting.
+
+        Returns the clockwise rotation in degrees (0, 90, 180 or 270) that makes the text
+        upright, or None when the page is too sparse to tell. Never raises.
         """
         ...

@@ -26,6 +26,7 @@ class BarcodePort(Protocol):
     ) -> list[BarcodeHit]:
         """Decode all barcodes visible at any of the given orientations (degrees clockwise).
 
+        BarcodeHit.orientation_deg: the clockwise rotation of the page that makes the code upright.
         Returns every hit found. Any symbology, any payload length — never filtered.
         Returns an empty list when no barcode is found. Never raises.
         """
