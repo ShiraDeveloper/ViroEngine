@@ -1981,7 +1981,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
 | 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
 | 9 | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
-| 10 | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
+| 10 ✅ | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
 | 11 | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
 | 12 | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
 | 13 | S6–S7 central number, receipt date, TrOCR | Ahuba | P3 | D4 | 4h | 8,11 |
@@ -2692,6 +2692,17 @@ python -m tools.demo classify A25 A4 --pdf reference/samples_part1.pdf
 # -> A4 : sender=כללית  method=goram_mafne role=sap_screen
 ```
 Reference: `samples_part2.pdf` p.12 — "לכבוד ביה"ח" at the top, the classic trap.
+
+> **✅ Completed — 2026-10-21 (D4)**
+> Verified locally: `ruff check` and `ruff format --check` clean · `mypy backend` and
+> `mypy --strict backend/core` clean · layering 0 violations · 267 tests pass, including
+> `test_classify.py` (the twelve named tests plus extras) and `test_logo_match.py` (synthetic images).
+> **Not measured, so not claimed:** sender accuracy on the dev split (target ≥ 95%), the
+> "zero of 48 pages return a destination" gate, and re-measuring the 88 threshold. They need
+> `eval/gold.csv` and the real S3–S4 (T11). The threshold stays at the list's own value.
+> Also open: logo crops in `config/logos/` (manifest is empty) and the `tools.demo classify`
+> command. `classify` takes extra optional keywords (`logo`, `crop`, `barcodes`, `config`).
+> The "shared central number" continuation rule is left to S10.
 
 ---
 
