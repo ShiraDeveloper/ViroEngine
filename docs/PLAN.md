@@ -2008,12 +2008,17 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 6 ✅ | Senders closed list | Shira | P1 | D2 | 2h | 2 |
 | 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
 | 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
+| 9 | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
+| 10 ✅ | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
+| 11 | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
+| 12 ✅ | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
+| 8 | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
 | 9 ✅ | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
 | 10 | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
 | 11 ✅ | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
 | 12 | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
 | 13 | S6–S7 central number, receipt date, TrOCR | Ahuba | P3 | D4 | 4h | 8,11 |
-| 14 | S8 scoring, ladder, calibration | Shira | P3 | D4 | 3h | 8 · **12,13 at runtime only** |
+| 14 ✅ | S8 scoring, ladder, calibration | Shira | P3 | D4 | 3h | 8 · **12,13 at runtime only** |
 | 15 | Orchestrator and evaluation runner — **M3** | Shira | P3 | D4–5 | 3h | 9–14 |
 | 16 | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
 | 17 | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
@@ -2768,6 +2773,17 @@ python -m tools.demo classify A25 A4 --pdf reference/samples_part1.pdf
 ```
 Reference: `samples_part2.pdf` p.12 — "לכבוד ביה"ח" at the top, the classic trap.
 
+> **✅ Completed — 2026-10-21 (D4)**
+> Verified locally: `ruff check` and `ruff format --check` clean · `mypy backend` and
+> `mypy --strict backend/core` clean · layering 0 violations · 267 tests pass, including
+> `test_classify.py` (the twelve named tests plus extras) and `test_logo_match.py` (synthetic images).
+> **Not measured, so not claimed:** sender accuracy on the dev split (target ≥ 95%), the
+> "zero of 48 pages return a destination" gate, and re-measuring the 88 threshold. They need
+> `eval/gold.csv` and the real S3–S4 (T11). The threshold stays at the list's own value.
+> Also open: logo crops in `config/logos/` (manifest is empty) and the `tools.demo classify`
+> command. `classify` takes extra optional keywords (`logo`, `crop`, `barcodes`, `config`).
+> The "shared central number" continuation rule is left to S10.
+
 ---
 
 ### Task 11 — S3–S4: page OCR, barcode sweep, region detection
@@ -2971,6 +2987,14 @@ python -m tools.demo candidates A1 B14 A17 --fields commitment_number,national_i
 ```
 A1's ID is read with ten digits (**VERIFY**); the surplus leading zero is stripped before the check
 digit runs, so length alone never rejects it (§5.3).
+
+> **✅ Completed — 2026-10-21 (D4)**
+> Verified locally: `ruff check` and `ruff format --check` clean · `mypy backend` and
+> `mypy --strict backend/core` clean · layering 0 violations · `bandit -ll` clean (0 medium/high) ·
+> 73 tests pass across `test_candidates_identity.py`, `test_candidates_commitment.py` and
+> `test_second_read.py` (the nineteen named tests plus extras), inside a green 329-test suite.
+> **Not measured, so not claimed:** candidate recall ≥ 95% for ID and commitment on the dev split —
+> that run depends on the gold set from T7, which is still pending joint labelling.
 
 ---
 
