@@ -36,7 +36,13 @@ from backend.core.models import (
 from backend.core.pipeline.s10_rows import RowContext, assemble_rows
 from backend.core.pipeline.vision_first import VisionServices, read_batch_vision
 from backend.core.scoring import DEFAULT_WEIGHTS, ScoringConfig
-from backend.core.vision_schema import PagePayload, label_belongs, name_plausible, page_answers
+from backend.core.vision_schema import (
+    PagePayload,
+    label_belongs,
+    name_label_clear,
+    name_plausible,
+    page_answers,
+)
 from backend.settings import Settings
 from backend.tests.fixtures.synthetic.pages import Pixels, clean_page
 
@@ -370,10 +376,6 @@ def test_a_name_read_from_the_address_line_is_dropped(
         (FieldKey.first_name, "מטופל:", True),
         (FieldKey.first_name, "First Name", True),
         (FieldKey.last_name, "שם ומשפחה", True),
-        (FieldKey.first_name, "", True),  # the patient sticker has no label
-        (FieldKey.first_name, "ת.ז", False),  # a name label is required
-        (FieldKey.last_name, "מחלקה", False),
-        (FieldKey.first_name, "בדיקה", False),
         (FieldKey.national_id, "ת.ז", True),
         (FieldKey.national_id, "מקרה", False),
         (FieldKey.commitment_number, "מס' קליטה", False),
@@ -385,6 +387,23 @@ def test_a_value_is_kept_only_beside_its_own_label(
     key: FieldKey, label: str, belongs: bool
 ) -> None:
     assert label_belongs(key, label) is belongs
+
+
+@pytest.mark.parametrize(
+    ("label", "clear"),
+    [
+        ("שם פרטי", True),
+        ("שם משפ'", True),
+        ("מטופל:", True),
+        ("First Name", True),
+        ("", True),  # the patient sticker has no label
+        ('ע"ש', False),  # A14: "שם" misread - kept, but reviewed
+        ("ת.ז", False),
+        ("מחלקה", False),
+    ],
+)
+def test_a_name_beside_a_non_name_label_is_unclear(label: str, clear: bool) -> None:
+    assert name_label_clear(label) is clear
 
 
 @pytest.mark.parametrize(
@@ -492,3 +511,22 @@ def test_the_store_counts_outcomes_without_values(tmp_path: Path) -> None:
     [stat] = store.field_stats()
     assert (stat.confirmed, stat.corrected) == (1, 2)
     assert "011223344" not in stat.model_dump_json()
+
+
+def test_a_name_beside_a_foreign_looking_label_is_shown_but_reviewed(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    """A14: the model reported the label "שם" as 'ע"ש'. The correct name must stay visible, and a
+    name not tied to a name label must never pass as confirmed - even when both readers agree."""
+    first = {"value": "ישראל", "label": 'ע"ש', "source": "handwritten", "box": BOX}
+    vision = Scripted(page=page_json(first_name=first))
+    verify = Scripted(verify={FieldKey.first_name: ["ישראל"]})
+    [outcome] = read_batch_vision(
+        [raw], services=services(settings, storage, imaging, vision, verify)
+    )
+
+    assert outcome is not None
+    name = outcome.results[FieldKey.first_name]
+    assert name.value == "ישראל"
+    assert name.level is ConfidenceLevel.D
+    assert name.reason == REASON_TEXT["name_label_unclear"]

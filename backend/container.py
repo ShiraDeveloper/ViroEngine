@@ -161,7 +161,9 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
             settings=settings, gemini_models=settings.gemini_page_models_list or None
         )
         vision_verify = VisionChainAdapter(
-            settings=settings, gemini_models=settings.gemini_verify_models_list or None
+            settings=settings,
+            gemini_models=settings.gemini_verify_models_list or None,
+            cache_scope="verify:",
         )
 
     regions: RegionDetectorPort = RuleBasedDetector(settings=settings, storage=storage)
