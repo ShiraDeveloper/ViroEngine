@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     # Longest side of the page image sent to the model, and its JPEG quality.
     vision_page_max_side: int = Field(default=2000, ge=512, le=4096)
     vision_jpeg_quality: int = Field(default=88, ge=40, le=100)
+    # Directory of solved example pages (examples.json + images) shown to the model before every
+    # page read (few-shot). Empty -> reference/fewshot/. A directory without examples.json turns
+    # few-shot off.
+    vision_fewshot_dir: str = ""
     # How the blind second read sees the page. "page" (default): the whole page again, read by a
     # different model - measured on the samples, crops cut from the model's own boxes were
     # sometimes beside the value and read as another number. "crops": zoomed crops, cheaper.

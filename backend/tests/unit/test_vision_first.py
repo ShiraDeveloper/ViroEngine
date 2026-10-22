@@ -366,6 +366,14 @@ def test_a_name_read_from_the_address_line_is_dropped(
         (FieldKey.last_name, "שם משפחה", True),
         (FieldKey.first_name, "כתובת", False),
         (FieldKey.first_name, "שם האב", False),
+        (FieldKey.first_name, "שם פרטי", True),
+        (FieldKey.first_name, "מטופל:", True),
+        (FieldKey.first_name, "First Name", True),
+        (FieldKey.last_name, "שם ומשפחה", True),
+        (FieldKey.first_name, "", True),  # the patient sticker has no label
+        (FieldKey.first_name, "ת.ז", False),  # a name label is required
+        (FieldKey.last_name, "מחלקה", False),
+        (FieldKey.first_name, "בדיקה", False),
         (FieldKey.national_id, "ת.ז", True),
         (FieldKey.national_id, "מקרה", False),
         (FieldKey.commitment_number, "מס' קליטה", False),
@@ -387,6 +395,9 @@ def test_a_value_is_kept_only_beside_its_own_label(
         ("CMV IgG", False),
         ("בדיקת דם", False),
         ("ישראל 2", False),
+        ("מכבי", False),
+        ("כללית", False),
+        ("מאוחדת", False),
     ],
 )
 def test_a_name_with_digits_or_clinical_words_is_rejected(value: str, ok: bool) -> None:

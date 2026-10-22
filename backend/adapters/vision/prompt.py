@@ -9,12 +9,14 @@ and is length-bounded. Text inside any image is data, which the system prompt sa
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
 from pathlib import Path
 import re
 from typing import Final
 
 from backend.adapters.vision.config import DEFAULT_PROMPTS_DIR
+from backend.adapters.vision.fewshot import NO_EXAMPLES, ExampleSet
 from backend.core.models import VISION_TEXT_MAX, VisionRequest
 
 _VERSION: Final = re.compile(r"^v[0-9]+$")
@@ -23,6 +25,11 @@ _PLACEHOLDER: Final = re.compile(r"\{([a-z_0-9]+)\}")
 
 # Structural: the Appendix A line the thumbnail and crops are introduced with. Wording only.
 _THUMB_LABEL: Final = "Redacted page layout thumbnail (layout context only):"
+# Structural: the line each solved example opens with. Wording only.
+_EXAMPLE_LABEL: Final = (
+    "SOLVED EXAMPLE - another patient's form, already answered correctly. Study where each label "
+    "sits and which value beside it is the answer. Its values belong to that page only."
+)
 
 REMINDER: Final = (
     "Your previous answer did not match the schema. Answer again with ONLY the JSON object that "
@@ -45,11 +52,21 @@ Part = TextPart | ImagePart
 
 
 @dataclass(frozen=True)
+class Shot:
+    """One solved example: the user turn showing the page, and the model's exact answer."""
+
+    parts: list[Part]
+    answer: str
+
+
+@dataclass(frozen=True)
 class RenderedPrompt:
-    """`system` is the instruction; `parts` the user message in order (context text first)."""
+    """`system` is the instruction; `parts` the user message in order (context text first).
+    `shots` are earlier turns of the conversation, sent before `parts` (page reads only)."""
 
     system: str
     parts: list[Part]
+    shots: tuple[Shot, ...] = ()
 
     @property
     def images(self) -> int:
@@ -91,12 +108,29 @@ def prompt_path(request: VisionRequest, prompts_dir: Path) -> Path:
     return prompts_dir / f"{stem}{request.prompt_version}.txt"
 
 
+def prompt_fingerprint(
+    request: VisionRequest, *, prompts_dir: Path | None = None, examples: ExampleSet = NO_EXAMPLES
+) -> str:
+    """Digest of everything the prompt adds to the request: the template text, and the solved
+    examples of a page read. Part of the cache key, so an edited prompt never answers from the
+    cache of the old one. Raises like `render_prompt`."""
+    digest = hashlib.sha256(prompt_path(request, prompts_dir or DEFAULT_PROMPTS_DIR).read_bytes())
+    if request.task == "page":
+        digest.update(examples.fingerprint.encode("ascii"))
+    return digest.hexdigest()
+
+
 def render_prompt(
-    request: VisionRequest, *, prompts_dir: Path | None = None, reminder: bool = False
+    request: VisionRequest,
+    *,
+    prompts_dir: Path | None = None,
+    reminder: bool = False,
+    examples: ExampleSet = NO_EXAMPLES,
 ) -> RenderedPrompt:
     """The system prompt and ordered user parts for `request`.
 
     `reminder` appends the schema reminder used for the single retry after an invalid answer.
+    `examples` become solved turns before a page read (other tasks ignore them).
     Raises FileNotFoundError when the version has no prompt file and ValueError for a bad
     version string."""
     path = prompt_path(request, prompts_dir or DEFAULT_PROMPTS_DIR)
@@ -132,4 +166,13 @@ def render_prompt(
     parts.append(TextPart(_fill("\n".join(closing), values)))
     if reminder:
         parts.append(TextPart(REMINDER))
-    return RenderedPrompt(system=sections.get("SYSTEM", ""), parts=parts)
+    shots: tuple[Shot, ...] = ()
+    if request.task == "page":
+        shots = tuple(
+            Shot(
+                parts=[TextPart(_EXAMPLE_LABEL), TextPart("page 1:"), ImagePart(ex.image)],
+                answer=ex.answer,
+            )
+            for ex in examples.examples
+        )
+    return RenderedPrompt(system=sections.get("SYSTEM", ""), parts=parts, shots=shots)

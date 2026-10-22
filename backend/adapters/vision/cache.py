@@ -27,11 +27,12 @@ _SUFFIX = ".json"
 CACHE_DIRNAME = "vision_cache"
 
 
-def cache_key(request: VisionRequest, model_id: str) -> str:
+def cache_key(request: VisionRequest, model_id: str, prompt: str = "") -> str:
     """Hex digest identifying this request's content under `model_id`. The thumbnail is part of
-    the content: the same crops with and without page context are different questions."""
+    the content: the same crops with and without page context are different questions. `prompt`
+    is the prompt's own fingerprint (template text, solved examples): editing either misses."""
     digest = hashlib.sha256()
-    for part in (request.task, request.prompt_version, model_id):
+    for part in (request.task, request.prompt_version, model_id, prompt):
         digest.update(part.encode("utf-8") + b"\x00")
     for crop in request.crops:
         digest.update(crop.field.value.encode("utf-8") + b"\x00" + crop.png + b"\x00")

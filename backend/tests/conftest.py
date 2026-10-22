@@ -19,6 +19,12 @@ from backend.tests.fixtures.synthetic.pages import Pixels
 JOB_ID = "job-test"
 
 
+@pytest.fixture(autouse=True)
+def _no_local_fewshot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The git-ignored sample examples in reference/fewshot/ never reach a test's requests."""
+    monkeypatch.setenv("VISION_FEWSHOT_DIR", str(tmp_path / "no-fewshot"))
+
+
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     """Defaults only (no .env), with job data under pytest's temp directory."""

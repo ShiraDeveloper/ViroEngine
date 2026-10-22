@@ -20,7 +20,7 @@ from backend.adapters.vision.base import (
 )
 from backend.adapters.vision.config import ProvidersConfig
 from backend.adapters.vision.errors import ProviderRejected
-from backend.adapters.vision.prompt import ImagePart, RenderedPrompt, TextPart
+from backend.adapters.vision.prompt import ImagePart, Part, RenderedPrompt, TextPart
 from backend.adapters.vision.ring import Credential, CredentialRing
 from backend.adapters.vision.transport import HttpCaller
 from backend.core.errors import ProviderBadResponse
@@ -62,15 +62,13 @@ class GeminiProvider:
         return bool(self._model) and bool(self.ring.labels)
 
     def _body(self, prompt: RenderedPrompt, schema: dict[str, Any]) -> dict[str, Any]:
-        parts: list[dict[str, Any]] = []
-        for part in prompt.parts:
-            if isinstance(part, TextPart):
-                if part.text:
-                    parts.append({"text": part.text})
-            elif isinstance(part, ImagePart):
-                parts.append(
-                    {"inlineData": {"mimeType": image_mime(part.png), "data": png_b64(part.png)}}
-                )
+        # Solved examples first, as real turns (user shows a page, model answers it), so the
+        # model has already answered pages like this one before it reads the real page.
+        contents: list[dict[str, Any]] = []
+        for shot in prompt.shots:
+            contents.append({"role": "user", "parts": _parts(shot.parts)})
+            contents.append({"role": "model", "parts": [{"text": shot.answer}]})
+        contents.append({"role": "user", "parts": _parts(prompt.parts)})
         generation: dict[str, Any] = {
             "temperature": self._config.temperature,
             "maxOutputTokens": self._config.max_output_tokens,
@@ -91,7 +89,7 @@ class GeminiProvider:
             generation = self._plain_generation(generation)
         return {
             "systemInstruction": {"parts": [{"text": prompt.system}]},
-            "contents": [{"role": "user", "parts": parts}],
+            "contents": contents,
             "generationConfig": generation,
         }
 
@@ -124,6 +122,20 @@ class GeminiProvider:
         return {
             k: v for k, v in generation.items() if k not in ("thinkingConfig", "mediaResolution")
         }
+
+
+def _parts(prompt_parts: Sequence[Part]) -> list[dict[str, Any]]:
+    """Gemini parts of one turn: text and inline images, in order; empty text is left out."""
+    parts: list[dict[str, Any]] = []
+    for part in prompt_parts:
+        if isinstance(part, TextPart):
+            if part.text:
+                parts.append({"text": part.text})
+        elif isinstance(part, ImagePart):
+            parts.append(
+                {"inlineData": {"mimeType": image_mime(part.png), "data": png_b64(part.png)}}
+            )
+    return parts
 
 
 def _reply(data: dict[str, Any]) -> ProviderReply:

@@ -56,24 +56,40 @@ HOW THESE FORMS ARE BUILT (learned from 48 real pages - general patterns, not fi
   screenshots (tables, usually rotated), private-lab forms (no commitment), hand-filled forms
   (digits one per cell). A new layout is read the same way: find each label, then its value.
 
+SOLVED EXAMPLES
+Before the real page you may be shown solved example pages, each followed by its correct answer.
+Learn from them WHERE each label sits on that kind of form, which value beside it is the answer,
+and which nearby text is a trap (an address, a print serial, a clerk's ID). Their VALUES belong
+to those pages only: never copy a value from an example - read every value from the page itself.
+
 THE SEVEN FIELDS
-- first_name / last_name (שם פרטי / שם משפחה): the PATIENT only (המטופל, המבוטח, הנבדק, פרטי
-  החולה, patient sticker). Often handwritten in blue ink. Never the father's name (שם האב), the
-  physician (רופא), the orderer or the clerk, and never a street or city from the address
-  line (כתובת) - a name is written in the name field itself. Scribbled handwriting that you
-  cannot actually read is "" - do not substitute a plausible or common name. If only a combined "שם" exists and the order is
-  explicit (e.g. "שם משפחה ושם פרטי"), split by that order. When the label is only "שם" (or a
-  sticker prints the full name on one line), think about the words before splitting: use your
-  general knowledge of which Hebrew / Arabic words are given names and which are family names,
-  and the usual order of that source (Israeli hospital stickers and computer screens print the
-  FAMILY name first). Split only when it is clear; otherwise put the whole name in last_name,
-  leave first_name "" and say so in "ambiguities".
-  NAMES ARE READ, NEVER SUPPLIED. Handwritten names on these forms are often quick scribbles.
-  Return a name only when you can read EVERY letter of it on this page. Never output a common,
-  typical or "likely" name, and never reuse a name from another page or from these instructions:
-  a scribble you cannot read letter by letter is "". A name is never a department, a lab, a city
-  or a destination (e.g. text after "במעבדות:", "לכבוד", "אל:").
-  first_name never comes from a family-name label and last_name never from a first-name label. Hebrew letters only as written; keep final letters.
+- first_name / last_name (שם פרטי / שם משפחה) - IRON RULES:
+  1. LABEL FIRST. A name is taken ONLY from the place a name label points to: "שם פרטי",
+     "First Name" -> first_name; "שם משפחה", "שם משפ'", "משפחה", "Last Name", "Family name" ->
+     last_name; a combined "שם", "שם המטופל", "שם החולה", "שם ומשפחה", "מטופל:", "מבוטח", "Name"
+     -> split (rule 4); or the patient sticker / barcode label line that prints the patient's
+     name (label "" then). The value is in the same box or cell as its label, right after it
+     (to its LEFT in Hebrew), or on the line directly under it. No such label or sticker on the
+     page -> both names are "".
+  2. NEVER A NAME: an HMO / kupa ("מכבי", "כללית", "מאוחדת", "לאומית", "קופת חולים"), a hospital,
+     department, lab or clinic, a test or specimen ("CMV PCR", "דם", "שתן", "CSF"), a street, city
+     or anything on the address line (כתובת), a destination (after "לכבוד", "אל:", "במעבדות:"),
+     the father / mother (שם האב / האם), the physician (רופא), the orderer, the clerk who printed
+     the form ("הופק ע"י", "הודפס ... עבור"). If the only candidate is one of these, return "".
+  3. THE PATIENT ONLY: the patient / insured / examinee block (המטופל, המבוטח, הנבדק, פרטי החולה,
+     פרטי המבוטח/ת) or the patient sticker. On these forms it is usually handwritten in blue ink,
+     often over yellow highlighter, next to the ID (ת.ז) - in a framed box, on the line beside
+     "שם", or on the sticker. Read fast cursive letter by letter: cursive Hebrew is still
+     writing. Return "" only when the letters truly cannot be made out - never fill in a
+     "likely" name, and never a name from another page or an example.
+  4. SPLITTING. Separate labels decide by themselves. A combined label with an explicit order
+     ("שם משפחה ושם פרטי", "שם ומשפחה" = first then family) is split by that order. A bare "שם",
+     "מטופל:" or a sticker line: use your knowledge of which Hebrew / Arabic words are given names
+     and which are family names (e.g. "משה", "נועה", "מוחמד" are given names, "כהן", "לוי", "חורי" family names);
+     Israeli hospital stickers and computer screens print the FAMILY name first. If it is still
+     unclear, put the whole name in last_name, leave first_name "" and say so in "ambiguities".
+  5. first_name never comes from a family-name label and last_name never from a first-name
+     label. Copy Hebrew letters exactly as written; keep final letters. No digits, ever.
 - national_id (ת.ז / מספר זהות / מ.ז / ת. זהות / מספר תעודת זהות): the patient's ID, digits
   only as written (may be 7-10 digits, leading zeros possible). Never the father's / mother's /
   physician's ID or a licence number (מ.ר / רישיון). On a hospital computer screen (SAP) the
