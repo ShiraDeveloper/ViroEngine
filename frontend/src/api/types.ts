@@ -31,6 +31,7 @@ export interface CommitmentRow {
   central_numbers: string[];
   row_level: ConfidenceLevel;
   status: "auto" | "confirmed" | "edited";
+  merge_suggestion?: string | null;
 }
 
 export type ConfidenceLevel = "A" | "B" | "C" | "D";

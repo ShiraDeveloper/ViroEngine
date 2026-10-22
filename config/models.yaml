@@ -159,3 +159,8 @@ second_read:
   upscale: 2.5                      # cubic; below 2 the gain disappears, above 3 only cost grows
   psm: 7                            # Tesseract single-line mode
   digit_candidates: 5               # most alternatives taken from the digit reader
+
+# --- S10 grouping and rows (T20) ---------------------------------------------------
+# RowsConfig defaults in backend/core/pipeline/s10_rows.py must equal these.
+rows:
+  same_location_iou: 0.5   # commitment readings whose boxes overlap this much are one commitment

@@ -2020,7 +2020,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 17 | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
 | 18 ◐ | S9 provider layer with failover | Ahuba | P4 | D5–6 | 4h | 14,15,17 |
 | 19 ✅ | Export adapters: Excel, CSV, JSON | Shira | P4 | D5–6 | **4h** | 2 · **15 at runtime only** |
-| 20 | S10 grouping and rows — **M4** | Ahuba | P4 | D6–7 | 3h | 15,18 |
+| 20 ◐ | S10 grouping and rows — **M4** | Ahuba | P4 | D6–7 | 3h | 15,18 |
 | 21 ✅ | Screens: login, upload, processing, export | Shira | P5 | D6–7 | 3h | 4 · **22 at runtime only** |
 | 22 | Full API: SSE, edits, audit, TTL | Ahuba | P5 | D7–8 | **6h** | 3,20 |
 | 23 | Review workspace with Evidence Lens | Shira | P5 | D7 | 5h | 4 · **22 at runtime only** |
@@ -3651,6 +3651,27 @@ python -m tools.demo rows --pdf reference/samples_part2.pdf --pages B20,B19,A9,A
 # -> g4 [A17] rows 1   commitment=<empty, flagged: לא נמצא בטופס>
 # -> pages 4 = grouped 4 + orphans 0
 ```
+
+> **◐ Implemented — 2026-10-22 (D5). Not run on the 48 real pages, so M4 is NOT declared.**
+> Built: `core/pipeline/s10_rows.py` (`group_pages`, `rows_from_group`, `assemble_rows`,
+> `pages_accounted_for`; `RowContext`, `RowsConfig`, `SameFormResolver`), `s11_finalize.py`
+> (`build_report`, `final_status`, `purge_schedule`, `accounting_errors`; moved out of the
+> orchestrator), `page_sequence.py` (explicit "עמוד N מתוך M"). `run_job` now assembles with S10
+> by default; `interim_rows.py` is deleted. `PageOutcome` gained `sha256`, `page_number`,
+> `page_total`; `CommitmentRow` gained the optional `merge_suggestion` (additive contract change,
+> `types.ts` regenerated — **Shira: the review screen may show it**); `models.yaml` gained `rows:`;
+> `Settings` gained `purged_visible_minutes` / `purge_sweep_minutes` for T22.
+> Behaviour: a central number or stamp date ties pages only if it survives *alone* at level A–C
+> (a stray `7` beside a barcode never does); the status is decided from the rows the reviewer
+> sees, so a multi-central page that is level D at page level no longer flags a job.
+> Verified: 89 new tests (grouping 31, rows 22, page marker 14, finalize 21, one `run_job`
+> integration test), including all 13 named in the task; 781 pass / 0 fail in `backend/tests`;
+> `mypy --strict backend/core`, `check_layering`, `check_docs` clean.
+> **Not verified / not built:** the 48-page row structure against gold (needs `build_container`,
+> which imports the T24 learning store, and the gold set from T7); the cloud confirmation of an
+> ambiguous page (the `SameFormResolver` hook exists, nothing is wired: an ambiguous page stays an
+> orphan, never guessed); `tools.demo rows`. A page whose commitments the S6 candidates already
+> merged into one reading cannot be split by S10.
 
 ---
 

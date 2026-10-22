@@ -231,6 +231,9 @@ class CommitmentRow(Strict):
     central_numbers: list[str]  # joined with "; " on export
     row_level: ConfidenceLevel  # worst among critical fields
     status: Literal["auto", "confirmed", "edited"]
+    # S10 (T20): row_id of an earlier row this one repeats (same page content, same critical
+    # values). A suggestion only: nothing is merged or removed automatically.
+    merge_suggestion: str | None = None
 
 
 class PageGroup(Strict):

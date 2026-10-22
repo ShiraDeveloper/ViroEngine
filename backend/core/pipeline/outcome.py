@@ -24,6 +24,10 @@ class PageOutcome(Strict):
     error_code: str | None = None
     page_role: PageRole | None = None
     sender: str | None = None
+    # S10 inputs: the page content hash (duplicate detection) and an explicit "page N of M".
+    sha256: str | None = None
+    page_number: int | None = None
+    page_total: int | None = None
     corrections: list[str] = Field(default_factory=list)
     durations_ms: dict[str, int] = Field(default_factory=dict)
     evaluations: dict[FieldKey, FieldEvaluation] = Field(default_factory=dict)
