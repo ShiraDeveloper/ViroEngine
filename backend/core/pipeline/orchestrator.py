@@ -17,10 +17,8 @@ fake adapters in CI and the real ones in production.
 from __future__ import annotations
 
 import asyncio
-from collections import Counter
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
 import gc
 import time
 from typing import Any, Final, Protocol
@@ -46,7 +44,6 @@ from backend.core.models import (
     Box,
     Candidate,
     ConfidenceLevel,
-    CostCounters,
     FieldKey,
     ImageRef,
     JobRecord,
@@ -59,13 +56,12 @@ from backend.core.models import (
     PatternHint,
     ReaderName,
     ReadingTrailStep,
-    RunReport,
     SenderSpec,
     SourceKind,
     Strict,
 )
-from backend.core.pipeline.interim_rows import one_row_per_page
 from backend.core.pipeline.outcome import Assembly, PageOutcome
+from backend.core.pipeline.page_sequence import find_page_sequence
 from backend.core.pipeline.s0_intake import UploadedBlob, intake
 from backend.core.pipeline.s1_measure import measure
 from backend.core.pipeline.s2_correct import correct
@@ -81,6 +77,13 @@ from backend.core.pipeline.s9_escalate import (
     EscalationStats,
     escalate,
     flag_for_review,
+)
+from backend.core.pipeline.s10_rows import RowContext, RowsConfig, assemble_rows
+from backend.core.pipeline.s11_finalize import (
+    accounting_errors,
+    build_report,
+    final_status,
+    flagged_field_count,
 )
 from backend.core.ports.barcode import BarcodePort
 from backend.core.ports.clock import ClockPort
@@ -104,9 +107,6 @@ from backend.settings import Settings
 log = structlog.get_logger()
 
 SseEvent = SsePageEvent | SseCountersEvent | SseRowEvent | SseDoneEvent | SseErrorEvent
-
-# Structural: shown in run_report.json so a result can be traced to the code that made it.
-ENGINE_VERSION: Final = "0.1.0"
 
 # Structural: the stages `process_page` runs, in order. S0 is the batch-level intake.
 PAGE_STAGES: Final = ("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9")
@@ -134,6 +134,7 @@ class PipelineConfig(Strict):
     identity: IdentityConfig = Field(default_factory=IdentityConfig)
     second_read: SecondReadConfig = Field(default_factory=SecondReadConfig)
     escalation: EscalationConfig = Field(default_factory=EscalationConfig)
+    rows: RowsConfig = Field(default_factory=RowsConfig)
     layers: PipelineLayers = Field(default_factory=PipelineLayers)
 
     @classmethod
@@ -148,6 +149,7 @@ class PipelineConfig(Strict):
             identity=IdentityConfig.model_validate(data.get("identity", {})),
             second_read=SecondReadConfig.model_validate(data.get("second_read", {})),
             escalation=EscalationConfig.model_validate(data.get("escalation", {})),
+            rows=RowsConfig.model_validate(data.get("rows", {})),
             layers=PipelineLayers.model_validate(data.get("layers", {})),
         )
 
@@ -434,6 +436,7 @@ def process_page(
         lab=LabInputs(settings=settings, clock=services.clock, size=page_size(page)),
     )
     evaluations = _decide_fields(page, cls, spec, candidates, measurement, services, timer)
+    sequence = find_page_sequence(ocr.text or " ".join(w.text for w in ocr.words))
     escalation = EscalationStats()
     if not settings.local_only and services.vision is not None and cls.page_role != "blank":
         timer.begin("S9")
@@ -464,6 +467,9 @@ def process_page(
         status="done",
         page_role=cls.page_role,
         sender=cls.sender,
+        sha256=raw.sha256,
+        page_number=sequence[0] if sequence else None,
+        page_total=sequence[1] if sequence else None,
         corrections=list(page.corrections_applied),
         durations_ms=timer.millis(),
         evaluations=evaluations,
@@ -534,57 +540,6 @@ def apply_labels(raws: Sequence[PageRaw], label_for: Labeler | None) -> list[Pag
     ]
 
 
-def build_report(
-    job_id: str,
-    outcomes: Sequence[PageOutcome],
-    *,
-    started_at: datetime,
-    finished_at: datetime,
-    row_count: int,
-    page_count: int,
-    intake_ms: int,
-    cfg: PipelineConfig,
-) -> RunReport:
-    """Counters only: no value, name, ID or date ever enters the report (project rule §7).
-    `fields_closed_local` counts fields that are not level D and did not leave the machine."""
-    results = [r for o in outcomes for r in o.results.values()]
-    levels = Counter(r.level.value for r in results)
-    closed = sum(1 for r in results if r.level is not ConfidenceLevel.D and not r.escalated)
-    durations: Counter[str] = Counter({"S0": intake_ms})
-    for outcome in outcomes:
-        durations.update(outcome.durations_ms)
-    total = len(results)
-    stats = [o.escalation for o in outcomes]
-    failovers = list(dict.fromkeys(hop for s in stats for hop in s.failovers))
-    return RunReport(
-        job_id=job_id,
-        started_at=started_at,
-        finished_at=finished_at,
-        page_count=page_count,
-        row_count=row_count,
-        fields_total=total,
-        fields_closed_local=closed,
-        fields_escalated=sum(1 for r in results if r.escalated),
-        fields_flagged=levels.get(ConfidenceLevel.D.value, 0),
-        tier1_calls=sum(s.calls for s in stats),
-        tier2_calls=0,  # no full-page tier exists: only crops ever leave the machine
-        local_close_rate=closed / total if total else 0.0,
-        level_histogram={lv.value: levels.get(lv.value, 0) for lv in ConfidenceLevel},
-        stage_durations_ms=dict(durations),
-        corrections_histogram=dict(Counter(c for o in outcomes for c in o.corrections)),
-        cost=CostCounters(
-            provider_calls=sum(s.calls for s in stats),
-            cache_hits=sum(s.cache_hits for s in stats),
-            input_tokens=sum(s.input_tokens for s in stats),
-            output_tokens=sum(s.output_tokens for s in stats),
-            estimated_usd=round(sum(s.estimated_usd for s in stats), 6),
-        ),
-        provider_failovers=failovers,
-        engine_version=ENGINE_VERSION,
-        prompt_version=cfg.classify.prompt_version,
-    )
-
-
 def _error(code: str, page_id: str | None, *, recoverable: bool) -> SseErrorEvent:
     data = SseErrorData(code=code, page_id=page_id, recoverable=recoverable)
     return SseErrorEvent(event="error", data=data)
@@ -595,16 +550,6 @@ def _done(status: JobStatus, flagged: int, started: float) -> SseDoneEvent:
     return SseDoneEvent(
         event="done", data=SseDoneData(status=status, flagged=flagged, duration_ms=ms)
     )
-
-
-def final_status(
-    report: RunReport, outcomes: Sequence[PageOutcome], errors: Sequence[str]
-) -> JobStatus:
-    """`failed` when no page was read; `needs_review` when any field is level D or any page
-    failed; otherwise `confirmed` (PLAN §4 S11)."""
-    if not any(o.status == "done" for o in outcomes):
-        return JobStatus.failed
-    return JobStatus.needs_review if report.fields_flagged or errors else JobStatus.confirmed
 
 
 async def run_job(
@@ -625,8 +570,7 @@ async def run_job(
     outright (unsupported, too large, encrypted) ends the job as `failed` with its code in
     `errors`. CPU-bound work runs in a worker thread, one page at a time, so the event loop
     stays free. `cloud_consent` lets crops of documents that are not known samples reach a
-    provider (PLAN §8.5); it defaults to False. `assemble` groups pages into rows; the default is the interim one-row-per-page
-    assembler until S10 (T20) exists. Artefacts are left in storage for review; the TTL purge
+    provider (PLAN §8.5); it defaults to False. `assemble` groups pages into rows; the default is S10 (`assemble_rows`). Artefacts are left in storage for review; the TTL purge
     (T22) removes them."""
     emit: Callable[[SseEvent], None] = on_event or (lambda event: None)
     started = time.perf_counter()
@@ -703,7 +647,15 @@ async def run_job(
         )
         emit(SseCountersEvent(event="counters", data=counters))
 
-    rows, groups, orphans = (assemble or one_row_per_page)(outcomes)
+    row_ctx = RowContext(
+        clock=c.clock,
+        senders=c.senders,
+        weights=c.pipeline.weights,
+        scoring=c.pipeline.scoring,
+        config=c.pipeline.rows,
+    )
+    rows, groups, orphans = (assemble or (lambda outs: assemble_rows(outs, ctx=row_ctx)))(outcomes)
+    errors.extend(accounting_errors(len(outcomes), groups, orphans))
     for row in rows:
         flagged_fields = [k for k, f in row.fields.items() if f.level is ConfidenceLevel.D]
         row_data = SseRowData(
@@ -719,10 +671,10 @@ async def run_job(
         row_count=len(rows),
         page_count=total,
         intake_ms=intake_ms,
-        cfg=c.pipeline,
+        prompt_version=c.pipeline.classify.prompt_version,
     )
-    status = final_status(report, outcomes, errors)
-    emit(_done(status, report.fields_flagged, started))
+    status = final_status(outcomes, rows, orphans, errors)
+    emit(_done(status, flagged_field_count(rows), started))
     return job.model_copy(
         update={
             "status": status,

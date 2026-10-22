@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     max_upload_mb: int = Field(default=50, ge=0, le=500)
     max_pages: int = Field(default=200, ge=1, le=1000)
     job_ttl_minutes: int = Field(default=30, ge=1, le=1440)
+    # S11 (PLAN §4): after the artefacts are purged the job answers `purged` for this long so the
+    # UI can show a message instead of a 404; the sweeper looks for expired jobs this often.
+    purged_visible_minutes: int = Field(default=10, ge=0, le=1440)
+    purge_sweep_minutes: int = Field(default=5, ge=1, le=60)
     render_dpi: int = Field(default=300, ge=100, le=600)
     max_concurrency: int = Field(default=2, ge=1, le=16)
     escalation_score_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
