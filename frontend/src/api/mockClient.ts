@@ -1,10 +1,14 @@
 import fixtureJson from '../../../fixtures/sample_job.json';
+import reviewFixtureJson from '../../../fixtures/sample_job_review.json';
 
 import type { ApiClient } from './client';
 import type { CommitmentRow, FieldResult, JobView, SseEvent } from './types';
 
 /** The frozen contract fixture (T2). Fictitious values only. */
-const fixture = fixtureJson as unknown as JobView;
+const contractFixture = fixtureJson as unknown as JobView;
+/** Same job with a third flagged field, for the timed three-field review test (T23 E2E). */
+const reviewFixture = reviewFixtureJson as unknown as JobView;
+const fixture = import.meta.env.VITE_MOCK_FIXTURE === 'review' ? reviewFixture : contractFixture;
 
 const MOCK_PAGE_IDS = ['fx#1', 'fx#2', 'fx#3', 'fx#4', 'fx#5', 'fx#6', 'fx#7'];
 const MOCK_EVENT_INTERVAL_MS = 400;
@@ -107,6 +111,18 @@ export const mockClient: ApiClient = {
   },
 
   cropUrl: (jobId, pageId) => `mock://crop/${jobId}/${pageId}`,
+
+  // A placeholder drawing, so the Lens has something to magnify without a backend.
+  fetchCrop: () =>
+    Promise.resolve(
+      new Blob(
+        [
+          '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40">' +
+            '<rect width="120" height="40" fill="lightgray"/><path d="M8 28h104" stroke="gray"/></svg>',
+        ],
+        { type: 'image/svg+xml' },
+      ),
+    ),
 
   exportUrl: (jobId, fmt) => `mock://export/${jobId}.${fmt}`,
 };
