@@ -12,7 +12,13 @@ import json
 import time
 from typing import Any
 
-from backend.adapters.vision.base import ProviderReply, check_model_id, png_b64, with_ring
+from backend.adapters.vision.base import (
+    ProviderReply,
+    check_model_id,
+    image_mime,
+    png_b64,
+    with_ring,
+)
 from backend.adapters.vision.config import ProvidersConfig
 from backend.adapters.vision.prompt import ImagePart, RenderedPrompt, TextPart
 from backend.adapters.vision.ring import Credential, CredentialRing
@@ -58,7 +64,7 @@ class ChatCompletionsProvider:
                 if part.text:
                     content.append({"type": "text", "text": part.text})
             elif isinstance(part, ImagePart):
-                url = f"data:image/png;base64,{png_b64(part.png)}"
+                url = f"data:{image_mime(part.png)};base64,{png_b64(part.png)}"
                 content.append({"type": "image_url", "image_url": {"url": url}})
         system = (
             f"{prompt.system}\n\nAnswer with ONE JSON object that validates against this JSON "

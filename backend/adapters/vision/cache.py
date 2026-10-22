@@ -36,6 +36,8 @@ def cache_key(request: VisionRequest, model_id: str) -> str:
     for crop in request.crops:
         digest.update(crop.field.value.encode("utf-8") + b"\x00" + crop.png + b"\x00")
     digest.update(b"thumb\x00" + (request.page_thumb or b""))
+    for image in request.page_images:
+        digest.update(b"page\x00" + image)
     digest.update(json.dumps(request.sender_options, ensure_ascii=False).encode("utf-8"))
     return digest.hexdigest()
 

@@ -5,6 +5,9 @@
 
 export const common = {
   appName: 'שורה בטוחה',
+  appTagline: 'מטופס התחייבות לשורה מאומתת',
+  footer: 'האקתון AI קוד פתוח 2026 · אתגר המעבדה המרכזית לנגיפים, משרד הבריאות',
+  footerPrivacy: 'הקבצים והערכים נמחקים אוטומטית 30 דקות אחרי העיבוד.',
   skipToContent: 'דלגי לתוכן הראשי',
   loading: 'טוען…',
   retry: 'נסי שוב',
@@ -31,14 +34,17 @@ export const login = {
   codeLabel: 'קוד גישה',
   codePlaceholder: 'הזיני את קוד הגישה',
   submit: 'כניסה',
-  demoBanner: 'מערכת הדגמה. העלו טפסי דוגמה בלבד, לא מסמכים אמיתיים.',
-  demoBannerLocalOnly: 'קובץ שאינו מטפסי הדוגמה יעובד במחשב בלבד, בלי שליחה לענן.',
+  demoBanner: 'מערכת הדגמה. העלו טפסי דוגמה בלבד, לא מסמכים אמיתיים של מטופלים.',
+  demoBannerLocalOnly: 'הקבצים נמחקים אוטומטית אחרי 30 דקות.',
+  heroTitle: 'קוראת את הטופס. מסמנת איפה היא לא בטוחה.',
+  heroBody:
+    'טפסי התחייבות סרוקים, מצולמים וכתובים ביד הופכים לשורות אקסל מאומתות — כל שדה עם רמת ביטחון והסבר.',
   errorWrongCode: 'קוד הגישה שגוי. נסי שוב.',
   errorNoCode: 'נדרש קוד גישה.',
 } as const;
 
 export const upload = {
-  title: 'העלאת טפסים',
+  title: 'קבצים',
   single: 'טופס בודד',
   batch: 'ערימה',
   modeLabel: 'מצב העלאה',
@@ -50,7 +56,21 @@ export const upload = {
   tooManyPages: 'יותר מדי עמודים. המגבלה היא 200 עמודים.',
   uploading: 'מעלה…',
   start: 'התחילי עיבוד',
-  privacyNote: 'העיבוד מתחיל במחשב. רק שדות שלא הצלחנו לקרוא נשלחים כחיתוך קטן.',
+  privacyNote: 'טפסי דוגמה בלבד. הקבצים נמחקים אוטומטית אחרי 30 דקות.',
+  heroEyebrow: 'מנוע חילוץ לטפסי התחייבות',
+  heroTitle: 'העלאת טפסים',
+  heroBody: 'טופס אחד או ערימה - והמערכת תחזיר טבלה מאומתת.',
+  features: [
+    { title: 'קריאה כפולה עיוורת', body: 'כל ערך נקרא פעמיים בנפרד. ירוק רק כששני הקוראים מסכימים.' },
+    { title: 'אימות בקוד', body: 'ספרת ביקורת של ת"ז, תאריך תקין, ברקוד מול הדפסה ורשימה סגורה של גורמים.' },
+    { title: 'לא מנחש', body: 'שדה שלא נמצא נשאר ריק ומסומן — עם הסיבה והחיתוך מהטופס.' },
+  ],
+  stats: [
+    { value: '7', label: 'שדות לכל התחייבות' },
+    { value: '≈5 שנ׳', label: 'לעמוד' },
+    { value: 'A–D', label: 'רמות ביטחון' },
+  ],
+  stepsLabel: 'שלבי העבודה',
   fileInputLabel: 'בחירת קבצים להעלאה',
   selectedTitle: 'קבצים שנבחרו',
   selectedCount: (count: number) => (count === 1 ? 'קובץ אחד נבחר' : `${count} קבצים נבחרו`),
@@ -61,22 +81,22 @@ export const upload = {
 } as const;
 
 export const processing = {
-  title: 'מעבדת את הטפסים',
+  title: 'קוראת את הטפסים',
   progress: (done: number, total: number) => `${done} מתוך ${total} הושלמו`,
-  kpiLocal: 'נסגרו על המחשב',
-  kpiCrops: 'חיתוכים שנשלחו',
-  kpiFlagged: 'ממתינים לבדיקה',
+  kpiLocal: 'שדות שזוהו',
+  kpiCrops: 'חיתוכים לאימות',
+  kpiFlagged: 'לבדיקה ידנית',
   stageNames: {
     S0: 'קליטה',
     S1: 'מדידה',
     S2: 'תיקון',
-    S3: 'קריאה מקומית',
+    S3: 'הכנה וברקודים',
     S4: 'איתור אזורים',
     S5: 'זיהוי גורם',
     S6: 'מועמדים',
     S7: 'קריאה שנייה',
-    S8: 'ציון',
-    S9: 'השלמה בענן',
+    S8: 'אימות וציון',
+    S9: 'קריאת AI ואימות',
     S10: 'בניית שורות',
   },
   cancel: 'ביטול',
@@ -94,9 +114,12 @@ export const processing = {
   },
   pollingNotice: 'החיבור לשרת נותק. ההתקדמות מתעדכנת כל כמה שניות.',
   finished: 'העיבוד הסתיים.',
-  pageQueued: 'ממתין',
+  pageQueued: 'בתור',
   pageRunning: 'בעיבוד',
-  pageDone: 'הסתיים',
+  pageDone: 'נקרא ואומת',
+  phasePrepare: 'מכינה את העמוד',
+  phaseAi: 'קריאת AI',
+  phaseVerify: 'אימות ודירוג',
   waiting: 'ממתינה לעדכון מהשרת.',
 } as const;
 
@@ -113,20 +136,21 @@ export const review = {
   },
   levels: {
     A: 'אומת בברקוד',
-    B: 'שני קוראים הסכימו',
-    C: 'נקרא פעם אחת',
+    B: 'אומת פעמיים',
+    C: 'זוהה',
     D: 'לא בטוח – בדקי',
   },
   rowRibbon: (flagged: number) => (flagged === 0 ? 'אין שדות לבדיקה' : `${flagged} שדות לבדיקה`),
   tableCaption: 'שורות התחייבות שחולצו מהטפסים',
   rowHeader: 'שורה',
+  pageOf: (pages: string) => `עמוד ${pages}`,
   filterAll: 'הצג הכול',
   filterReview: 'רק לבדיקה',
   filterLabel: 'סינון שורות',
   evidenceTitle: 'ראיה',
   evidenceHint: 'בחרי שדה בטבלה כדי לראות מהיכן נקרא.',
   trailTitle: 'מי קרא מה',
-  cloudChip: 'נשלח חיתוך בלבד',
+  cloudChip: 'קריאת ענן',
   candidatesTitle: 'בחרי ערך',
   manualEntry: 'הקלדה',
   emptyFieldNote: 'לא נמצא. עדיף ריק מסומן מערך מנוחש.',
@@ -151,7 +175,7 @@ export const review = {
   flaggedSummary: (n: number) =>
     n === 0 ? 'אין שדות לבדיקה' : n === 1 ? 'שדה אחד לבדיקה' : `${n} שדות לבדיקה`,
   readers: {
-    zxing: 'ברקוד',
+    zxing: 'ברקוד (מקומי)',
     tesseract: 'OCR מקומי',
     trocr: 'קורא כתב יד מקומי',
     gemini: "ג'מיני",
@@ -191,6 +215,18 @@ export const review = {
   emptyRows: 'עדיין אין שורות להצגה.',
   filteredEmpty: 'אין שורות שדורשות בדיקה.',
   sourceTitle: 'מקור',
+  summaryLabel: 'סיכום העבודה',
+  readinessTitle: 'מוכנות לייצוא',
+  readinessHint: 'עולה עם כל שדה שאת מאשרת או מתקנת',
+  readinessLabel: (pct: number) => `מוכנות לייצוא: ${pct} אחוזים`,
+  foundBeside: 'נמצא בטופס ליד:',
+  aiUnavailableTitle: 'קורא ה-AI לא היה זמין לחלק מהעמודים',
+  aiUnavailableBody:
+    'המכסה היומית של מפתחות Gemini נגמרה או שהשירות עמוס, ולכן עמודים אלה נקראו במחשב בלבד ויותר שדות מסומנים לבדיקה. הוסיפי מפתח (GEMINI_API_KEYS) או הפעילי חיוב ב-AI Studio, והריצי שוב.',
+  statRows: 'שורות',
+  statVerified: 'שדות תקינים',
+  statSingle: 'נקראו פעם אחת',
+  statFlagged: 'לבדיקה',
 } as const;
 
 export const exportScreen = {
@@ -202,6 +238,15 @@ export const exportScreen = {
   json: 'הורדת JSON',
   apiNote: 'אותם נתונים זמינים גם ב-API, לחיבור עתידי למערכות המעבדה.',
   done: 'הקובץ הורד.',
+  downloadFailed: 'ההורדה נכשלה. נסי שוב.',
+  formatHints: {
+    xlsx: 'שורה לכל התחייבות, צבע לכל רמת ביטחון והערה עם הסיבה',
+    csv: 'לטעינה למערכות אחרות',
+    json: 'כולל מקור וראיה לכל שדה',
+  },
+  rowsLabel: 'שורות',
+  flaggedLabel: 'שדות לבדיקה',
+  verifiedLabel: 'שדות ללא צורך בבדיקה',
 } as const;
 
 export const dashboard = {

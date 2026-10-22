@@ -35,6 +35,52 @@ class Settings(BaseSettings):
     gemini_api_keys: str = ""  # comma-separated; rotated on 429 / invalid key
     gemini_model: str = "gemini-2.5-flash"
     gemini_model_lite: str = "gemini-2.5-flash-lite"
+    # Vision-first engine: the page reader tries these models in order. Each model has its own
+    # free daily quota, so a model whose quota is spent hands over to the next one. Flash-Lite is
+    # deliberately absent: measured on the samples it put a commitment number in the central
+    # number field, which a barcode then "confirmed" - a silent error. With no strong model left
+    # a page goes to the local cascade and is flagged instead.
+    gemini_page_models: str = (
+        "gemini-3-flash-preview,gemini-3.6-flash,gemini-3.5-flash,gemini-3.7-flash,"
+        "gemini-3.8-flash,gemini-flash-latest,gemini-2.5-flash"
+    )
+    # The blind second read of zoomed crops: a different model from the page reader, so the two
+    # readings are independent. Gemini 3.6 first: measured, 2.5 Flash dropped digits of printed
+    # numbers on crops (A12's 11118052 -> 1118052). Flash-Lite last, it misreads faint stamps.
+    gemini_verify_models: str = (
+        "gemini-3.6-flash,gemini-3.5-flash,gemini-3.7-flash,gemini-3.8-flash,gemini-flash-latest,"
+        "gemini-2.5-flash,gemini-3-flash-preview,gemini-2.5-flash-lite"
+    )
+    # Rendering resolution for the vision-first engine: 200 DPI already exceeds the 2000 px the
+    # model receives, and renders in about half the time of the cascade's 300 DPI.
+    vision_render_dpi: int = Field(default=200, ge=100, le=600)
+
+    # --- Engine -------------------------------------------------------------
+    # vision_first: one full-page read + one blind crop re-read per page, validated in code
+    # (docs/decisions/ADR-017). cascade: the original local-OCR-first pipeline (PLAN §4), which
+    # is also what runs automatically when no provider can answer.
+    engine_mode: Literal["vision_first", "cascade"] = "vision_first"
+    # Batches read at the same time in vision_first mode (network-bound, not CPU-bound).
+    vision_concurrency: int = Field(default=8, ge=1, le=16)
+    # Pages per page-read request. 1 is the most accurate (a model shown several pages at once
+    # misses faint stamps and can mix pages up); raise it only to stretch a free daily quota.
+    vision_pages_per_call: int = Field(default=1, ge=1, le=10)
+    # Pages per batch: their verification crops travel in ONE request. 1 (default) gives every
+    # page its own blind re-read: measured on the samples, a verifier shown crops of several pages
+    # repeated one page's name on another. Raise it only to stretch a free daily quota.
+    vision_batch_pages: int = Field(default=1, ge=1, le=10)
+    # Longest side of the page image sent to the model, and its JPEG quality.
+    vision_page_max_side: int = Field(default=2000, ge=512, le=4096)
+    vision_jpeg_quality: int = Field(default=88, ge=40, le=100)
+    # How the blind second read sees the page. "page" (default): the whole page again, read by a
+    # different model - measured on the samples, crops cut from the model's own boxes were
+    # sometimes beside the value and read as another number. "crops": zoomed crops, cheaper.
+    verify_mode: Literal["page", "crops"] = "page"
+    # Margin added around a field box before the verification crop, as a share of the box size.
+    verify_crop_margin: float = Field(default=0.35, ge=0.0, le=3.0)
+    # PLAN §8.5 gate. False (default): every uploaded document may be read by the cloud model -
+    # the demo must work on any form. True: only known sample pages or jobs with explicit consent.
+    cloud_requires_consent: bool = False
 
     # --- Fallback providers -----------------------------------------------
     openrouter_api_key: str = ""
@@ -133,6 +179,15 @@ class Settings(BaseSettings):
     # stamp's date sits above those lines (A1: ~0.08 diagonal above "המרכזית").
     stamp_reread_reach: float = Field(default=0.10, gt=0.0, le=1.0)
     stamp_reread_max: int = Field(default=2, ge=0, le=10)  # crops per page; 0 disables
+    # Patient-block re-read: the page pass is unstable on the block's small bold labels beside
+    # blue handwriting (A1: "פרטי המבוטח/ת" and 'ת"ז' are lost, "שם" reads as "DW"), while a
+    # crop of the block reads them. The area around each group of patient-label words found,
+    # this share of the page diagonal on every side, is read again (A1: the header sits ~0.03
+    # diagonal above "שם").
+    patient_reread_reach: float = Field(default=0.06, gt=0.0, le=1.0)
+    # Crops per page; 0 disables. 3, because the provider box ("שם", "כתובת") and a footer line
+    # ("המבוטח/ת") anchor groups of their own (A1).
+    patient_reread_max: int = Field(default=3, ge=0, le=10)
 
     # --- S4 regions (T11) -------------------------------------------------
     # Printed sideways, so OCR is imperfect: one wrong letter of five scores 80. Measured on the
@@ -184,6 +239,9 @@ class Settings(BaseSettings):
     yolo_kinds: str = "central_sticker,receipt_stamp,patient_box,commitment_label"
 
     # --- Paths ------------------------------------------------------------
+    # The built frontend (`npm run build`). When the folder exists the API also serves the app at
+    # `/`, so one container is the whole demo (Hugging Face Space). Absent: API only.
+    static_dir: str = "./frontend/dist"
     tesseract_cmd: str = "/usr/bin/tesseract"
     models_dir: str = "./models"
     data_dir: str = "./.tmp"
@@ -197,6 +255,16 @@ class Settings(BaseSettings):
     def gemini_keys_list(self) -> list[str]:
         """Split comma-separated Gemini API keys. Empty string → empty list."""
         return [k.strip() for k in self.gemini_api_keys.split(",") if k.strip()]
+
+    @property
+    def gemini_page_models_list(self) -> list[str]:
+        """Page-reader model ids in order. Empty string -> empty list."""
+        return [m.strip() for m in self.gemini_page_models.split(",") if m.strip()]
+
+    @property
+    def gemini_verify_models_list(self) -> list[str]:
+        """Verification model ids in order. Empty string -> empty list."""
+        return [m.strip() for m in self.gemini_verify_models.split(",") if m.strip()]
 
     @property
     def yolo_kinds_list(self) -> list[str]:

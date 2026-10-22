@@ -41,6 +41,7 @@ from backend.core.ports.clock import ClockPort
 from backend.core.ports.senders import SenderIndexPort
 from backend.core.scoring import (
     CRITICAL_FIELDS,
+    CROSS_FIELD_NOTE,
     DEFAULT_WEIGHTS,
     ScoringConfig,
     ScoringWeights,
@@ -155,6 +156,8 @@ class _Evidence:
                 if norm == decided:
                     found[norm] = base
                     continue
+                if any(CROSS_FIELD_NOTE in c.notes for c in cands):
+                    continue  # a number two fields claimed never stands on its own (ADR-017)
                 alone = evaluate_field(
                     key,
                     cands,
@@ -232,6 +235,15 @@ def _group_id(first: PageOutcome) -> str:
     return f"grp-{first.page_id}"
 
 
+def _has_values(page: PageOutcome) -> bool:
+    """True when the page closed (level A-C) a central or commitment number: it is a sample."""
+    return any(
+        r.value and r.level is not ConfidenceLevel.D
+        for k, r in page.results.items()
+        if k in (FieldKey.central_number, FieldKey.commitment_number)
+    )
+
+
 def _walk(
     pages: Sequence[PageOutcome], ctx: RowContext, ev: _Evidence
 ) -> tuple[list[_Open], list[str]]:
@@ -240,11 +252,15 @@ def _walk(
     current: _Open | None = None
     for page in pages:
         role = page.page_role
-        if page.status != "done" or role is None or role == "unknown":
+        if page.status != "done" or role is None:
             orphans.append(page.page_id)
-        elif role == "primary_form":
+        elif role == "primary_form" or (role == "unknown" and _has_values(page)):
+            # A page whose role could not be told but that carries values is a form of its own:
+            # dropping it to the orphans tab would lose a whole row from the spreadsheet.
             current = _open_group(page, ev)
             groups.append(current)
+        elif role == "unknown":
+            orphans.append(page.page_id)
         elif current is None:
             orphans.append(page.page_id)
         elif role == "blank":
@@ -365,16 +381,21 @@ class _Cluster:
     trail_from: FieldResult | None = None
 
 
-def _commitment_clusters(pages: Sequence[PageOutcome], config: RowsConfig) -> list[_Cluster]:
+def _commitment_clusters(
+    pages: Sequence[PageOutcome], config: RowsConfig, ev: _Evidence
+) -> list[_Cluster]:
+    """Clusters of the commitment candidates whose value survives alone (level A-C). A candidate
+    S8 rejected - a nearby word, a date beside the label - never opens a row of its own."""
     key = FieldKey.commitment_number
     items: list[tuple[int, Candidate, FieldResult, str]] = []
     for index, page in enumerate(pages):
         result = page.results.get(key)
         if result is None:
             continue
+        surviving = ev.survivors(page, key)
         for cand in result.candidates:
             norm = _norm(key, cand.value)
-            if norm is not None:
+            if norm is not None and norm in surviving:
                 items.append((index, cand, result, norm))
     parent = list(range(len(items)))
 
@@ -407,12 +428,13 @@ def _commitment_clusters(pages: Sequence[PageOutcome], config: RowsConfig) -> li
 
 
 def _commitment_results(
-    pages: Sequence[PageOutcome], spec: SenderSpec | None, ctx: RowContext
+    pages: Sequence[PageOutcome], spec: SenderSpec | None, ctx: RowContext, ev: _Evidence
 ) -> list[FieldResult]:
-    """One result per distinct commitment, in page then top-to-bottom order; a single flagged
-    result when the form has none. A lone commitment keeps its page-level S8 result unchanged."""
+    """One result per distinct surviving commitment, in page then top-to-bottom order; a single
+    result when the form has at most one, which keeps its page-level S8 result unchanged (flagged,
+    with its own reason, when nothing survived)."""
     key = FieldKey.commitment_number
-    clusters = _commitment_clusters(pages, ctx.config)
+    clusters = _commitment_clusters(pages, ctx.config, ev)
     page_results = [p.results[key] for p in pages if key in p.results]
     if len(clusters) <= 1:
         if page_results:
@@ -473,7 +495,7 @@ def rows_from_group(
     if central is not None:
         shared[FieldKey.central_number] = central
     rows: list[CommitmentRow] = []
-    for number, commitment in enumerate(_commitment_results(members, spec, ctx), start=1):
+    for number, commitment in enumerate(_commitment_results(members, spec, ctx, ev), start=1):
         fields = {k: v.model_copy(deep=True) for k, v in shared.items()}
         fields[FieldKey.commitment_number] = commitment
         rows.append(

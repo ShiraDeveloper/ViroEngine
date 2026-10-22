@@ -16,12 +16,15 @@ from backend.adapters.storage.tempdir import TmpdirStorage
 from backend.core.geometry import contains, grow, unrotate_box
 from backend.core.models import BarcodeHit, Box, NormalizedPage, OcrWord
 from backend.core.pipeline.s3_read_page import (
+    PATIENT_LANGS,
+    PATIENT_PSM,
     READABLE_LINE_LANGS,
     READABLE_LINE_PSM,
     SIDEWAYS_PSM,
     STAMP_PSM,
     caption_strips,
     nearby_text,
+    patient_areas,
     read_page,
     readable_line_area,
     stamp_areas,
@@ -351,6 +354,83 @@ def test_stamp_rereads_capped_per_page(settings: Settings) -> None:
     """Lab-name lines also appear in address lines; at most ``stamp_reread_max`` are read."""
     groups = [_word("לנגיפים", (y, 0.40, y + 0.01, 0.48)) for y in (0.10, 0.40, 0.70, 0.90)]
     assert len(stamp_areas(groups, SIZE, settings)) == settings.stamp_reread_max
+
+
+# ---------------------------------------------------------------- patient-block re-read (T11)
+
+
+def _into_crop(page_box: Box, area: Box) -> Box:
+    h, w = area[2] - area[0], area[3] - area[1]
+    return (
+        (page_box[0] - area[0]) / h,
+        (page_box[1] - area[1]) / w,
+        (page_box[2] - area[0]) / h,
+        (page_box[3] - area[1]) / w,
+    )
+
+
+def test_patient_labels_reread_and_placed_on_the_page(
+    make_normalized: MakeNormalized, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    """A1: the page pass keeps only "כתובת" of the block; the area around it is read again and
+    the lost labels land on the page frame."""
+    page = make_normalized(pages.clean_page())
+    anchor = [_word("כתובת:", (0.820, 0.894, 0.828, 0.940))]
+    (area,) = patient_areas(anchor, SIZE, settings)
+    header: Box = (0.771, 0.913, 0.779, 0.950)
+    id_label: Box = (0.785, 0.915, 0.793, 0.935)
+    ocr = ScriptedOcr(
+        words=anchor,
+        crop_script=[
+            [
+                _word("פרטי", _into_crop(header, area)),
+                _word('ת"ז', _into_crop(id_label, area)),
+            ]
+        ],
+    )
+    result, _ = _read(page, settings, storage, imaging, ocr=ocr, barcode=FakeBarcode())
+    placed = {w.text: w.box for w in result.words}  # type: ignore[attr-defined]
+    assert placed["פרטי"] == pytest.approx(header, abs=1e-6)
+    assert placed['ת"ז'] == pytest.approx(id_label, abs=1e-6)
+    assert ocr.crop_calls == [{"psm": PATIENT_PSM, "langs": PATIENT_LANGS}]
+
+
+def test_patient_reread_keeps_label_words_only(
+    make_normalized: MakeNormalized, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    """A second, different reading of a handwritten value would split it in S6."""
+    page = make_normalized(pages.clean_page())
+    anchor = [_word("שם", (0.804, 0.925, 0.811, 0.952))]
+    ocr = ScriptedOcr(
+        words=anchor,
+        crop_script=[
+            [_word("0011223344", (0.4, 0.1, 0.5, 0.4)), _word("ישראל", (0.4, 0.5, 0.5, 0.7))]
+        ],
+    )
+    result, _ = _read(page, settings, storage, imaging, ocr=ocr, barcode=FakeBarcode())
+    assert [w.text for w in result.words] == ["שם"]  # type: ignore[attr-defined]
+
+
+def test_patient_areas_block_with_most_label_words_first(settings: Settings) -> None:
+    lone = [_word("שם", (0.10, 0.90, 0.11, 0.95))]
+    block = [
+        _word("שם", (0.80, 0.90, 0.81, 0.95)),
+        _word("כתובת", (0.82, 0.88, 0.83, 0.95)),
+        _word("משפחה", (0.84, 0.88, 0.85, 0.95)),
+    ]
+    first, *_ = patient_areas([*lone, *block], SIZE, settings)
+    assert first[0] < 0.80 < first[2]
+
+
+def test_patient_rereads_capped_per_page(settings: Settings) -> None:
+    groups = [_word("כתובת", (y, 0.40, y + 0.01, 0.48)) for y in (0.10, 0.35, 0.60, 0.85)]
+    assert len(patient_areas(groups, SIZE, settings)) == settings.patient_reread_max
+
+
+def test_patient_reread_disabled_at_zero(settings: Settings) -> None:
+    anchor = [_word("כתובת", (0.50, 0.40, 0.51, 0.48))]
+    off = settings.model_copy(update={"patient_reread_max": 0})
+    assert patient_areas(anchor, SIZE, off) == []
 
 
 # ---------------------------------------------------------------- readable line under bars (T13)

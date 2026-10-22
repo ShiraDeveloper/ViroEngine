@@ -33,36 +33,31 @@ See `eval/results/final_report.md` and [`docs/limitations.md`](docs/limitations.
 
 ## Run locally
 
-```bash
-cp .env.example .env            # fill in APP_ACCESS_CODE, API_KEY, GEMINI_API_KEYS
-docker compose up --build       # backend :8000, frontend :5173
+```powershell
+cp .env.example .env            # fill in GEMINI_API_KEYS (https://aistudio.google.com/apikey)
+pip install -r requirements.txt
+cd frontend; npm ci; $env:VITE_API_BASE="/v1"; npx vite build; cd ..
+python -m uvicorn backend.app:app --port 8000     # web app + API on http://localhost:8000
 ```
 
-Without Docker:
-```bash
-pip install -r requirements.txt && uvicorn backend.app:app --port 8000
-cd frontend && npm ci && npm run dev
-```
-
-Hebrew Tesseract is required: `tesseract --list-langs` must include `heb`. The Docker image
-installs it; on Windows use the UB-Mannheim build with the Hebrew pack and set `TESSERACT_CMD`.
-
-Set `LOCAL_ONLY=true` to run with no external service at all — more fields are flagged for review
-and nothing leaves the machine.
+Or `docker build -t safeline . && docker run -p 8000:8000 --env-file .env safeline`.
+Deploy to a free Hugging Face Space: [`docs/DEPLOY.md`](docs/DEPLOY.md) (one script).
 
 ## How it works
 
-Code first, model second, human only where needed. Each field climbs the cascade only until it is
-resolved:
+Vision model first, code decides, human only where needed ([ADR-017](docs/decisions/ADR-017-vision-first.md)):
 
 ```
-barcode · check digit · closed list   →  local OCR (heb+eng)  →  local handwritten digits
-   →  cloud vision, crops only  →  orange flag with a reason
+barcode sweep (local)  →  page read: Gemini 3 Flash, strict schema, closed sender list
+   →  blind re-read of zoomed crops (the second reader never sees the first answer)
+   →  code: ID check digit · real date · barcode vs reading · one number never in two fields
+   →  A barcode-confirmed · B two readers agree · D orange, with the reason and the pixels
 ```
 
-The decision to escalate comes from a **combined score** built from seven independent signals, not
-from the OCR engine's own confidence — on handwriting Tesseract reports high confidence for values
-it invented, which is exactly how a wrong number reaches a spreadsheet unnoticed.
+The model never reports its own confidence; agreement between independent readers and national
+validation rules do. A field that cannot be verified stays empty and flagged, never guessed. If no
+strong model answers (quota, outage) the page falls back to the local OCR cascade of PLAN §4 and
+is flagged, so a run never stops. About 5–10 s a page, pages read in parallel.
 
 ![Architecture](assets/architecture.png)
 
@@ -76,8 +71,8 @@ OpenCV headless (orientation, deskew, CLAHE) · pypdfium2 · TrOCR-small ONNX in
 digits) · YOLOv8n ONNX (region detection, included only if it won the bake-off) · rapidfuzz ·
 Pydantic v2.
 
-**Cloud, free tiers, crops only:** Gemini 2.5 Flash / Flash-Lite · fallback OpenRouter free vision
-models · last resort Groq.
+**Cloud, free tiers:** Gemini 3 Flash (page read) · Gemini 2.5 Flash (blind verification) ·
+fallback OpenRouter free vision models.
 
 **Application:** FastAPI · React + Vite + TypeScript + Tailwind + Radix · openpyxl · SQLite.
 

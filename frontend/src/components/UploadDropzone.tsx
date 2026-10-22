@@ -35,9 +35,11 @@ export function UploadDropzone({ multiple, disabled = false, onFiles }: UploadDr
     if (files.length > 0) onFiles(files);
   }
 
-  const border = dragging ? 'border-primary-500 bg-primary-100' : 'border-primary-300 bg-surface-raised';
+  const border = dragging
+    ? 'border-teal-500 bg-teal-100 scale-[1.01]'
+    : 'border-primary-300 bg-gradient-to-b from-surface-raised to-primary-100/40 hover:border-primary-500';
   return (
-    <div className="relative mt-5">
+    <div className="relative">
       <input
         id={inputId}
         type="file"
@@ -55,12 +57,18 @@ export function UploadDropzone({ multiple, disabled = false, onFiles }: UploadDr
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        className={`flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed p-7 text-center peer-focus-visible:shadow-focus peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${border}`}
+        className={`flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed px-5 py-8 text-center transition-all duration-base ease-token peer-focus-visible:shadow-focus peer-disabled:cursor-not-allowed peer-disabled:opacity-60 ${border}`}
       >
-        <UploadCloud aria-hidden="true" className="size-8 text-primary-500" />
-        <span className="text-lg font-semibold text-ink-strong">{upload.dropTitle}</span>
-        <span className="text-sm text-ink-muted">{upload.dropHint}</span>
-        <span className="text-sm font-medium text-primary-700 underline">{upload.browse}</span>
+        <span className="grid size-16 place-items-center rounded-full bg-gradient-to-br from-primary-700 to-teal-500 text-ink-inverse shadow-raised">
+          <UploadCloud aria-hidden="true" className="size-8" />
+        </span>
+        <span className="text-xl font-semibold text-ink-strong">{upload.dropTitle}</span>
+        <span className="rounded-pill bg-surface-sunken px-3 py-1 text-xs font-medium text-ink-base">
+          {upload.dropHint}
+        </span>
+        <span className="text-sm font-medium text-primary-700 underline underline-offset-4">
+          {upload.browse}
+        </span>
         <span className="sr-only">{upload.fileInputLabel}</span>
       </label>
     </div>

@@ -27,6 +27,13 @@ WEIGHT_SUM_TOLERANCE = 1e-6
 # Structural: the note S7 puts on a candidate from the independent second local read. It is what
 # makes a second Tesseract pass at another psm count as a distinct reader. Equal to S7's note.
 SECOND_READ_NOTE = "second_read"
+# Structural: the note on a candidate from the vision-first arbiter - a third, zoomed reading made
+# only when the first two disagree (ADR-017). It is a reader of its own.
+THIRD_READ_NOTE = "third_read"
+
+# Structural: the note on every candidate of a field whose number another field also claimed
+# (ADR-017). S10 never lets such a candidate survive on its own, so the flag cannot be undone.
+CROSS_FIELD_NOTE = "cross_field_conflict"
 
 # Structural: shown instead of an invented sender (project rule §2).
 SENDER_NOT_LISTED = "לא ברשימה"

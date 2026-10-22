@@ -4,6 +4,8 @@
 
 @layer base {
   :root {
+    --ring-fill: theme('colors.brand.glow');
+    --ring-track: rgb(255 255 255 / 0.18);
     --motion-fast: theme('transitionDuration.fast');
     --motion-base: theme('transitionDuration.base');
     --motion-slow: theme('transitionDuration.slow');

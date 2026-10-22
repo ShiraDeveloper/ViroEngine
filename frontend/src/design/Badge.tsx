@@ -26,7 +26,7 @@ export function Badge({ level, withText = true }: BadgeProps) {
   return (
     <span
       data-level={level}
-      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-start text-xs font-medium ${LEVEL_STYLE[level].surface}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-pill px-3 py-1 text-start text-xs font-semibold ${LEVEL_STYLE[level].surface}`}
     >
       <Icon aria-hidden="true" className="size-3" />
       <span className={withText ? undefined : 'sr-only'}>{text}</span>

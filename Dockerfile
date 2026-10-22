@@ -1,7 +1,8 @@
-# Safe Line — production Docker image
+# Safe Line — production Docker image: the API and the built web app in ONE container
 #
-# python:3.12-slim + Tesseract Hebrew + OpenCV runtime deps
-# Non-root user (uid 10001) for least privilege.
+# Stage 1 builds the React app (served by the API at `/`, the API stays at `/v1`).
+# Stage 2: python:3.12-slim + Tesseract Hebrew (local fallback engine) + OpenCV runtime deps.
+# Non-root user (uid 1000, which is also the uid a Hugging Face Space runs as).
 # DATA_DIR=/tmp/safeline — nothing survives a restart (privacy by design).
 # One uvicorn worker: concurrency comes from the async queue, not from processes.
 #
@@ -9,6 +10,16 @@
 # Run:    docker run --rm -p 8000:8000 --env-file .env safeline
 # Health: curl localhost:8000/v1/health
 # Verify: docker run --rm safeline tesseract --list-langs  # must show 'heb'
+
+FROM node:20-slim AS web
+WORKDIR /web
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+COPY fixtures/ /fixtures/
+# Same origin as the API: no CORS, no second host. The demo mock client is not used.
+ENV VITE_API_BASE=/v1
+RUN npx vite build
 
 FROM python:3.12-slim AS base
 
@@ -44,11 +55,13 @@ COPY backend/ ./backend/
 COPY scripts/ ./scripts/
 COPY config/ ./config/
 COPY pyproject.toml .
+COPY --from=web /web/dist ./frontend/dist
 
 # --- Data directory --------------------------------------------------------
 # Nothing survives a restart — this is the privacy guarantee.
 ENV DATA_DIR=/tmp/safeline
-RUN mkdir -p /tmp/safeline && chown safeline:safeline /tmp/safeline
+ENV STATIC_DIR=/app/frontend/dist
+RUN mkdir -p /tmp/safeline && chown safeline:safeline /tmp/safeline && chmod 700 /tmp/safeline
 
 # --- Switch to non-root user -----------------------------------------------
 USER safeline
