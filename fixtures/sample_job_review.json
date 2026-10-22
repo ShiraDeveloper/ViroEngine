@@ -1,0 +1,1665 @@
+{
+  "job_id": "job-demo",
+  "status": "needs_review",
+  "expires_at": "2026-10-19T09:30:00+03:00",
+  "page_count": 7,
+  "pages_done": 7,
+  "rows": [
+    {
+      "row_id": "r-001",
+      "group_id": "g-001",
+      "page_ids": [
+        "fx#1"
+      ],
+      "fields": {
+        "sender": {
+          "field": "sender",
+          "value": "כללית",
+          "display_value": "כללית",
+          "level": "B",
+          "score": 0.93,
+          "source": "printed",
+          "box": [
+            0.02,
+            0.3,
+            0.1,
+            0.7
+          ],
+          "candidates": [
+            {
+              "value": "כללית",
+              "reader": "tesseract",
+              "source": "printed",
+              "box": [
+                0.02,
+                0.3,
+                0.1,
+                0.7
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "letterhead",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "כללית",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "first_name": {
+          "field": "first_name",
+          "value": "דנה",
+          "display_value": "דנה",
+          "level": "B",
+          "score": 0.86,
+          "source": "handwritten",
+          "box": [
+            0.3,
+            0.55,
+            0.34,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "דנה",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.3,
+                0.55,
+                0.34,
+                0.8
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "דנה",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S9",
+              "reader": "gemini",
+              "outcome": "value",
+              "value": "דנה",
+              "reader_confidence": 0.9,
+              "duration_ms": 820,
+              "cloud": true,
+              "tier": 1,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "last_name": {
+          "field": "last_name",
+          "value": "לוי",
+          "display_value": "לוי",
+          "level": "B",
+          "score": 0.86,
+          "source": "handwritten",
+          "box": [
+            0.3,
+            0.55,
+            0.34,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "לוי",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.3,
+                0.55,
+                0.34,
+                0.8
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "לוי",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S9",
+              "reader": "gemini",
+              "outcome": "value",
+              "value": "לוי",
+              "reader_confidence": 0.9,
+              "duration_ms": 820,
+              "cloud": true,
+              "tier": 1,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "national_id": {
+          "field": "national_id",
+          "value": "100000017",
+          "display_value": "100000017",
+          "level": "B",
+          "score": 0.91,
+          "source": "handwritten",
+          "box": [
+            0.36,
+            0.55,
+            0.4,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "100000017",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.36,
+                0.55,
+                0.4,
+                0.8
+              ],
+              "reader_confidence": 0.7,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [
+            {
+              "name": "israeli_id_check_digit",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            }
+          ],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "100000017",
+              "reader_confidence": 0.7,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "central_number": {
+          "field": "central_number",
+          "value": "900101",
+          "display_value": "900101",
+          "level": "A",
+          "score": 0.99,
+          "source": "barcode",
+          "box": [
+            0.05,
+            0.05,
+            0.1,
+            0.25
+          ],
+          "candidates": [
+            {
+              "value": "900101",
+              "reader": "zxing",
+              "source": "barcode",
+              "box": [
+                0.05,
+                0.05,
+                0.1,
+                0.25
+              ],
+              "reader_confidence": 1.0,
+              "label_distance": 0.04,
+              "region": "central_sticker",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "zxing",
+              "outcome": "value",
+              "value": "900101",
+              "reader_confidence": 1.0,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "900101",
+              "reader_confidence": 0.95,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "receipt_date": {
+          "field": "receipt_date",
+          "value": "2026-10-12",
+          "display_value": "12/10/2026",
+          "level": "B",
+          "score": 0.88,
+          "source": "stamp",
+          "box": [
+            0.8,
+            0.55,
+            0.88,
+            0.9
+          ],
+          "candidates": [
+            {
+              "value": "2026-10-12",
+              "reader": "tesseract",
+              "source": "stamp",
+              "box": [
+                0.8,
+                0.55,
+                0.88,
+                0.9
+              ],
+              "reader_confidence": 0.8,
+              "label_distance": 0.04,
+              "region": "receipt_stamp",
+              "notes": []
+            }
+          ],
+          "validations": [
+            {
+              "name": "date_exists",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            },
+            {
+              "name": "date_not_future",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            }
+          ],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "2026-10-12",
+              "reader_confidence": 0.8,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "commitment_number": {
+          "field": "commitment_number",
+          "value": "700000101",
+          "display_value": "700000101",
+          "level": "A",
+          "score": 0.97,
+          "source": "barcode",
+          "box": [
+            0.2,
+            0.1,
+            0.25,
+            0.5
+          ],
+          "candidates": [
+            {
+              "value": "700000101",
+              "reader": "tesseract",
+              "source": "barcode",
+              "box": [
+                0.2,
+                0.1,
+                0.25,
+                0.5
+              ],
+              "reader_confidence": 0.9,
+              "label_distance": 0.04,
+              "region": "commitment_label",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "700000101",
+              "reader_confidence": 0.9,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        }
+      },
+      "central_numbers": [
+        "900101"
+      ],
+      "row_level": "A",
+      "status": "auto"
+    },
+    {
+      "row_id": "r-002",
+      "group_id": "g-002",
+      "page_ids": [
+        "fx#2"
+      ],
+      "fields": {
+        "sender": {
+          "field": "sender",
+          "value": "מכבי שירותי בריאות",
+          "display_value": "מכבי שירותי בריאות",
+          "level": "B",
+          "score": 0.93,
+          "source": "printed",
+          "box": [
+            0.02,
+            0.3,
+            0.1,
+            0.7
+          ],
+          "candidates": [
+            {
+              "value": "מכבי שירותי בריאות",
+              "reader": "tesseract",
+              "source": "printed",
+              "box": [
+                0.02,
+                0.3,
+                0.1,
+                0.7
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "letterhead",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "מכבי שירותי בריאות",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "first_name": {
+          "field": "first_name",
+          "value": null,
+          "display_value": null,
+          "level": "D",
+          "score": 0.3,
+          "source": "handwritten",
+          "box": [
+            0.3,
+            0.55,
+            0.34,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "יעל",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.3,
+                0.55,
+                0.34,
+                0.8
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            },
+            {
+              "value": "יעלה",
+              "reader": "gemini",
+              "source": "handwritten",
+              "box": [
+                0.3,
+                0.55,
+                0.34,
+                0.8
+              ],
+              "reader_confidence": 0.6,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "יעל",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S9",
+              "reader": "gemini",
+              "outcome": "value",
+              "value": "יעל",
+              "reader_confidence": 0.9,
+              "duration_ms": 820,
+              "cloud": true,
+              "tier": 1,
+              "page_sent": false
+            }
+          ],
+          "reason": "שני הקוראים לא הסכימו",
+          "escalated": true
+        },
+        "last_name": {
+          "field": "last_name",
+          "value": "כהן",
+          "display_value": "כהן",
+          "level": "B",
+          "score": 0.86,
+          "source": "handwritten",
+          "box": [
+            0.3,
+            0.55,
+            0.34,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "כהן",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.3,
+                0.55,
+                0.34,
+                0.8
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "כהן",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S9",
+              "reader": "gemini",
+              "outcome": "value",
+              "value": "כהן",
+              "reader_confidence": 0.9,
+              "duration_ms": 820,
+              "cloud": true,
+              "tier": 1,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "national_id": {
+          "field": "national_id",
+          "value": "100000025",
+          "display_value": "100000025",
+          "level": "B",
+          "score": 0.91,
+          "source": "handwritten",
+          "box": [
+            0.36,
+            0.55,
+            0.4,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "100000025",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.36,
+                0.55,
+                0.4,
+                0.8
+              ],
+              "reader_confidence": 0.7,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [
+            {
+              "name": "israeli_id_check_digit",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            }
+          ],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "100000025",
+              "reader_confidence": 0.7,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "central_number": {
+          "field": "central_number",
+          "value": "900102",
+          "display_value": "900102",
+          "level": "A",
+          "score": 0.99,
+          "source": "barcode",
+          "box": [
+            0.05,
+            0.05,
+            0.1,
+            0.25
+          ],
+          "candidates": [
+            {
+              "value": "900102",
+              "reader": "zxing",
+              "source": "barcode",
+              "box": [
+                0.05,
+                0.05,
+                0.1,
+                0.25
+              ],
+              "reader_confidence": 1.0,
+              "label_distance": 0.04,
+              "region": "central_sticker",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "zxing",
+              "outcome": "value",
+              "value": "900102",
+              "reader_confidence": 1.0,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "900102",
+              "reader_confidence": 0.95,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "receipt_date": {
+          "field": "receipt_date",
+          "value": "2026-10-12",
+          "display_value": "12/10/2026",
+          "level": "B",
+          "score": 0.88,
+          "source": "stamp",
+          "box": [
+            0.8,
+            0.55,
+            0.88,
+            0.9
+          ],
+          "candidates": [
+            {
+              "value": "2026-10-12",
+              "reader": "tesseract",
+              "source": "stamp",
+              "box": [
+                0.8,
+                0.55,
+                0.88,
+                0.9
+              ],
+              "reader_confidence": 0.8,
+              "label_distance": 0.04,
+              "region": "receipt_stamp",
+              "notes": []
+            }
+          ],
+          "validations": [
+            {
+              "name": "date_exists",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            },
+            {
+              "name": "date_not_future",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            }
+          ],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "2026-10-12",
+              "reader_confidence": 0.8,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "commitment_number": {
+          "field": "commitment_number",
+          "value": "Q480215",
+          "display_value": "Q480215",
+          "level": "C",
+          "score": 0.82,
+          "source": "printed",
+          "box": [
+            0.2,
+            0.1,
+            0.25,
+            0.5
+          ],
+          "candidates": [
+            {
+              "value": "Q480215",
+              "reader": "tesseract",
+              "source": "printed",
+              "box": [
+                0.2,
+                0.1,
+                0.25,
+                0.5
+              ],
+              "reader_confidence": 0.9,
+              "label_distance": 0.04,
+              "region": "commitment_label",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "Q480215",
+              "reader_confidence": 0.9,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        }
+      },
+      "central_numbers": [
+        "900102"
+      ],
+      "row_level": "C",
+      "status": "auto"
+    },
+    {
+      "row_id": "r-003",
+      "group_id": "g-003",
+      "page_ids": [
+        "fx#3",
+        "fx#4"
+      ],
+      "fields": {
+        "sender": {
+          "field": "sender",
+          "value": "וולפסון",
+          "display_value": "וולפסון",
+          "level": "B",
+          "score": 0.93,
+          "source": "printed",
+          "box": [
+            0.02,
+            0.3,
+            0.1,
+            0.7
+          ],
+          "candidates": [
+            {
+              "value": "וולפסון",
+              "reader": "tesseract",
+              "source": "printed",
+              "box": [
+                0.02,
+                0.3,
+                0.1,
+                0.7
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "letterhead",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "וולפסון",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "first_name": {
+          "field": "first_name",
+          "value": "רונית",
+          "display_value": "רונית",
+          "level": "B",
+          "score": 0.86,
+          "source": "handwritten",
+          "box": [
+            0.3,
+            0.55,
+            0.34,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "רונית",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.3,
+                0.55,
+                0.34,
+                0.8
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "רונית",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S9",
+              "reader": "gemini",
+              "outcome": "value",
+              "value": "רונית",
+              "reader_confidence": 0.9,
+              "duration_ms": 820,
+              "cloud": true,
+              "tier": 1,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "last_name": {
+          "field": "last_name",
+          "value": "ברק",
+          "display_value": "ברק",
+          "level": "B",
+          "score": 0.86,
+          "source": "handwritten",
+          "box": [
+            0.3,
+            0.55,
+            0.34,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "ברק",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.3,
+                0.55,
+                0.34,
+                0.8
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "ברק",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S9",
+              "reader": "gemini",
+              "outcome": "value",
+              "value": "ברק",
+              "reader_confidence": 0.9,
+              "duration_ms": 820,
+              "cloud": true,
+              "tier": 1,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "national_id": {
+          "field": "national_id",
+          "value": "100000033",
+          "display_value": "100000033",
+          "level": "B",
+          "score": 0.91,
+          "source": "handwritten",
+          "box": [
+            0.36,
+            0.55,
+            0.4,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "100000033",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.36,
+                0.55,
+                0.4,
+                0.8
+              ],
+              "reader_confidence": 0.7,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [
+            {
+              "name": "israeli_id_check_digit",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            }
+          ],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "100000033",
+              "reader_confidence": 0.7,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "central_number": {
+          "field": "central_number",
+          "value": "900103",
+          "display_value": "900103",
+          "level": "A",
+          "score": 0.99,
+          "source": "barcode",
+          "box": [
+            0.05,
+            0.05,
+            0.1,
+            0.25
+          ],
+          "candidates": [
+            {
+              "value": "900103",
+              "reader": "zxing",
+              "source": "barcode",
+              "box": [
+                0.05,
+                0.05,
+                0.1,
+                0.25
+              ],
+              "reader_confidence": 1.0,
+              "label_distance": 0.04,
+              "region": "central_sticker",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "zxing",
+              "outcome": "value",
+              "value": "900103",
+              "reader_confidence": 1.0,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "900103",
+              "reader_confidence": 0.95,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "receipt_date": {
+          "field": "receipt_date",
+          "value": null,
+          "display_value": null,
+          "level": "D",
+          "score": 0.0,
+          "source": "unknown",
+          "box": null,
+          "candidates": [
+            {
+              "value": "2026-10-12",
+              "reader": "tesseract",
+              "source": "stamp",
+              "box": [
+                0.8,
+                0.55,
+                0.88,
+                0.9
+              ],
+              "reader_confidence": 0.8,
+              "label_distance": 0.04,
+              "region": "receipt_stamp",
+              "notes": [
+                "stamp"
+              ]
+            },
+            {
+              "value": "2026-10-14",
+              "reader": "gemini",
+              "source": "handwritten",
+              "box": [
+                0.12,
+                0.05,
+                0.16,
+                0.25
+              ],
+              "reader_confidence": 0.7,
+              "label_distance": 0.04,
+              "region": "central_sticker",
+              "notes": [
+                "handwritten"
+              ]
+            }
+          ],
+          "validations": [
+            {
+              "name": "date_exists",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            }
+          ],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "2026-10-12",
+              "reader_confidence": 0.8,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S9",
+              "reader": "gemini",
+              "outcome": "value",
+              "value": "2026-10-14",
+              "reader_confidence": 0.7,
+              "duration_ms": 820,
+              "cloud": true,
+              "tier": 1,
+              "page_sent": false
+            }
+          ],
+          "reason": "החותמת והתאריך בכתב יד שונים",
+          "escalated": true
+        },
+        "commitment_number": {
+          "field": "commitment_number",
+          "value": "300401",
+          "display_value": "300401",
+          "level": "B",
+          "score": 0.9,
+          "source": "printed",
+          "box": [
+            0.2,
+            0.1,
+            0.25,
+            0.5
+          ],
+          "candidates": [
+            {
+              "value": "300401",
+              "reader": "tesseract",
+              "source": "printed",
+              "box": [
+                0.2,
+                0.1,
+                0.25,
+                0.5
+              ],
+              "reader_confidence": 0.9,
+              "label_distance": 0.04,
+              "region": "commitment_label",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "300401",
+              "reader_confidence": 0.9,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        }
+      },
+      "central_numbers": [
+        "900103"
+      ],
+      "row_level": "D",
+      "status": "auto"
+    },
+    {
+      "row_id": "r-004",
+      "group_id": "g-004",
+      "page_ids": [
+        "fx#5",
+        "fx#6"
+      ],
+      "fields": {
+        "sender": {
+          "field": "sender",
+          "value": "מעבדת רוזנבלט",
+          "display_value": "מעבדת רוזנבלט",
+          "level": "B",
+          "score": 0.93,
+          "source": "printed",
+          "box": [
+            0.02,
+            0.3,
+            0.1,
+            0.7
+          ],
+          "candidates": [
+            {
+              "value": "מעבדת רוזנבלט",
+              "reader": "tesseract",
+              "source": "printed",
+              "box": [
+                0.02,
+                0.3,
+                0.1,
+                0.7
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "letterhead",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "מעבדת רוזנבלט",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "first_name": {
+          "field": "first_name",
+          "value": "אורי",
+          "display_value": "אורי",
+          "level": "B",
+          "score": 0.86,
+          "source": "handwritten",
+          "box": [
+            0.3,
+            0.55,
+            0.34,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "אורי",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.3,
+                0.55,
+                0.34,
+                0.8
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "אורי",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S9",
+              "reader": "gemini",
+              "outcome": "value",
+              "value": "אורי",
+              "reader_confidence": 0.9,
+              "duration_ms": 820,
+              "cloud": true,
+              "tier": 1,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "last_name": {
+          "field": "last_name",
+          "value": "שמש",
+          "display_value": "שמש",
+          "level": "B",
+          "score": 0.86,
+          "source": "handwritten",
+          "box": [
+            0.3,
+            0.55,
+            0.34,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "שמש",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.3,
+                0.55,
+                0.34,
+                0.8
+              ],
+              "reader_confidence": 0.88,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "שמש",
+              "reader_confidence": 0.88,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S9",
+              "reader": "gemini",
+              "outcome": "value",
+              "value": "שמש",
+              "reader_confidence": 0.9,
+              "duration_ms": 820,
+              "cloud": true,
+              "tier": 1,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "national_id": {
+          "field": "national_id",
+          "value": "100000041",
+          "display_value": "100000041",
+          "level": "B",
+          "score": 0.91,
+          "source": "handwritten",
+          "box": [
+            0.36,
+            0.55,
+            0.4,
+            0.8
+          ],
+          "candidates": [
+            {
+              "value": "100000041",
+              "reader": "tesseract",
+              "source": "handwritten",
+              "box": [
+                0.36,
+                0.55,
+                0.4,
+                0.8
+              ],
+              "reader_confidence": 0.7,
+              "label_distance": 0.04,
+              "region": "patient_box",
+              "notes": []
+            }
+          ],
+          "validations": [
+            {
+              "name": "israeli_id_check_digit",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            }
+          ],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "100000041",
+              "reader_confidence": 0.7,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "central_number": {
+          "field": "central_number",
+          "value": "900104",
+          "display_value": "900104",
+          "level": "A",
+          "score": 0.99,
+          "source": "barcode",
+          "box": [
+            0.05,
+            0.05,
+            0.1,
+            0.25
+          ],
+          "candidates": [
+            {
+              "value": "900104",
+              "reader": "zxing",
+              "source": "barcode",
+              "box": [
+                0.05,
+                0.05,
+                0.1,
+                0.25
+              ],
+              "reader_confidence": 1.0,
+              "label_distance": 0.04,
+              "region": "central_sticker",
+              "notes": []
+            }
+          ],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "zxing",
+              "outcome": "value",
+              "value": "900104",
+              "reader_confidence": 1.0,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            },
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "900104",
+              "reader_confidence": 0.95,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "receipt_date": {
+          "field": "receipt_date",
+          "value": "2026-10-13",
+          "display_value": "13/10/2026",
+          "level": "B",
+          "score": 0.88,
+          "source": "stamp",
+          "box": [
+            0.8,
+            0.55,
+            0.88,
+            0.9
+          ],
+          "candidates": [
+            {
+              "value": "2026-10-13",
+              "reader": "tesseract",
+              "source": "stamp",
+              "box": [
+                0.8,
+                0.55,
+                0.88,
+                0.9
+              ],
+              "reader_confidence": 0.8,
+              "label_distance": 0.04,
+              "region": "receipt_stamp",
+              "notes": []
+            }
+          ],
+          "validations": [
+            {
+              "name": "date_exists",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            },
+            {
+              "name": "date_not_future",
+              "kind": "hard",
+              "passed": true,
+              "detail": null,
+              "repaired_from": null
+            }
+          ],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "value",
+              "value": "2026-10-13",
+              "reader_confidence": 0.8,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": null,
+          "escalated": false
+        },
+        "commitment_number": {
+          "field": "commitment_number",
+          "value": null,
+          "display_value": null,
+          "level": "D",
+          "score": 0.0,
+          "source": "unknown",
+          "box": null,
+          "candidates": [],
+          "validations": [],
+          "trail": [
+            {
+              "stage": "S6",
+              "reader": "tesseract",
+              "outcome": "no_value",
+              "value": null,
+              "reader_confidence": 0.0,
+              "duration_ms": 140,
+              "cloud": false,
+              "tier": null,
+              "page_sent": false
+            }
+          ],
+          "reason": "לא נמצא בטופס",
+          "escalated": false
+        }
+      },
+      "central_numbers": [
+        "900104"
+      ],
+      "row_level": "D",
+      "status": "auto"
+    }
+  ],
+  "orphan_page_ids": [
+    "fx#7"
+  ],
+  "report": {
+    "job_id": "job-demo",
+    "started_at": "2026-10-19T09:00:00+03:00",
+    "finished_at": "2026-10-19T09:01:36+03:00",
+    "page_count": 7,
+    "row_count": 4,
+    "fields_total": 28,
+    "fields_closed_local": 25,
+    "fields_escalated": 1,
+    "fields_flagged": 2,
+    "tier1_calls": 1,
+    "tier2_calls": 0,
+    "local_close_rate": 0.8929,
+    "level_histogram": {
+      "A": 5,
+      "B": 20,
+      "C": 1,
+      "D": 2
+    },
+    "stage_durations_ms": {
+      "S0": 900,
+      "S1": 1400,
+      "S3": 41000,
+      "S4": 6200,
+      "S6": 9800,
+      "S9": 820,
+      "S10": 300
+    },
+    "corrections_histogram": {
+      "rotate": 2,
+      "deskew": 1
+    },
+    "cost": {
+      "provider_calls": 1,
+      "cache_hits": 0,
+      "input_tokens": 640,
+      "output_tokens": 90,
+      "estimated_usd": 0.0
+    },
+    "provider_failovers": [],
+    "engine_version": "0.1.0-fixture",
+    "prompt_version": "v1"
+  }
+}

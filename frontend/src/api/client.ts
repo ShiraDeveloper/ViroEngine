@@ -1,3 +1,4 @@
+import type { EvalMetricsResponse } from './metrics';
 import { mockClient } from './mockClient';
 import { openEventStream } from './sse';
 import type {
@@ -27,7 +28,13 @@ export interface ApiClient {
   undo(jobId: string, rowId: string): Promise<CommitmentRow>;
   confirm(jobId: string): Promise<JobView>;
   cropUrl(jobId: string, pageId: string, box: Box, pad?: number): string;
+  /** The crop image as a Blob. A browser <img> cannot send X-API-Key, so the Lens fetches here. */
+  fetchCrop(jobId: string, pageId: string, box: Box, pad?: number): Promise<Blob>;
   exportUrl(jobId: string, fmt: 'xlsx' | 'csv' | 'json'): string;
+  /** Stress Mode: a new job over the source job's pages, degraded by `ops`. */
+  stress(jobId: string, ops: readonly string[]): Promise<UploadResponse>;
+  /** The latest measured evaluation report, or `{ available: false }` when none exists. */
+  getEvalMetrics(): Promise<EvalMetricsResponse>;
 }
 
 /** A non-2xx API answer. `status` is the HTTP status; the body is never surfaced to the UI. */
@@ -71,6 +78,13 @@ export function createHttpClient(options: HttpClientOptions): ApiClient {
     });
     if (!response.ok) throw new ApiError(response.status);
     return (await response.json()) as T;
+  }
+
+  function cropPath(jobId: string, pageId: string, box: Box, pad: number): string {
+    return (
+      `/jobs/${encodeURIComponent(jobId)}/pages/${encodeURIComponent(pageId)}/crop` +
+      `?box=${box.join(',')}&pad=${pad}`
+    );
   }
 
   function uploadHeaders(idempotencyKey: string): Record<string, string> {
@@ -129,9 +143,22 @@ export function createHttpClient(options: HttpClientOptions): ApiClient {
     confirm: (jobId) =>
       request<JobView>(`/jobs/${encodeURIComponent(jobId)}/confirm`, { method: 'POST' }),
     cropUrl: (jobId, pageId, box, pad = DEFAULT_CROP_PAD) =>
-      `${baseUrl}/jobs/${encodeURIComponent(jobId)}/pages/${encodeURIComponent(pageId)}/crop` +
-      `?box=${box.join(',')}&pad=${pad}`,
+      `${baseUrl}${cropPath(jobId, pageId, box, pad)}`,
+    async fetchCrop(jobId, pageId, box, pad = DEFAULT_CROP_PAD) {
+      const response = await doFetch(`${baseUrl}${cropPath(jobId, pageId, box, pad)}`, {
+        headers: keyHeader,
+      });
+      if (!response.ok) throw new ApiError(response.status);
+      return response.blob();
+    },
     exportUrl: (jobId, fmt) => `${baseUrl}/jobs/${encodeURIComponent(jobId)}/export?format=${fmt}`,
+    stress: (jobId, ops) =>
+      request<UploadResponse>(`/jobs/${encodeURIComponent(jobId)}/stress`, {
+        method: 'POST',
+        body: JSON.stringify({ ops }),
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    getEvalMetrics: () => request<EvalMetricsResponse>('/metrics/eval'),
   };
 }
 

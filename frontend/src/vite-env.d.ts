@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE?: string;
   /** X-API-Key for the demo deployment. Shipped to the browser, so never a production secret. */
   readonly VITE_API_KEY?: string;
+  /** Mock only: "review" loads the fixture with three flagged fields. */
+  readonly VITE_MOCK_FIXTURE?: string;
 }
 
 interface ImportMeta {

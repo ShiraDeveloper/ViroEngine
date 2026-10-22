@@ -50,6 +50,7 @@ export function ReviewTable({ rows, filter, selected, onSelectCell }: ReviewTabl
   }
 
   return (
+    <div data-review-grid="">
     <Table caption={review.tableCaption}>
       <THead>
         <Tr>
@@ -80,5 +81,6 @@ export function ReviewTable({ rows, filter, selected, onSelectCell }: ReviewTabl
         ))}
       </TBody>
     </Table>
+    </div>
   );
 }
