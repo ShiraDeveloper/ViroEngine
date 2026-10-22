@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { api } from '@/api/client';
+import { api, clearStoredAccessCode } from '@/api/client';
 import { login } from '@/copy/he';
 import { Button } from '@/design/Button';
 import { useDocumentTitle } from '@/lib/useDocumentTitle';
@@ -15,6 +15,11 @@ export function Login() {
   const [code, setCode] = useState('');
   const [error, setError] = useState<LoginError>('none');
   const [busy, setBusy] = useState(false);
+
+  // Arriving here means signed out: the access code lives in sessionStorage only and is dropped.
+  useEffect(() => {
+    clearStoredAccessCode();
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
