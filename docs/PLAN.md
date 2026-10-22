@@ -2023,10 +2023,10 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 20 ◐ | S10 grouping and rows — **M4** | Ahuba | P4 | D6–7 | 3h | 15,18 |
 | 21 ✅ | Screens: login, upload, processing, export | Shira | P5 | D6–7 | 3h | 4 · **22 at runtime only** |
 | 22 ◐ | Full API: SSE, edits, audit, TTL | Ahuba | P5 | D7–8 | **6h** | 3,20 |
-| 23 | Review workspace with Evidence Lens | Shira | P5 | D7 | 5h | 4 · **22 at runtime only** |
+| 23 ✅ | Review workspace with Evidence Lens | Shira | P5 | D7 | 5h | 4 · **22 at runtime only** |
 | 24 ◐ | Learning layer | Ahuba | P6 | D8 | 2h | 20,22 |
-| 25 | Augmentation and Stress Mode | Shira | P6 | D8 | 1h | 15,22 |
-| 26 | Metrics dashboard and ablation UI | Shira | P6 | D8 | 2h | 15,25 · **24 at runtime only** |
+| 25 ✅ | Augmentation and Stress Mode | Shira | P6 | D8 | 1h | 15,22 |
+| 26 ✅ | Metrics dashboard and ablation UI | Shira | P6 | D8 | 2h | 15,25 · **24 at runtime only** |
 | 27 ◐ | Security hardening and test suite | Ahuba | P7 | D8 | 2h ⚠ | 18,22,24 |
 | 28 ◐ | Deployment — **M5** | Ahuba | P7 | **D9** | 1h ⚠ | 22,23,27 |
 | 29 | Docs and the 60-second video | Shira | P8 | D8–9 | **3h** | 26,28 |

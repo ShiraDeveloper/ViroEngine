@@ -1,6 +1,6 @@
 # Demo script and runbook
 
-> **Status: skeleton.** Completed in **Task 29**; the Plan B URL is added in **Task 28**.
+> **Status: complete for Task 29; the Plan B URL is added when Task 28 deploys.**
 > Choreography rationale in [`PLAN.md`](./PLAN.md) §9.8; video script in §15.2.
 
 ## Live demo — ~90 seconds
@@ -24,9 +24,23 @@ header says `15.06.2026`. The engine takes the stamp. One click shows exactly wh
 
 ## Recorded video — 60 seconds
 
-See `PLAN.md` §15.2 for the second-by-second table. Hebrew narration, burned-in Hebrew subtitles,
-opens without registration. **The closing numbers are the real held-out figures** — placeholders
-must never ship.
+Hebrew narration, burned-in Hebrew subtitles, opens without registration, under 60 seconds.
+**The closing numbers are the real held-out figures** — placeholders must never ship. The
+authoritative table is `PLAN.md` §15.2; this is the same cut:
+
+| Seconds | Show | Narration intent |
+|---|---|---|
+| 0–6 | The pile: rotated, handwritten, stamped forms | The problem is real |
+| 6–16 | Drag 30 forms; Live Pipeline; the local counter climbing | It runs, mostly on the machine |
+| 16–28 | Three orange cells; click one; Evidence Lens zooms the stamp | It says when it is unsure, and why |
+| 28–38 | Pick a candidate, confirm, export, open the coloured Excel | It finishes the job |
+| 38–50 | Stress Mode: yellow removed, rotated, blurred; still working | It is not tuned to the samples |
+| 50–60 | Dashboard: silent error, local close rate, cost | The figures, measured on held-out pages |
+
+**Recording checklist (manual, not automatable).** Record at 1280×720 · cut to ≤ 60 s · burn in
+Hebrew subtitles · open the file in a private window with no login · confirm the closing numbers
+equal `eval/results/final_report.md` · keep an offline copy on the presenting laptop · export the
+best 8 seconds as `assets/demo.gif` (< 5 MB) and uncomment the image line in the root `README.md`.
 
 ## Hosting runbook (T28)
 
