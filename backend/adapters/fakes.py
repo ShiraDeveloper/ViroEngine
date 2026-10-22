@@ -22,6 +22,7 @@ from backend.core.models import (
     BarcodeHit,
     Box,
     CommitmentRow,
+    FieldStat,
     ImageRef,
     LayoutHint,
     LayoutObservation,
@@ -290,6 +291,13 @@ class FakeLearningStore:
 
     def record_confirmation(self, obs: LayoutObservation) -> None:
         """Accept and discard the observation."""
+
+    def record_outcome(self, sender: str, field: str, *, corrected: bool) -> None:
+        """Accept and discard the count."""
+
+    def field_stats(self) -> list[FieldStat]:
+        """Nothing learned."""
+        return []
 
     def layout_hints(self, sender: str, field: str) -> list[LayoutHint]:
         """Always returns an empty list."""

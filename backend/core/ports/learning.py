@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Protocol, runtime_checkable
 
-from backend.core.models import LayoutHint, LayoutObservation, PatternHint, RunMetric
+from backend.core.models import FieldStat, LayoutHint, LayoutObservation, PatternHint, RunMetric
 
 
 @runtime_checkable
@@ -43,6 +43,14 @@ class LearningStorePort(Protocol):
 
     def record_run(self, metric: RunMetric) -> None:
         """Append one finished job's counters (no values) to the learning curve."""
+        ...
+
+    def record_outcome(self, sender: str, field: str, *, corrected: bool) -> None:
+        """Count one reviewed field: accepted as read, or corrected by a person. Counts only."""
+        ...
+
+    def field_stats(self) -> list[FieldStat]:
+        """Everything review has taught so far, one entry per (sender, field). Never a value."""
         ...
 
     def pattern_hints(self, sender: str, field: str) -> list[PatternHint]:

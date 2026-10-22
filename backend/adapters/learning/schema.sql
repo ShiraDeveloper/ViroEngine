@@ -36,6 +36,14 @@ CREATE TABLE IF NOT EXISTS label_synonym (
     UNIQUE (sender, field, label_text)
 );
 
+CREATE TABLE IF NOT EXISTS field_outcome (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender TEXT NOT NULL, field TEXT NOT NULL,
+    confirmed INTEGER NOT NULL DEFAULT 0, corrected INTEGER NOT NULL DEFAULT 0,
+    last_seen TEXT NOT NULL,
+    UNIQUE (sender, field)
+);
+
 CREATE TABLE IF NOT EXISTS sender_proposal (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     canonical TEXT NOT NULL UNIQUE, keywords TEXT NOT NULL,

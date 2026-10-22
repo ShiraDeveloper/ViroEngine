@@ -70,7 +70,7 @@ export function Export({ client = api }: ExportProps = {}) {
     setBusy(fmt);
     try {
       const blob = await client.fetchExport(jobId, fmt);
-      saveBlob(blob, `safeline-${jobId.slice(0, 8)}.${fmt}`);
+      saveBlob(blob, `viroengine-${jobId.slice(0, 8)}.${fmt}`);
       toast.push({ tone: 'success', title: exportScreen.done });
     } catch {
       toast.push({ tone: 'error', title: exportScreen.downloadFailed });

@@ -77,6 +77,16 @@ export interface FieldResult {
   escalated: boolean;
 }
 
+/** What review taught about one (sender, field), from confirmed jobs - counts, a printed label and an abstracted shape only, never a value (PLAN §7.1). */
+export interface FieldStat {
+  sender: string;
+  field: FieldKey;
+  confirmed?: number;
+  corrected?: number;
+  label?: string | null;
+  shape?: string | null;
+}
+
 export interface Health {
   status: "ok" | "unready";
   tesseract: "ready" | "unavailable";

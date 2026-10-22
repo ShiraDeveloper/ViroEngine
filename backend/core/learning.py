@@ -21,6 +21,7 @@ from backend.core.models import (
     FieldKey,
     FieldResult,
     LayoutObservation,
+    ReaderName,
     RegionKind,
     SenderSpec,
 )
@@ -134,6 +135,15 @@ def observations_from_row(
         if page is None or page.page_role is None:
             continue
         shape = abstract_shape(result.value) if key in _SHAPED else None
+        label = next(
+            (
+                n[len("label:") :]
+                for c in result.candidates
+                for n in c.notes
+                if n.startswith("label:")
+            ),
+            None,
+        )
         observed.append(
             LayoutObservation(
                 sender=sender,
@@ -142,11 +152,27 @@ def observations_from_row(
                 box=result.box,
                 source=result.source,
                 page_role=page.page_role,
-                label_text=None,
+                label_text=label,
                 shape=shape,
             )
         )
     return observed
+
+
+def field_outcomes(row: CommitmentRow) -> list[tuple[str, FieldKey, bool]]:
+    """(sender, field, corrected) for every field of a confirmed row that had a reading or was
+    set by a person: what the review says about how well the engine read it. No value."""
+    sender_field = row.fields.get(FieldKey.sender)
+    sender = sender_field.value if sender_field is not None else None
+    if not sender or sender == SENDER_NOT_LISTED:
+        return []
+    out: list[tuple[str, FieldKey, bool]] = []
+    for key, result in row.fields.items():
+        corrected = any(step.reader is ReaderName.human for step in result.trail)
+        if result.value is None and not corrected:
+            continue  # nothing was read and nobody filled it: no evidence either way
+        out.append((sender, key, corrected))
+    return out
 
 
 def with_learned(spec: SenderSpec | None, learning: LearningStorePort) -> SenderSpec | None:

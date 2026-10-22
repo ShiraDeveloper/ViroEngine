@@ -47,6 +47,7 @@ from backend.core.models import (
     Candidate,
     ConfidenceLevel,
     FieldKey,
+    FieldStat,
     ImageRef,
     JobRecord,
     JobStatus,
@@ -218,6 +219,13 @@ class _NoLearning:
     def record_run(self, metric: RunMetric) -> None:
         """Discard the metric."""
 
+    def record_outcome(self, sender: str, field: str, *, corrected: bool) -> None:
+        """Discard the count."""
+
+    def field_stats(self) -> list[FieldStat]:
+        """Nothing learned."""
+        return []
+
 
 @dataclass
 class _Timer:
@@ -387,6 +395,7 @@ def _vision_services(services: PipelineServices) -> VisionServices | None:
         scoring=cfg.scoring,
         prompt_version=cfg.classify.prompt_version,
         ocr=services.ocr_printed,
+        learning=services.learning if cfg.layers.learning else None,
         usd_per_million=(
             cfg.escalation.usd_per_million_input_tokens,
             cfg.escalation.usd_per_million_output_tokens,

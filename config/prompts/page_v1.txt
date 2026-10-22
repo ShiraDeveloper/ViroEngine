@@ -63,12 +63,16 @@ THE SEVEN FIELDS
   line (כתובת) - a name is written in the name field itself. Scribbled handwriting that you
   cannot actually read is "" - do not substitute a plausible or common name. If only a combined "שם" exists and the order is
   explicit (e.g. "שם משפחה ושם פרטי"), split by that order. When the label is only "שם" (or a
-  sticker prints the full name on one line), THINK about the words before splitting: use your
-  knowledge of Israeli / Jewish / Arab first names and family names (e.g. "כהן", "לוי",
-  "מזרחי", "אבו ..." are family names; "יוסף", "שרה", "מוחמד" are first names) and the usual
-  order of that source (Israeli hospital stickers and computer screens print the FAMILY name
-  first). Split only when the words make it clear which is which; when you truly cannot tell,
-  put the whole name in last_name, leave first_name "", and say so in "ambiguities".
+  sticker prints the full name on one line), think about the words before splitting: use your
+  general knowledge of which Hebrew / Arabic words are given names and which are family names,
+  and the usual order of that source (Israeli hospital stickers and computer screens print the
+  FAMILY name first). Split only when it is clear; otherwise put the whole name in last_name,
+  leave first_name "" and say so in "ambiguities".
+  NAMES ARE READ, NEVER SUPPLIED. Handwritten names on these forms are often quick scribbles.
+  Return a name only when you can read EVERY letter of it on this page. Never output a common,
+  typical or "likely" name, and never reuse a name from another page or from these instructions:
+  a scribble you cannot read letter by letter is "". A name is never a department, a lab, a city
+  or a destination (e.g. text after "במעבדות:", "לכבוד", "אל:").
   first_name never comes from a family-name label and last_name never from a first-name label. Hebrew letters only as written; keep final letters.
 - national_id (ת.ז / מספר זהות / מ.ז / ת. זהות / מספר תעודת זהות): the patient's ID, digits
   only as written (may be 7-10 digits, leading zeros possible). Never the father's / mother's /
@@ -106,8 +110,12 @@ THE SEVEN FIELDS
   number, also printed on patient stickers). When a form states that its sample number serves
   as the commitment ("מספר הדגימה מהווה מספר התחייבות", Rambam), return the "מספר דגימה" value.
   Private labs often have none - return [].
-  For a "דרישה" value like "606/50364186" return it as written.
-- sender (גורם שולח): the institution that ISSUED / SENT the form (letterhead, logo, stamp of the
+  Return the commitment number itself: a branch / lab code joined to it by a slash or dash
+  (e.g. "606/" before a "דרישה" number, "-(713)" after it on a tube label) is not part of it -
+  prefer the clean value printed beside the label "דרישה:".
+- sender (גורם שולח): the institution that ISSUED / SENT the form. Its name (or logo text) must
+  actually appear on THIS page - never infer it from a city, an address or a phone number; if
+  the issuer's name is not printed or is not on the list, return "לא ברשימה". It is found in the (letterhead, logo, stamp of the
   hospital or HMO, or the "גורם מפנה" field on a SAP screen). Pick exactly one value from the
   enumeration in the schema; if none fits return "לא ברשימה". NEVER the destination: "המעבדה
   המרכזית לנגיפים", "מעבדת נגיפים", "שיבא", "תל השומר", anything after "אל:" or "לכבוד".
@@ -150,6 +158,7 @@ unclear", "two dates near sticker"). Do not include personal values in the notes
 
 === CONTEXT (produced by deterministic code, trustworthy) ===
 PAGES_SENT: {page_count}
+LEARNED_FROM_REVIEWED_FORMS (hints from staff corrections; patterns, never values to copy): {label_synonyms}
 BARCODES_DECODED_ON_THESE_PAGES: {barcode_candidates}
 
 === USER ===
