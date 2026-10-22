@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-from datetime import date
 import logging
 from pathlib import Path
 import re
@@ -34,14 +33,13 @@ from backend.adapters.ocr.tesseract import TesseractAdapter
 from backend.adapters.regions.rule_based import RuleBasedDetector
 from backend.adapters.storage.tempdir import TmpdirStorage
 from backend.core.geometry import contains, page_size
-from backend.core.models import Candidate, FieldKey, NormalizedPage, PageRaw, RegionKind, SourceKind
-from backend.core.normalize import format_date
+from backend.core.models import Candidate, FieldKey, NormalizedPage, PageRaw, RegionKind
 from backend.core.pipeline.s0_intake import UploadedBlob, intake
 from backend.core.pipeline.s1_measure import measure
 from backend.core.pipeline.s2_correct import correct
 from backend.core.pipeline.s3_read_page import read_page
 from backend.core.pipeline.s4_regions import detect_regions
-from backend.core.pipeline.s6_candidates import candidates_central, candidates_receipt_date
+from backend.core.pipeline.s6_candidates_lab import candidates_central, candidates_receipt_date
 from backend.settings import Settings
 
 _LABEL = re.compile(r"^[A-Za-z]+(\d+)$")
@@ -249,11 +247,6 @@ def run_candidates(labels: list[str], pdf: Path | None, fields: set[FieldKey]) -
 def _describe_candidate(candidate: Candidate) -> str:
     """'939376 barcode', '18/06/2026 stamp', plus any reason notes."""
     value = candidate.value
-    if candidate.region is RegionKind.receipt_stamp or candidate.source is SourceKind.handwritten:
-        try:
-            value = format_date(date.fromisoformat(value))
-        except ValueError:
-            pass  # a central number, or a date the calendar rejected: shown as read
     notes = f" ({', '.join(candidate.notes)})" if candidate.notes else ""
     return f"{value} {candidate.source.value}{notes}"
 

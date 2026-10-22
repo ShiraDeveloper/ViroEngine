@@ -3065,15 +3065,32 @@ before relying on either page as a test fixture.
 
 > **✅ Done 2026-10-21 (Ahuba) — code complete; Done-when criteria partly met. The misses are real
 > and listed below.**
-> Added: `core/pipeline/s6_candidates.py` (central + date branches only — Shira's T12 branches are
-> not touched), `core/text_match.py` (stdlib fuzzy matching for the core), `adapters/ocr/trocr_digits.py`
+> Added: `core/pipeline/s6_candidates_lab.py` (central + date, per the §13 split; Shira's
+> dispatcher `s6_candidates.py` routes to it through an optional `lab: LabInputs`),
+> `core/text_match.py` (stdlib fuzzy matching for the core), `adapters/ocr/trocr_digits.py`
 > (`TrOcrDigits`: lazy, cached, beam search with up to 5 candidates, whitelist-constrained decoding,
 > missing/over-budget model → empty result), `tools/export_trocr.py`, `tools/demo.py candidates`,
 > `tests/unit/{test_candidates_central,test_candidates_date,test_trocr}.py` (the 16 named tests plus
 > 15). Changed: `s3_read_page.py` (stamp re-read, below) + 3 tests in `test_read_page.py`,
 > `settings.py`/`.env.example` (+9 settings), `container.py`, `config/models.yaml`, `models/README.md`,
 > the train-yolo skill's TrOCR appendix.
-> Verified: 387 tests pass, 1 skipped (POSIX permissions) — the installed-model size test runs ·
+> **Integrated 2026-10-22 with Shira's T10/T12/T14/T15** and measured end to end (S0→S8 through
+> her orchestrator, `LOCAL_ONLY`, all 48 pages, truth by eye — not a held-out split):
+> | Field, end to end | Result |
+> |---|---|
+> | Central number closed (A/B/C) and right | **24 of 43** pages that have one (was 11 before the readable-line read below) · **0 closed wrong** |
+> | Central number in the candidates | 33 of 43; the other pages are flagged D, none guessed |
+> | Receipt date closed and right | **0 of 18** · **0 closed wrong** (was 1 wrong at radius 0.10). A1's correct stamp date is D: Shira's S7 re-reads it with no whitelist and its Hebrew noise becomes a rival (`readers_disagree`) |
+> | Multi-central pages (A9, A24, B12) | every value is a candidate; S8 picks one per field, so they are D `multiple_candidates` — the multi-value row is S10's (T20) |
+> Two further T13 changes came from this run: (9) *the number printed under each barcode is read
+> on its own upright band of the colour page* (`psm 6`, digits + A–Z, `READABLE_LINE_*`), so the
+> barcode gets an independent printed reading — this is what lifts 11 → 24 to level A; and on a
+> printed sticker only that band yields `printed` candidates (no more `1`/`7` from the caption);
+> (10) *`receipt_date_radius` 0.10 → 0.04*, measured: printed decoys stood at 0.06–0.09 from the
+> sticker (A15, B18), the handwritten notes within 0.01.
+> Integration edits in Shira's files, for her review: `s6_candidates.py` (routes the lab fields,
+> as its docstring anticipated) and one call in `orchestrator.py` (passes `LabInputs`).
+> Verified: 551 tests pass, 1 skipped (POSIX permissions) — the installed-model size test runs ·
 > core coverage 97% · `ruff` check + format, `mypy backend`, `mypy --strict backend/core`,
 > `check_layering.py`, `check_env_example.py` clean · no digit-count filter, no central↔date check.
 > **Measured on all 48 sample pages, 2026-10-21** (Tesseract 5.4 `heb+eng`; *not* a held-out split;
@@ -3119,8 +3136,11 @@ before relying on either page as a test fixture.
 > **Follow-ups:** (a) **T17:** TrOCR-small is the reader to beat or drop — on this measurement it
 > loses to escalation; (b) **T16:** stamp and handwritten-block localization are exactly what the YOLO experiment should
 > be judged on — without a box, neither TrOCR (S7) nor the provider (S9) has a crop to read on the
-> 11 SAP pages; (c) **T12/T15 (Shira):** the thin `s6_candidates` dispatcher and S7's TrOCR call
-> through `OcrPort` are hers; (d) re-check every number here on the dev/held-out split once T7 exists.
+> 11 SAP pages; (c) **Shira (S7, T12):** give `receipt_date` and `central_number` a
+> digits-and-separators whitelist in `whitelist_for` — today the unwhitelisted re-read of A1's
+> stamp invents a Hebrew rival and demotes a correct date to D; (d) **T18:** every field left at
+> D here (handwritten SAP numbers, faint stamps) is what the provider must read — the crops exist;
+> (e) re-check every number here on the dev/held-out split once T7 exists.
 
 ---
 

@@ -22,6 +22,7 @@ No payload is filtered by length or shape anywhere in this module.
 from __future__ import annotations
 
 from collections.abc import Sequence
+import string
 import time
 from typing import Final
 
@@ -39,6 +40,7 @@ from backend.core.geometry import (
     grow,
     iou,
     page_size,
+    readable_line_box,
     union,
     unrotate_box,
 )
@@ -82,6 +84,15 @@ STAMP_WORDS: Final = ("התקבל", "המעבדה", "המרכזית", "לנגי�
 # The sticker caption is a near match for "המרכזית"; a word closer to it is a caption, not a
 # stamp word.
 _CENTRAL_CAPTION: Final = "מרכזי"
+
+# The human-readable line under a barcode: digits and capital letters (payloads such as
+# Z0217283597 carry a letter), read upright, in English only, from the COLOUR page. Measured on
+# A1, A8, A12, A17 (T13): psm 7 on the binarized page returned nothing on 3 of 4 stickers - the
+# band also holds the foot of the bars and a scanner streak - while psm 6 (one block) on colour
+# read every number, the bars coming out as a separate letters-only token that is discarded.
+READABLE_LINE_PSM: Final = 6
+READABLE_LINE_LANGS: Final = "eng"
+READABLE_LINE_WHITELIST: Final = string.digits + string.ascii_uppercase
 # Sparse-text mode for the stamp re-read: the stamp mixes a display word, gapped digits and
 # small lines, and a block mode drops the gapped digits (measured on A1).
 STAMP_PSM: Final = 11
@@ -111,10 +122,14 @@ def read_page(
     radius_px = settings.proximity_radius * diagonal(size)
     words = list(raw.words)
     binarized = storage.get(page.gray_bin)
+    colour = storage.get(page.color) if hits else b""
     for hit in hits:
         for extra in _caption_words(
             page, hit, binarized, radius_px, size, settings, ocr, imaging, storage
         ):
+            if not _already_read(extra, words):
+                words.append(extra)
+        for extra in _readable_line_words(page, hit, colour, settings, ocr, imaging, storage):
             if not _already_read(extra, words):
                 words.append(extra)
     for extra in _stamp_words(page, words, binarized, size, settings, ocr, imaging, storage):
@@ -219,6 +234,48 @@ def _caption_words(
                 box = from_crop(unrotate_box(word.box, turn), area)
                 found.append(word.model_copy(update={"box": box}))
     return found
+
+
+def readable_line_area(hit: BarcodeHit, settings: Settings) -> Box:
+    """The band under `hit`'s bars (once upright) where its number is printed, page frame."""
+    return readable_line_box(
+        hit.box,
+        hit.orientation_deg,
+        reach=settings.readable_line_reach,
+        margin=settings.readable_line_margin,
+    )
+
+
+def _readable_line_words(
+    page: NormalizedPage,
+    hit: BarcodeHit,
+    colour: bytes,
+    settings: Settings,
+    ocr: OcrPort,
+    imaging: ImagingPort,
+    storage: StoragePort,
+) -> list[OcrWord]:
+    """The number printed under the bars, read on its own upright band of the colour page and
+    placed back on the page frame. Only tokens holding a digit are kept: the band also catches
+    the foot of the bars. This is a reading independent of the decoder, so S8 can see the two
+    agree. Never raises."""
+    if not colour:
+        return []
+    area = readable_line_area(hit, settings)
+    turn = hit.orientation_deg if hit.orientation_deg in BARCODE_ORIENTATIONS else 0
+    try:
+        band = imaging.crop(colour, area, rotate_deg=turn)
+    except RenderFailed:
+        return []
+    ref = storage.put_page_image(page.raw.image.job_id, page.raw.page_id, band.data, "crop")
+    result = ocr.read_crop(
+        ref, whitelist=READABLE_LINE_WHITELIST, psm=READABLE_LINE_PSM, langs=READABLE_LINE_LANGS
+    )
+    return [
+        w.model_copy(update={"box": from_crop(unrotate_box(w.box, turn), area)})
+        for w in result.words
+        if any(ch.isdigit() for ch in w.text)
+    ]
 
 
 def stamp_areas(words: Sequence[OcrWord], size: Size, settings: Settings) -> list[Box]:

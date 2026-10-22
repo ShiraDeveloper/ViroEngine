@@ -39,6 +39,7 @@ from backend.api.schemas import (
     SseRowEvent,
 )
 from backend.core.errors import SafeLineError
+from backend.core.geometry import page_size
 from backend.core.models import (
     Box,
     Candidate,
@@ -69,7 +70,7 @@ from backend.core.pipeline.s2_correct import correct
 from backend.core.pipeline.s3_read_page import read_page
 from backend.core.pipeline.s4_regions import detect_regions
 from backend.core.pipeline.s5_classify import Classification, ClassifyConfig, classify
-from backend.core.pipeline.s6_candidates import generate_candidates
+from backend.core.pipeline.s6_candidates import LabInputs, generate_candidates
 from backend.core.pipeline.s6_candidates_identity import IdentityConfig
 from backend.core.pipeline.s7_second_read import SecondReadConfig, second_read
 from backend.core.pipeline.s8_score import FieldEvaluation, evaluate_field
@@ -408,7 +409,13 @@ def process_page(
         )
     timer.begin("S6")
     candidates = generate_candidates(
-        ocr, barcodes, regions, spec=spec, page_role=cls.page_role, identity=cfg.identity
+        ocr,
+        barcodes,
+        regions,
+        spec=spec,
+        page_role=cls.page_role,
+        identity=cfg.identity,
+        lab=LabInputs(settings=settings, clock=services.clock, size=page_size(page)),
     )
     evaluations = _decide_fields(page, cls, spec, candidates, measurement, services, timer)
     return PageOutcome(

@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     # sideways caption sits this close to its barcode; the next unrelated label does not.
     proximity_radius: float = Field(default=0.06, gt=0.0, le=1.0)
     bars_retry_scale: float = Field(default=2.0, ge=1.0, le=4.0)  # retry of an undecoded barcode
+    # The number printed under a barcode is read again on its own band (T13): it is the
+    # independent printed reading that confirms a barcode (level A). Band extent in bar
+    # heights past the bars, and overlap/end margin in bar sizes.
+    readable_line_reach: float = Field(default=1.2, gt=0.0, le=5.0)
+    readable_line_margin: float = Field(default=0.15, ge=0.0, le=1.0)
     # Receipt-stamp re-read (T13): the page pass reads at most the stamp's small lab-name lines.
     # The area around them, this share of the page diagonal on every side, is read again; the
     # stamp's date sits above those lines (A1: ~0.08 diagonal above "המרכזית").
@@ -118,8 +123,11 @@ class Settings(BaseSettings):
 
     # --- S6 candidates: central number and receipt date (T13) -----------
     # A handwritten receipt date counts when it lies this share of the page diagonal from a
-    # central sticker (PLAN T13); farther dates are the form's own.
-    receipt_date_radius: float = Field(default=0.10, gt=0.0, le=1.0)
+    # central sticker; farther dates are the form's own. The plan's 0.10 admitted printed decoys
+    # that S8 then closed wrongly (A15's letter date at 0.082, B18 at 0.061); the handwritten
+    # notes on the samples sit within 0.01 (B6, B19). Measured on all 48 pages, 2026-10-22 -
+    # re-calibrate on the dev split once T7 exists.
+    receipt_date_radius: float = Field(default=0.04, gt=0.0, le=1.0)
 
     # --- TrOCR handwritten-digit reader (T13) -----------------------------
     # Files inside models_dir, written by tools/export_trocr.py (provenance: models/README.md).

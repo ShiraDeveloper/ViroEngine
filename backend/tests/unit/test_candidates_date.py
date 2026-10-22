@@ -7,7 +7,7 @@ import pytest
 
 from backend.adapters.fakes import FixedClock
 from backend.core.models import Box, OcrResult, OcrWord, ReaderName, Region, RegionKind, SourceKind
-from backend.core.pipeline.s6_candidates import (
+from backend.core.pipeline.s6_candidates_lab import (
     NOTE_DATE_FUTURE,
     NOTE_DATE_IMPOSSIBLE,
     NOTE_STAMP_HANDWRITTEN_DIFFER,
@@ -66,14 +66,14 @@ def _stamp_words(day: list[str], month_year: tuple[str, str] = ("-06-", "2026"))
 def test_stamp_with_spaced_digits(settings: Settings) -> None:
     """A1: '1 8 -06- 2026' read as separate tokens -> 2026-06-18 from the stamp."""
     assert _dates(_stamp_words(["1", "8"]), [STAMP_A1], settings) == [
-        ("2026-06-18", SourceKind.stamp)
+        ("18/06/2026", SourceKind.stamp)
     ]
 
 
 def test_gapped_day_keeps_both_digits(settings: Settings) -> None:
     """A5: '2 1 -06- 2026' must not lose its first digit and become the 1st."""
     assert _dates(_stamp_words(["2", "1"]), [STAMP_A1], settings) == [
-        ("2026-06-21", SourceKind.stamp)
+        ("21/06/2026", SourceKind.stamp)
     ]
 
 
@@ -81,7 +81,7 @@ def test_handwritten_beside_sticker(settings: Settings) -> None:
     """B6: '13.8.26' written under the sticker -> 2026-08-13, tagged handwritten."""
     words = [_word("13.8.26", (0.128, 0.105, 0.140, 0.180))]
     found = _dates(words, [STICKER], settings)
-    assert found == [("2026-08-13", SourceKind.handwritten)]
+    assert found == [("13/08/2026", SourceKind.handwritten)]
 
 
 def test_patient_admission_date_rejected(settings: Settings) -> None:
@@ -103,7 +103,7 @@ def test_form_header_date_rejected(settings: Settings) -> None:
         _word("הפקה", (0.130, 0.215, 0.140, 0.260)),
         _word("תאריך", (0.130, 0.265, 0.140, 0.320)),
     ]
-    assert _dates(words, [STAMP_A1, STICKER], settings) == [("2026-06-18", SourceKind.stamp)]
+    assert _dates(words, [STAMP_A1, STICKER], settings) == [("18/06/2026", SourceKind.stamp)]
 
 
 def test_sample_collection_date_rejected(settings: Settings) -> None:
@@ -145,8 +145,8 @@ def test_conflict_emits_both_with_reason(settings: Settings) -> None:
         size=SIZE,
     )
     assert {(c.value, c.source) for c in found} == {
-        ("2026-06-18", SourceKind.stamp),
-        ("2026-06-17", SourceKind.handwritten),
+        ("18/06/2026", SourceKind.stamp),
+        ("17/06/2026", SourceKind.handwritten),
     }
     assert all(NOTE_STAMP_HANDWRITTEN_DIFFER in c.notes for c in found)
 
@@ -160,7 +160,7 @@ def test_agreeing_stamp_and_handwritten_carry_no_conflict(settings: Settings) ->
         clock=FixedClock(),
         size=SIZE,
     )
-    assert {c.value for c in found} == {"2026-06-18"} and len(found) == 2
+    assert {c.value for c in found} == {"18/06/2026"} and len(found) == 2
     assert all(NOTE_STAMP_HANDWRITTEN_DIFFER not in c.notes for c in found)
 
 
@@ -176,7 +176,7 @@ def test_future_date_flagged_not_accepted(settings: Settings) -> None:
         clock=FixedClock(),
         size=SIZE,
     )
-    assert [(c.value, c.notes) for c in found] == [("2027-06-18", [NOTE_DATE_FUTURE])]
+    assert [(c.value, c.notes) for c in found] == [("18/06/2027", [NOTE_DATE_FUTURE])]
 
 
 def test_impossible_date_flagged(settings: Settings) -> None:
@@ -196,3 +196,16 @@ def test_date_far_from_any_sticker_ignored(settings: Settings) -> None:
     """With no stamp, a date far from every sticker is the form's own date."""
     words = [_word("13.8.26", (0.700, 0.700, 0.712, 0.780))]
     assert _dates(words, [STICKER], settings) == []
+
+
+def test_unlabelled_printed_date_a_little_away_from_sticker_ignored(settings: Settings) -> None:
+    """A15: the letter's own date, with no label, stands 0.08 of the diagonal from the sticker.
+    It is not a note beside the sticker; S8 closed it wrongly when it was admitted."""
+    sticker = Region(
+        kind=RegionKind.central_sticker,
+        box=(0.24, 0.02, 0.33, 0.22),
+        detector="rule-based",
+        score=1.0,
+    )
+    words = [_word("06/08/2026", (0.139, 0.132, 0.147, 0.216))]
+    assert _dates(words, [sticker], settings) == []

@@ -16,11 +16,14 @@ from backend.adapters.storage.tempdir import TmpdirStorage
 from backend.core.geometry import contains, grow, unrotate_box
 from backend.core.models import BarcodeHit, Box, NormalizedPage, OcrWord
 from backend.core.pipeline.s3_read_page import (
+    READABLE_LINE_LANGS,
+    READABLE_LINE_PSM,
     SIDEWAYS_PSM,
     STAMP_PSM,
     caption_strips,
     nearby_text,
     read_page,
+    readable_line_area,
     stamp_areas,
 )
 from backend.core.reading_order import group_lines
@@ -255,8 +258,9 @@ def test_sideways_caption_is_read_and_placed_on_the_page(
     assert caption[0].box == pytest.approx(caption_box, abs=1e-3)
     assert {w.text for w in result.words} == {"מרכזי"}  # type: ignore[attr-defined]
     assert "מרכזי" in hits[0].nearby_text
-    assert len(ocr.crop_calls) == 2  # one strip beyond each end of the bars
-    assert all(c["psm"] == SIDEWAYS_PSM and c["langs"] == "heb" for c in ocr.crop_calls)
+    caption_calls = [c for c in ocr.crop_calls if c["langs"] == "heb"]
+    assert len(caption_calls) == 2  # one strip beyond each end of the bars
+    assert all(c["psm"] == SIDEWAYS_PSM for c in caption_calls)
 
 
 def test_sideways_caption_of_a_sticker_applied_upside_down(
@@ -347,3 +351,53 @@ def test_stamp_rereads_capped_per_page(settings: Settings) -> None:
     """Lab-name lines also appear in address lines; at most ``stamp_reread_max`` are read."""
     groups = [_word("לנגיפים", (y, 0.40, y + 0.01, 0.48)) for y in (0.10, 0.40, 0.70, 0.90)]
     assert len(stamp_areas(groups, SIZE, settings)) == settings.stamp_reread_max
+
+
+# ---------------------------------------------------------------- readable line under bars (T13)
+
+
+@pytest.mark.parametrize("orientation", [0, 90, 180, 270])
+def test_readable_line_lies_below_the_bars_once_upright(
+    orientation: int, settings: Settings
+) -> None:
+    """The band sits on the side of the bars that is 'below' after turning the code upright."""
+    bars: Box = (0.40, 0.40, 0.45, 0.50)
+    area = readable_line_area(_hit_at(bars, orientation), settings)
+    below, above, right, left = (
+        area[2] > bars[2],
+        area[0] < bars[0],
+        area[3] > bars[3],
+        area[1] < bars[1],
+    )
+    expected = {0: below, 180: above, 90: right, 270: left}[orientation]
+    assert expected
+
+
+def _hit_at(box: Box, orientation: int) -> BarcodeHit:
+    return BarcodeHit(
+        payload="939376", symbology="Code128", box=box, orientation_deg=orientation, nearby_text=[]
+    )
+
+
+def test_readable_line_is_read_and_placed_on_the_page(
+    make_normalized: MakeNormalized, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    """A1: the decoder found 939376; the printed line under the bars is read on its own band
+    (digits whitelist, single line) and lands on the page under the bars."""
+    page = make_normalized(pages.clean_page())
+    bars: Box = (0.032, 0.232, 0.056, 0.312)
+    area = readable_line_area(_hit_at(bars, 0), settings)
+    ocr = ScriptedOcr(
+        crop_script=[
+            [],
+            [],
+            [_word("939376", (0.2, 0.1, 0.8, 0.9)), _word("|", (0.0, 0.0, 0.1, 0.1))],
+        ]
+    )
+    result, _ = _read(
+        page, settings, storage, imaging, ocr=ocr, barcode=ScriptedBarcode([_hit_at(bars, 0)])
+    )
+    printed = [w for w in result.words if w.text == "939376"]  # type: ignore[attr-defined]
+    assert len(printed) == 1 and contains(area, printed[0].box)
+    assert "|" not in {w.text for w in result.words}  # type: ignore[attr-defined]
+    assert {"psm": READABLE_LINE_PSM, "langs": READABLE_LINE_LANGS} in ocr.crop_calls

@@ -15,7 +15,7 @@ from backend.core.models import (
     RegionKind,
     SourceKind,
 )
-from backend.core.pipeline.s6_candidates import candidates_central
+from backend.core.pipeline.s6_candidates_lab import candidates_central
 from backend.settings import Settings
 
 SIZE = (2480, 3508)  # A4 at 300 DPI, (width, height) px
@@ -179,3 +179,19 @@ def test_caption_proximity_unused_when_a_sticker_exists(settings: Settings) -> N
 
 def test_nothing_found_is_an_empty_list(settings: Settings) -> None:
     assert candidates_central([], _ocr([]), [], settings=settings, size=SIZE) == []
+
+
+def test_caption_digits_are_not_the_printed_number(settings: Settings) -> None:
+    """A9/B10: on a printed sticker only the line under the bars is the number; a '1' or '7'
+    read off the caption or the edge of the sticker is no candidate."""
+    hits = [_hit("945598", (0.500, 0.300, 0.520, 0.380), ["מרכזי"])]
+    words = [
+        _word("945598", (0.522, 0.305, 0.532, 0.375)),  # under the bars
+        _word("1", (0.505, 0.395, 0.515, 0.400)),  # beside them, by the caption
+    ]
+    regions = [_sticker((0.495, 0.295, 0.540, 0.410))]
+    found = candidates_central(hits, _ocr(words), regions, settings=settings, size=SIZE)
+    assert [(c.value, c.source) for c in found] == [
+        ("945598", SourceKind.barcode),
+        ("945598", SourceKind.printed),
+    ]

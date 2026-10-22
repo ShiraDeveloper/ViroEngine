@@ -30,7 +30,14 @@ from datetime import date
 import re
 from typing import Final
 
-from backend.core.geometry import Size, center, diagonal, distance_to_box, union
+from backend.core.geometry import (
+    Size,
+    center,
+    diagonal,
+    distance_to_box,
+    readable_line_box,
+    union,
+)
 from backend.core.models import (
     BarcodeHit,
     Box,
@@ -42,7 +49,7 @@ from backend.core.models import (
     RegionKind,
     SourceKind,
 )
-from backend.core.normalize import normalize_central
+from backend.core.normalize import format_date, normalize_central
 from backend.core.ports.clock import ClockPort
 from backend.core.reading_order import group_lines, has_hebrew
 from backend.core.text_match import best_similarity, normalize, similarity
@@ -140,8 +147,26 @@ def candidates_central(
             )
 
     for region in stickers:
+        # On a printed sticker the number is the human-readable line under the bars; anywhere
+        # else in the region a digit is the caption's or a bar read as a "1". On a sticker with
+        # no decoded barcode (handwritten), the whole region is the number's place.
+        bars = [h for h in barcodes if _inside(h.box, region.box)]
+        lines = [
+            readable_line_box(
+                h.box,
+                h.orientation_deg,
+                reach=settings.readable_line_reach,
+                margin=settings.readable_line_margin,
+            )
+            for h in bars
+        ]
         for word in ocr.words:
-            if not _inside(word.box, region.box) or not _is_value_token(word, settings):
+            if not _is_value_token(word, settings):
+                continue
+            if lines:
+                if not any(_inside(word.box, line) for line in lines):
+                    continue
+            elif not _inside(word.box, region.box):
                 continue
             # Read off the bars themselves: the printed number stands beside the bars.
             if any(_inside(word.box, hit.box) for hit in barcodes):
@@ -207,7 +232,7 @@ def candidates_receipt_date(
 ) -> list[Candidate]:
     """Receipt-date candidates: the 'התקבל' stamp first, then a date beside a central sticker.
 
-    Everything else on the page is an explicit decoy. Values are ISO dates (YYYY-MM-DD); a
+    Everything else on the page is an explicit decoy. Values are DD/MM/YYYY (``format_date``); a
     date-like token that is not on the calendar keeps its text and carries
     ``date_impossible``; a future date carries ``date_future``. When the stamp and the
     handwritten date differ, both are emitted and both carry ``stamp_and_handwritten_differ``.
@@ -294,12 +319,13 @@ def _date_windows(line: Sequence[OcrWord]) -> list[tuple[list[OcrWord], str]]:
 
 
 def _date_value(text: str, today: date) -> tuple[str, list[str]]:
-    """ISO value and reason notes for a date-like text (hard rules from T8)."""
+    """Display value DD/MM/YYYY (the form S8 parses and shows) and reason notes (hard rules
+    from T8)."""
     parsed = parse_il_date(text)
     if parsed is None:
         return text, [NOTE_DATE_IMPOSSIBLE]
     notes = [] if date_not_future(parsed, now=today) else [NOTE_DATE_FUTURE]
-    return parsed.isoformat(), notes
+    return format_date(parsed), notes
 
 
 def _is_caption(word: OcrWord, size: Size, settings: Settings) -> bool:
