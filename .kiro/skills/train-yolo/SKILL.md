@@ -30,9 +30,18 @@ consistent visual shape — use it for that class alone. This is the most probab
 
 ## Step 1 — Build the dataset locally
 
+`eval/gold.csv` holds values only, not boxes. Boxes come from `eval/results/gold_boxes.csv`, which
+`python -m eval.make_gold --propose` writes next to the draft (one box per highlight, the patient
+block merged). **It is a draft: review every box by hand before training** - the highlighter is
+inconsistent and is only a proposal.
+
 ```bash
-python -m eval.build_yolo_dataset --gold eval/gold.csv --out eval/results/yolo
+python -m eval.build_yolo_dataset --boxes eval/results/gold_boxes.csv --out eval/results/yolo
 ```
+
+It refuses to run without `eval/held_out.txt`. It builds one image per page (no augmented
+variants; ultralytics augments during training). Pages are the raw renders in
+`eval/results/pages/`; some SAP pages are sideways there, so prefer normalised pages if you have them.
 
 Four classes: `central_sticker`, `receipt_stamp`, `patient_box`, `commitment_label`.
 
@@ -112,15 +121,15 @@ Record in `models/README.md`: the source model, the dataset commit, the training
 validation mAP50, the file size and the checksum. Weights are git-ignored, so provenance must live
 in the repository.
 
-Enable in `config/models.yaml`:
-```yaml
-region_detector: yolo_onnx        # or: rule_based
-yolo:
-  path: models/yolov8n_regions_int8.onnx
-  conf: 0.35
-  iou: 0.45
-  classes: [central_sticker, receipt_stamp, patient_box, commitment_label]
+Enable in `.env` (the runtime reads `Settings`; `config/models.yaml` mirrors the values):
 ```
+REGION_DETECTOR=yolo_onnx        # or: rule_based (default)
+YOLO_MODEL_FILE=yolov8n_regions_int8.onnx
+YOLO_CONF=0.35
+YOLO_IOU=0.45
+YOLO_KINDS=receipt_stamp         # classes where YOLO replaces the rule-based regions
+```
+A missing or oversize model file falls back to `rule_based`.
 
 ## Step 5 — Compare and decide
 

@@ -51,6 +51,7 @@ reader is dropped per the cut list if it loses to escalating.
 | Dataset | `eval/build_yolo_dataset.py` from gold boxes; 48 pages × 5 variants, **split by page** |
 | Classes | `central_sticker`, `receipt_stamp`, `patient_box`, `commitment_label` |
 | Training command | `imgsz=1024`, 100 epochs, patience 20, `degrees=10`, `fliplr=0.0` |
+| Status (2026-10-22) | **Not trained.** No model file exists; every row below is a placeholder. Dataset builder and adapter are implemented and unit-tested only |
 | Validation mAP50 | _value_ |
 | Export | ONNX opset 17 + int8 dynamic quantization |
 | File size | _MB_ |

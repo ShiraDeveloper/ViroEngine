@@ -28,7 +28,18 @@ escalating. _Outcome: to be filled._
 
 The rule-based detector finds regions by reading the labels around them. If the label itself is
 unreadable, or the layout is unfamiliar, it has nothing to work from. The YOLOv8n experiment
-(Task 16) addresses this, under a decision rule declared in advance. _Outcome: to be filled._
+(Task 16) addresses this, under a decision rule declared in advance. _Outcome (2026-10-22): the
+experiment has **not been run** - the code and the dataset builder exist, but there is no
+trained model, because training needs the reviewed gold boxes (T7) and a GPU session. The
+rule-based detector stays the only active detector; see ADR-016. No claim about YOLO is made._
+
+**Licence note (AGPL-3.0).** `ultralytics`, the library that trains and exports YOLOv8, is
+AGPL-3.0. It is used only offline, on a training machine, and is not a dependency of this
+repository (a test asserts that nothing under `backend/` imports it and that it is in neither
+`requirements.txt` nor `pyproject.toml`). The runtime reads the exported ONNX file with
+`onnxruntime` (MIT). Whether the *weights* trained with an AGPL tool carry the licence is a
+question we did not resolve; if the system is ever deployed closed-source, take legal advice or
+retrain with a permissively licensed detector first.
 
 Measured by Task 11 on the 48 sample pages (ground truth counted by eye; dev data, not held-out):
 

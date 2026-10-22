@@ -153,12 +153,22 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
 
         vision = VisionChainAdapter(settings=settings)
 
+    regions: RegionDetectorPort = RuleBasedDetector(settings=settings, storage=storage)
+    if settings.region_detector == "yolo_onnx":
+        from backend.adapters.regions.yolo_onnx import YoloPreferred, YoloRegionDetector  # T16
+
+        regions = YoloPreferred(
+            yolo=YoloRegionDetector(settings=settings, storage=storage),
+            fallback=regions,
+            kinds=settings.yolo_kinds_list,
+        )
+
     return Container(
         settings=settings,
         ocr_printed=TesseractAdapter(settings=settings, storage=storage),
         ocr_digits=TrOcrDigits(settings=settings, storage=storage),
         barcode=ZxingAdapter(settings=settings, storage=storage),
-        regions=RuleBasedDetector(settings=settings, storage=storage),
+        regions=regions,
         vision=vision,
         storage=storage,
         documents=DocumentReader(settings=settings),

@@ -50,5 +50,5 @@ and a negative result is recorded just as fully as a positive one.
 | 013 | Reader selection | **pending** | T17 bake-off |
 | 014 | Hosting: stay on Render or move to the Space | **pending** | Day-3 measurement |
 | 015 | Does the sticker barcode equal the printed digits? Decides whether level A exists | **pending** | T5 |
-| 016 | Region detector: rule-based or YOLO | **pending** | T16 |
+| 016 | Region detector: rule-based or YOLO | **open** - experiment prepared, not run (no model, no held-out numbers) | T16 |
 | 017 | Final results | **pending** | T30 |
