@@ -29,14 +29,17 @@ from typing import Final, cast, get_args
 import structlog
 
 from backend.core.errors import ProviderExhausted, SafeLineError
+from backend.core.learning import with_learned
 from backend.core.models import (
     REASON_TEXT,
+    VISION_TEXT_MAX,
     BarcodeHit,
     Box,
     Candidate,
     ConfidenceLevel,
     CropPayload,
     FieldKey,
+    FieldStat,
     PageAnswer,
     PageRaw,
     ReaderName,
@@ -54,6 +57,7 @@ from backend.core.pipeline.s9_escalate import EscalationStats, flag_for_review
 from backend.core.ports.barcode import BarcodePort
 from backend.core.ports.clock import ClockPort
 from backend.core.ports.imaging import ImagingPort
+from backend.core.ports.learning import LearningStorePort
 from backend.core.ports.ocr import OcrPort
 from backend.core.ports.senders import SenderIndexPort
 from backend.core.ports.storage import StoragePort
@@ -136,6 +140,8 @@ class VisionServices:
     # Local orientation detection (Tesseract OSD, ~1.5 s): a page is turned upright before the
     # model sees it - rotated SAP screenshots read far worse sideways. None skips it.
     ocr: OcrPort | None = None
+    # What review taught (counts, labels, shapes - never values). None: nothing is learned.
+    learning: LearningStorePort | None = None
 
 
 @dataclass
@@ -221,6 +227,10 @@ def _cloud_candidates(
     senders: SenderIndexPort,
 ) -> list[Candidate]:
     out: list[Candidate] = []
+    if key is FieldKey.commitment_number and len(values) > 1:
+        # Several commitments share one union box; row assembly would merge candidates at one
+        # place into one commitment, so each keeps no box and becomes its own row.
+        box = None
     for value in values:
         text = _canonical(senders, value) if key is FieldKey.sender else value
         if not text:
@@ -261,6 +271,32 @@ def _upright(raw: PageRaw, services: VisionServices) -> PageRaw:
     return raw.model_copy(update={"image": image})
 
 
+def _enhanced(raw: PageRaw, pixels: bytes, services: VisionServices) -> bytes:
+    """The page with only the corrections its measurement calls for, for the model's eyes: a
+    blurred fax is sharpened, uneven phone-photo light is evened out (CLAHE), fax grain is
+    removed. A clean page is untouched; a failed operation keeps the previous image. Colour is
+    kept - never binarised, the blue ink and faint stamps would be lost (PLAN §4 S2)."""
+    settings = services.settings
+    measured = services.imaging.measure_pixels(pixels)
+    if not measured.measured:
+        return pixels
+    ops = []
+    if measured.noise_score > settings.noise_threshold:
+        ops.append("denoise")
+    if measured.illumination_cv > settings.illumination_cv_threshold:
+        ops.append("clahe")
+    if measured.blur_score < settings.blur_threshold:
+        ops.append("sharpen")
+    for op in ops:
+        try:
+            pixels = services.imaging.apply_operation(pixels, op).data
+        except SafeLineError:
+            continue
+    if ops:
+        log.info("page_enhanced", page_id=raw.page_id, ops=ops)
+    return pixels
+
+
 def _prepare(raw: PageRaw, services: VisionServices) -> _Page:
     """Barcodes and the JPEG page image of one page. Raises SafeLineError for an unreadable
     image (the orchestrator then fails just this page)."""
@@ -269,6 +305,7 @@ def _prepare(raw: PageRaw, services: VisionServices) -> _Page:
     raw = _upright(raw, services)
     pixels = services.storage.get(raw.image)
     hits = services.barcode.sweep(raw.image)
+    pixels = _enhanced(raw, pixels, services)
     image = services.imaging.thumbnail(
         pixels, max_side=settings.vision_page_max_side, jpeg_quality=settings.vision_jpeg_quality
     ).data
@@ -289,9 +326,7 @@ def _self_validated(key: FieldKey, values: Sequence[str], services: VisionServic
     if key is FieldKey.receipt_date:
         parsed = parse_il_date(value)
         return parsed is not None and date_not_future(parsed, now=services.clock.now().date())
-    if key is FieldKey.sender:
-        return _canonical(services.senders, value) is not None
-    return False
+    return False  # names, numbers without a barcode and the sender always get a second read
 
 
 def _from_address(name: str, address: str) -> bool:
@@ -628,6 +663,8 @@ def _arbitrate(page: _Page, keys: Sequence[FieldKey], services: VisionServices) 
 def _evaluate_all(page: _Page, services: VisionServices) -> dict[FieldKey, FieldEvaluation]:
     sender_values = [c.value for c in page.reads.get(FieldKey.sender, [])]
     spec = services.senders.get(sender_values[0]) if sender_values else None
+    if services.learning is not None:
+        spec = with_learned(spec, services.learning)  # learned shapes make s_pattern informative
     return {
         key: evaluate_field(
             key,
@@ -658,6 +695,7 @@ def _outcome(
         evaluations[key] = _settle(key, evaluations[key])
     _flag_shared_numbers(evaluations)
     _flag_twin_names(evaluations)
+    _distrust(evaluations, evaluations[FieldKey.sender].result.value, services)
     for key in _SHOWN_WHEN_DISPUTED:
         evaluations[key] = _show_first_reading(evaluations[key])
     answer = page.answer
@@ -691,6 +729,64 @@ def _outcome(
     )
 
 
+# Structural: review evidence needed before a statistic changes anything (one correction is an
+# anecdote, three are a pattern - PLAN §7.3), and the correction rate from which a single reading
+# of that field is no longer trusted.
+_MIN_REVIEWED: Final = 3
+_DISTRUST_RATE: Final = 0.34
+_MAX_LEARNED_LINES: Final = 30
+
+
+def _field_stats(services: VisionServices) -> dict[tuple[str, FieldKey], FieldStat]:
+    if services.learning is None:
+        return {}
+    try:
+        return {(s.sender, s.field): s for s in services.learning.field_stats()}
+    except Exception:  # learning is an aid: a broken store never stops a read
+        log.warning("learning_unavailable")
+        return {}
+
+
+def _learned_lines(services: VisionServices) -> list[str]:
+    """What review taught, as short guidance lines for the model: where an institution puts a
+    field, its usual shape, and which fields staff often had to correct. No value ever."""
+    lines: list[str] = []
+    for stat in _field_stats(services).values():
+        if stat.total < _MIN_REVIEWED:
+            continue
+        parts = [f"{stat.sender} / {stat.field.value}: reviewed {stat.total}x"]
+        if stat.label:
+            parts.append(f'found beside "{stat.label}"')
+        if stat.shape:
+            parts.append(f"shape {stat.shape}")
+        if stat.correction_rate >= _DISTRUST_RATE:
+            parts.append(f"staff corrected it {stat.corrected}x - read it with extra care")
+        lines.append(", ".join(parts)[:VISION_TEXT_MAX])
+    return lines[:_MAX_LEARNED_LINES]
+
+
+def _distrust(
+    evaluations: dict[FieldKey, FieldEvaluation], sender: str | None, services: VisionServices
+) -> None:
+    """A single reading (level C) of a field that staff corrected often for this institution is
+    not trusted: it goes to level D `often_corrected`, still showing the reading. Agreement of two
+    readers or a barcode (A/B) is evidence of its own and is left alone. In place."""
+    if not sender:
+        return
+    stats = _field_stats(services)
+    for key, ev in evaluations.items():
+        stat = stats.get((sender, key))
+        if stat is None or stat.total < _MIN_REVIEWED or stat.correction_rate < _DISTRUST_RATE:
+            continue
+        if ev.result.level is not ConfidenceLevel.C:
+            continue
+        flagged = flag_for_review(ev, "often_corrected")
+        shown = flagged.result.model_copy(
+            update={"value": ev.result.value, "display_value": ev.result.value}
+        )
+        evaluations[key] = FieldEvaluation(result=shown, signals=flagged.signals, evidence=None)
+
+
 def _read_pages(group: Sequence[_Page], services: VisionServices) -> VisionResponse | None:
     """One page-read request for `group`; sets each page's answer and first reads. None when no
     provider could answer (the pages keep no answer and fall back to the cascade)."""
@@ -705,6 +801,7 @@ def _read_pages(group: Sequence[_Page], services: VisionServices) -> VisionRespo
         crops=[],
         sender_options=options,
         barcode_candidates=list(dict.fromkeys(payloads))[:_MAX_BARCODES],
+        label_synonyms=_learned_lines(services),
         prompt_version=services.prompt_version,
         response_schema=page_schema(options),
     )

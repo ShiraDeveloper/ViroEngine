@@ -76,9 +76,6 @@ export function Login() {
             <h1>{login.title}</h1>
             <p className="mt-1 text-ink-muted">{login.subtitle}</p>
           </header>
-          <p className="rounded-md bg-state-neutral-bg p-3 text-sm text-state-neutral-fg">
-            {login.demoBanner} {login.demoBannerLocalOnly}
-          </p>
           <form onSubmit={(event) => void onSubmit(event)} noValidate className="flex flex-col gap-3">
             <label htmlFor="access-code" className="text-sm font-medium text-ink-strong">
               {login.codeLabel}

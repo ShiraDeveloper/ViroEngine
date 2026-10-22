@@ -124,7 +124,7 @@ def create_app(*, use_fakes: bool = False) -> FastAPI:
     settings = Settings()
 
     app = FastAPI(
-        title="Safe Line",
+        title="ViroEngine",
         description="Confidence-aware extraction engine for Israeli medical commitment forms",
         version="0.1.0",
         docs_url="/v1/docs",

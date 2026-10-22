@@ -24,7 +24,7 @@ from backend.api.errors import (
 from backend.api.schemas import FieldEditRequest, JobView
 from backend.container import Container
 from backend.core.errors import EditConflict
-from backend.core.learning import assert_pii_free, observations_from_row
+from backend.core.learning import assert_pii_free, field_outcomes, observations_from_row
 from backend.core.models import (
     CommitmentRow,
     ConfidenceLevel,
@@ -160,6 +160,11 @@ async def confirm_job(
         assert_pii_free(obs)
     for obs in observations:
         container.learning.record_confirmation(obs)
+    # How well each field was read: accepted as is, or corrected by a person (counts only). The
+    # vision-first engine reads these back to trust or distrust a single reading (ADR-017).
+    for row in entry.record.rows:
+        for sender, key, corrected in field_outcomes(row):
+            container.learning.record_outcome(sender, key.value, corrected=corrected)
     now = container.clock.now()
     rows = []
     for row in entry.record.rows:

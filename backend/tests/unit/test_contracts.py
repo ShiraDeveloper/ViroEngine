@@ -146,7 +146,8 @@ def test_level_d_accepts_every_closed_set_reason(reason: str) -> None:
 
 
 def test_reason_set_matches_plan_size() -> None:
-    assert len(REASON_TEXT) == 12
+    # PLAN §5.2's twelve, plus ADR-017's `often_corrected` (learned from staff corrections).
+    assert len(REASON_TEXT) == 13
 
 
 @pytest.mark.parametrize(

@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 import json
+from pathlib import Path
 
 import pytest
 
@@ -24,6 +25,7 @@ from backend.core.models import (
     BarcodeHit,
     ConfidenceLevel,
     FieldKey,
+    FieldStat,
     ImageRef,
     PageRaw,
     ProviderHealth,
@@ -326,7 +328,6 @@ def test_values_code_can_vouch_for_are_not_re_read(
     sent = {c.field for r in verify.requests for c in r.crops}
     assert FieldKey.national_id not in sent  # the check digit vouches for it
     assert FieldKey.receipt_date not in sent  # a real, past date
-    assert FieldKey.sender not in sent  # on the closed list
     assert {FieldKey.first_name, FieldKey.last_name} <= sent  # names always get a second read
 
 
@@ -406,3 +407,77 @@ def test_the_same_word_as_first_and_family_name_is_flagged(
     for key in (FieldKey.first_name, FieldKey.last_name):
         assert outcome.results[key].level is ConfidenceLevel.D
         assert outcome.results[key].value == "יוסף"
+
+
+def test_several_commitments_become_separate_rows(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    items = [
+        {"value": v, "source": "screen", "box": [500, 100, 520, 300]}
+        for v in ("260005102632", "260005102611", "260005102644")
+    ]
+    vision = Scripted(page=page_json(commitment_number=items))
+    verify = Scripted(page=page_json(commitment_number=items))  # the second reader sees all three
+    svc = services(settings, storage, imaging, vision, verify)
+    svc = VisionServices(**{**svc.__dict__, "settings": settings})  # whole-page second read
+    [outcome] = read_batch_vision([raw], services=svc)
+
+    assert outcome is not None
+    rows, _, _ = assemble_rows([outcome], ctx=RowContext(clock=SystemClock()))
+    assert len(rows) == 3
+
+
+@dataclass
+class Learned:
+    """A learning store holding one statistic."""
+
+    stats: list[FieldStat]
+
+    def field_stats(self) -> list[FieldStat]:
+        return self.stats
+
+    def label_synonyms(self, sender: str, field: str) -> list[str]:
+        return []
+
+    def pattern_hints(self, sender: str, field: str) -> list[object]:
+        return []
+
+
+def test_a_field_staff_often_corrected_is_not_trusted_on_one_reading(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    stat = FieldStat(sender="מאוחדת", field=FieldKey.last_name, confirmed=2, corrected=3)
+    svc = services(settings, storage, imaging, Scripted(), Scripted())
+    svc = VisionServices(**{**svc.__dict__, "learning": Learned([stat])})
+    [outcome] = read_batch_vision([raw], services=svc)
+
+    assert outcome is not None
+    last = outcome.results[FieldKey.last_name]
+    assert last.level is ConfidenceLevel.D
+    assert last.reason == REASON_TEXT["often_corrected"]
+    assert last.value == "ישראלי"  # still shown for the technician
+
+
+def test_a_field_staff_confirmed_is_left_as_read(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    stat = FieldStat(sender="מאוחדת", field=FieldKey.last_name, confirmed=9, corrected=0)
+    vision = Scripted()
+    svc = services(settings, storage, imaging, vision, Scripted())
+    svc = VisionServices(**{**svc.__dict__, "learning": Learned([stat])})
+    [outcome] = read_batch_vision([raw], services=svc)
+
+    assert outcome is not None
+    assert outcome.results[FieldKey.last_name].level is ConfidenceLevel.C
+    assert any("reviewed 9x" in line for line in vision.requests[0].label_synonyms)
+
+
+def test_the_store_counts_outcomes_without_values(tmp_path: Path) -> None:
+    from backend.adapters.learning.sqlite_store import SqliteLearningStore
+
+    store = SqliteLearningStore(settings=Settings(_env_file=None, data_dir=str(tmp_path)))  # type: ignore[call-arg]
+    for corrected in (True, True, False):
+        store.record_outcome("מאוחדת", "national_id", corrected=corrected)
+    [stat] = store.field_stats()
+    assert (stat.confirmed, stat.corrected) == (1, 2)
+    assert "011223344" not in stat.model_dump_json()

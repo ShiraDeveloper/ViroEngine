@@ -36,7 +36,7 @@ async def export_job(
         body,
         media_type=exporter.media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="safeline-{job_id[:8]}.{exporter.fmt}"',
+            "Content-Disposition": f'attachment; filename="viroengine-{job_id[:8]}.{exporter.fmt}"',
             "Cache-Control": "no-store",
         },
     )

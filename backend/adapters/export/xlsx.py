@@ -46,7 +46,7 @@ TEXT_KEYS: frozenset[FieldKey | str] = frozenset(
 MIN_WIDTH = 10
 MAX_WIDTH = 80
 WIDTH_PADDING = 3
-COMMENT_AUTHOR = "Safe Line"
+COMMENT_AUTHOR = "ViroEngine"
 COMMENT_SIZE = (320, 110)  # width, height in points
 
 AUDIT_HEADERS = ("זמן", "שורה", "שדה", "ערך קודם", "ערך חדש", "פעולה", "מבצע")
@@ -200,7 +200,7 @@ def _fill_summary(ws: Worksheet, report: RunReport) -> None:
     """Title, colour legend and RunReport counters. Counters only - no field values."""
     ws.sheet_view.rightToLeft = True
     ws.sheet_view.showGridLines = False
-    title = ws.cell(row=1, column=1, value="שורה בטוחה · סיכום ריצה")
+    title = ws.cell(row=1, column=1, value="ViroEngine · סיכום ריצה")
     title.font = Font(name=FONT_NAME, bold=True, size=16, color=FILL_HEADER)
     ws.row_dimensions[1].height = 30
     _section(ws, 3, "מקרא צבעים")

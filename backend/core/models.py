@@ -91,6 +91,7 @@ REASON_TEXT: dict[str, str] = {
     "low_quality_region": "איכות התמונה באזור נמוכה",
     "providers_exhausted": "לא ניתן לאמת — נדרשת בדיקה",
     "multiple_candidates": "נמצאו כמה אפשרויות",
+    "often_corrected": "שדה שתוקן לעיתים קרובות בעבר",
 }
 
 
@@ -456,6 +457,26 @@ class RunMetric(Strict):
     local_close_rate: float
     provider_calls: int
     engine_version: str
+
+
+class FieldStat(Strict):
+    """What review taught about one (sender, field), from confirmed jobs - counts, a printed label
+    and an abstracted shape only, never a value (PLAN §7.1)."""
+
+    sender: str
+    field: FieldKey
+    confirmed: int = 0  # accepted as the engine read it
+    corrected: int = 0  # changed by a person
+    label: str | None = None  # the printed label it was most often found beside
+    shape: str | None = None  # the most confirmed shape, e.g. '#########'
+
+    @property
+    def total(self) -> int:
+        return self.confirmed + self.corrected
+
+    @property
+    def correction_rate(self) -> float:
+        return self.corrected / self.total if self.total else 0.0
 
 
 class LayoutHint(Strict):

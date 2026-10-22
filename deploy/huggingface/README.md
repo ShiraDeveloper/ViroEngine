@@ -1,5 +1,5 @@
 ---
-title: Safe Line
+title: ViroEngine
 emoji: 🔬
 colorFrom: blue
 colorTo: green
@@ -8,7 +8,7 @@ app_port: 8000
 pinned: false
 ---
 
-# Safe Line · שורה בטוחה (Hugging Face Space)
+# ViroEngine (Hugging Face Space)
 
 Commitment forms → validated Excel rows. This Space runs the whole demo in one container: the web
 app at `/` and the API at `/v1`. This file is the **Space's** `README.md`, copied in by

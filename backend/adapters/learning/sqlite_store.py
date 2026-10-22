@@ -23,6 +23,7 @@ import structlog
 from backend.core.learning import assert_pii_free, shape_to_regex
 from backend.core.models import (
     FieldKey,
+    FieldStat,
     LayoutHint,
     LayoutObservation,
     PatternHint,
@@ -140,6 +141,59 @@ class SqliteLearningStore:
                     """,
                     (obs.sender, obs.field.value, label),
                 )
+
+    def record_outcome(self, sender: str, field: str, *, corrected: bool) -> None:
+        """Count one reviewed field as confirmed or corrected. Counts only - nothing to leak."""
+        column = "corrected" if corrected else "confirmed"
+        with self._connect() as db:
+            db.execute(
+                f"""
+                INSERT INTO field_outcome (sender, field, {column}, last_seen)
+                VALUES (?, ?, 1, ?)
+                ON CONFLICT (sender, field) DO UPDATE SET
+                    {column} = {column} + 1, last_seen = excluded.last_seen
+                """,
+                (sender, field, self._now()),
+            )
+
+    def field_stats(self) -> list[FieldStat]:
+        """One entry per reviewed (sender, field), with its most frequent printed label and its
+        most confirmed shape. Never a value."""
+        with self._connect() as db:
+            outcomes = db.execute(
+                "SELECT sender, field, confirmed, corrected FROM field_outcome ORDER BY id"
+            ).fetchall()
+            labels = {
+                (r["sender"], r["field"]): r["label_text"]
+                for r in db.execute(
+                    "SELECT sender, field, label_text, MAX(hits) FROM label_synonym "
+                    "GROUP BY sender, field"
+                ).fetchall()
+            }
+            shapes = {
+                (r["sender"], r["field"]): r["shape"]
+                for r in db.execute(
+                    "SELECT sender, field, shape, MAX(hits) FROM pattern_hint GROUP BY sender, field"
+                ).fetchall()
+            }
+        stats: list[FieldStat] = []
+        for r in outcomes:
+            key = (r["sender"], r["field"])
+            try:
+                field = FieldKey(r["field"])
+            except ValueError:
+                continue
+            stats.append(
+                FieldStat(
+                    sender=r["sender"],
+                    field=field,
+                    confirmed=r["confirmed"],
+                    corrected=r["corrected"],
+                    label=labels.get(key),
+                    shape=shapes.get(key),
+                )
+            )
+        return stats
 
     def propose_sender(self, canonical: str, keywords: list[str]) -> None:
         """Record that a person confirmed an institution that is not in the closed list. It is a
