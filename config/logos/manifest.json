@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "note": "Logo crops are sample data and are git-ignored. Each entry names the source page so the crop can be regenerated. Empty until the logos are cropped from reference/samples_part*.pdf (T10 step 2).",
+  "logos": []
+}

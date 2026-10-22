@@ -7,15 +7,20 @@ Dependency injection is done via build_container(); never construct adapters els
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
+from backend.core.pipeline.orchestrator import PipelineConfig
 from backend.core.ports.barcode import BarcodePort
 from backend.core.ports.clock import ClockPort
 from backend.core.ports.document import DocumentPort
 from backend.core.ports.exporter import ExporterPort
 from backend.core.ports.imaging import ImagingPort
 from backend.core.ports.learning import LearningStorePort
+from backend.core.ports.logo import LogoMatcherPort
 from backend.core.ports.ocr import OcrPort
 from backend.core.ports.region_detector import RegionDetectorPort
+from backend.core.ports.senders import SenderIndexPort
 from backend.core.ports.storage import StoragePort
 from backend.core.ports.vision_llm import VisionLLMPort
 from backend.settings import Settings
@@ -37,6 +42,26 @@ class Container:
     learning: LearningStorePort
     clock: ClockPort
     exporters: dict[str, ExporterPort]
+    senders: SenderIndexPort  # the closed list of sending institutions (T6)
+    logo: LogoMatcherPort | None  # ORB letterhead fallback; None when unavailable
+    pipeline: PipelineConfig  # thresholds and layer switches from config/models.yaml
+
+
+DEFAULT_MODELS_PATH = Path(__file__).resolve().parents[1] / "config" / "models.yaml"
+
+
+def load_pipeline_config(
+    path: Path | None = None, *, layers: dict[str, bool] | None = None
+) -> PipelineConfig:
+    """Parse `config/models.yaml` into a PipelineConfig. `layers` overrides entries of the
+    `layers:` section (the ablation switches), so a layer is toggled without a code edit.
+    Raises FileNotFoundError, yaml.YAMLError or pydantic.ValidationError on a bad file."""
+    import yaml  # type: ignore[import-untyped]  # local: only the composition root reads files
+
+    data: dict[str, Any] = yaml.safe_load((path or DEFAULT_MODELS_PATH).read_text(encoding="utf-8"))
+    if layers:
+        data["layers"] = {**data.get("layers", {}), **layers}
+    return PipelineConfig.from_mapping(data)
 
 
 def build_container(settings: Settings, *, use_fakes: bool = False) -> Container:
@@ -56,6 +81,7 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
             FakeLearningStore,
             FakeOcr,
             FakeRegionDetector,
+            FakeSenders,
             FakeStorage,
             FakeVision,
             FixedClock,
@@ -81,6 +107,9 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
                 ),
                 "csv": FakeExporter(fmt="csv", media_type="text/csv"),
             },
+            senders=FakeSenders(),
+            logo=None,
+            pipeline=load_pipeline_config(),
         )
 
     # --- Real adapters — created in later tasks (T9, T11, T13, T18, T19, T24) ---
@@ -94,8 +123,10 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     from backend.adapters.imaging.pdf import DocumentReader  # T9
     from backend.adapters.learning.sqlite_store import SqliteLearningStore  # T24
     from backend.adapters.ocr.tesseract import TesseractAdapter  # T11
-    from backend.adapters.ocr.trocr_digits import TrOcrDigitsAdapter  # T13
+    from backend.adapters.ocr.trocr_digits import TrOcrDigits  # T13
     from backend.adapters.regions.rule_based import RuleBasedDetector  # T11
+    from backend.adapters.senders.loader import SenderIndex  # T6
+    from backend.adapters.senders.logo_match import OrbLogoMatcher  # T10
     from backend.adapters.storage.tempdir import TmpdirStorage  # T9
 
     storage = TmpdirStorage(settings=settings)
@@ -108,7 +139,7 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     return Container(
         settings=settings,
         ocr_printed=TesseractAdapter(settings=settings, storage=storage),
-        ocr_digits=TrOcrDigitsAdapter(settings=settings),
+        ocr_digits=TrOcrDigits(settings=settings, storage=storage),
         barcode=ZxingAdapter(settings=settings, storage=storage),
         regions=RuleBasedDetector(settings=settings, storage=storage),
         vision=vision,
@@ -122,4 +153,7 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
             "xlsx": XlsxExporter(),
             "csv": CsvExporter(),
         },
+        senders=SenderIndex.load(),
+        logo=OrbLogoMatcher(storage),
+        pipeline=load_pipeline_config(),
     )

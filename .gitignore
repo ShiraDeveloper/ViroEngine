@@ -132,3 +132,7 @@ scratch/
 _preview/
 notes.local.md
 TODO.local.md
+
+# --- Logo crops are sample data; only the manifest is committed ---
+config/logos/*
+!config/logos/manifest.json

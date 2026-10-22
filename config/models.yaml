@@ -11,13 +11,43 @@
 #   T16 — YOLO experiment (may add region detector config)
 
 # --- Scoring thresholds ----------------------------------------------------
-# Re-derived by eval/calibrate.py; do not edit manually.
+# ScoringConfig defaults in backend/core/scoring.py must equal these (a test enforces it).
+# Hand-set knobs first; the block between the markers is rewritten by eval/calibrate.py.
 scoring:
-  escalation_score_threshold: 0.80   # also in .env; calibrate.py writes here
-  level_a_min: 0.95
-  level_b_min: 0.80
-  level_c_min: 0.60
-  # level_d: everything below level_c_min
+  level_a_enabled: true             # ADR-015 PROVISIONAL: set false if Docker/CI shows no agreement
+  label_unknown: 0.5                # s_label when a candidate has no governing label
+  margin_full_gap: 0.25             # score gap to the runner-up at which s_margin reaches 1.0
+  image_unknown: 0.8                # s_image when no PageMeasurement is supplied
+  blur_sharp: 100.0                 # ASSUMPTION: Laplacian variance of a fully sharp page
+  source_scores:                    # PLAN §5.1
+    barcode: 1.0
+    printed: 0.85
+    screen: 0.80
+    stamp: 0.60
+    handwritten: 0.45
+    unknown: 0.30
+  # BEGIN calibrated - eval/calibrate.py rewrites everything up to END; do not edit by hand
+  # provenance: PLAN §5.1 initial values, NOT yet calibrated (no dev-split signal dump exists)
+  escalation_score_threshold: 0.80  # also in .env
+  weights:
+    agree: 0.26
+    source: 0.18
+    label: 0.16
+    margin: 0.14
+    pattern: 0.10
+    conf: 0.08
+    image: 0.08
+  # END calibrated
+
+# --- Pipeline layers (T15) ---------------------------------------------------
+# Switches the ablation table (PLAN §10.5) turns off one at a time:
+#   python -m eval.run_eval --split dev --ablation no_second_read
+# PipelineLayers defaults in backend/core/pipeline/orchestrator.py must equal these.
+layers:
+  second_read: true                 # S7 independent re-read of risky candidates
+  digit_reader: true                # S7 reader 2b (TrOCR); has no effect without second_read
+  learning: true                    # learned layout hints in S4
+  logo: true                        # ORB logo fallback in S5
 
 # --- Readers ---------------------------------------------------------------
 readers:
@@ -25,10 +55,17 @@ readers:
   digit_ocr: trocr                   # "trocr" | "tesseract" — bake-off decides (T17)
   region_detector: rule-based        # "rule-based" | "yolov8n-onnx" — ADR-016 decides (T16)
 
-# --- TrOCR (handwritten digits) -------------------------------------------
+# --- TrOCR (handwritten digits, T13) --------------------------------------
+# Read at runtime from Settings (TROCR_* in .env); mirrored here for calibrate.py.
 trocr:
-  model_path: models/trocr-small-digits.onnx   # git-ignored; see models/README.md
-  max_sequence_length: 12
+  source_model: microsoft/trocr-small-handwritten
+  revision: b4648cfa171985a6745f37ddd637e98c0da958ac
+  vision_file: models/trocr_small_encoder_int8.onnx   # git-ignored; see models/README.md
+  text_file: models/trocr_small_decoder_int8.onnx
+  vocab_file: models/trocr_small_vocab.json
+  max_length: 12          # tokens; a digit field is a dozen at most
+  candidates: 5           # beam width = readings returned
+  max_model_mb: 80        # larger file sets are refused at load
 
 # --- YOLOv8n region detector (experimental, T16) --------------------------
 yolo:
@@ -50,3 +87,42 @@ providers:
     base_delay_seconds: 0.5
     max_delay_seconds: 8.0
     jitter_factor: 0.25
+
+# --- S5 sender + page-role classification (T10) -----------------------------
+# ClassifyConfig defaults in backend/core/pipeline/s5_classify.py must equal these.
+classify:
+  sender_min_ratio: null            # null -> min_ratio of config/senders.json (88)
+  logo_min_inlier: 0.35             # ORB inlier ratio
+  letterhead_top_fraction: 0.22     # letterhead band when no region was detected
+  blank_max_words: 15
+  destination_follow_tokens: 4      # tokens removed after the אל: / לכבוד markers
+  field_line_tolerance: 0.015       # normalised y distance for a label's value
+  field_value_max_tokens: 6
+  prompt_version: v1
+
+# --- S6 identity candidates: ID, names, commitment (T12) ----------------------
+# IdentityConfig defaults in backend/core/pipeline/s6_candidates_identity.py must equal these.
+# Distances are normalised page fractions.
+identity:
+  id_label_radius: 0.12             # of page width, from the ID label to its first digit
+  id_min_digits: 7                  # a lost leading zero is padded in normalization
+  id_max_digits: 10                 # a surplus leading zero is stripped in normalization
+  id_max_tokens: 4
+  name_radius: 0.25                 # ASSUMPTION: a name runs to the end of its line
+  name_max_tokens: 4
+  commitment_radius: 0.18           # of page width, in the reading direction
+  commitment_max_tokens: 3
+  chain_gap: 0.05                   # largest gap between tokens of one value
+  line_tolerance: 0.015             # y distance that still counts as the same line
+  below_gap: 0.05                   # label-to-value vertical gap when the value is below
+  column_margin: 0.03               # SAP commitment column slack around its header
+  barcode_confidence: 0.95          # reported confidence of a decoded symbol
+
+# --- S7 second local read (T12) ----------------------------------------------
+# SecondReadConfig defaults in backend/core/pipeline/s7_second_read.py must equal these.
+second_read:
+  risky_confidence: 0.75            # reader confidence below this triggers a second read
+  pad_fraction: 0.02                # crop padding, fraction of the image diagonal
+  upscale: 2.5                      # cubic; below 2 the gain disappears, above 3 only cost grows
+  psm: 7                            # Tesseract single-line mode
+  digit_candidates: 5               # most alternatives taken from the digit reader
