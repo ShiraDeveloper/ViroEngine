@@ -1,42 +1,87 @@
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
+import type { ResilientOptions } from '@/api/sse';
+import { LivePipeline } from '@/components/LivePipeline';
 import { common, processing } from '@/copy/he';
 import { buttonClasses } from '@/design/Button';
 import { EmptyState } from '@/design/EmptyState';
-import { ltr } from '@/lib/rtl';
 import { useDocumentTitle } from '@/lib/useDocumentTitle';
-import { useJob } from '@/lib/useJob';
+import { useJobProgress } from '@/lib/useJobProgress';
+import type { ProgressClient } from '@/lib/useJobProgress';
 
-/** Stub: the Live Pipeline grid and SSE wiring arrive with T21/T22. Shows job progress only. */
-export function Processing() {
+export interface ProcessingProps {
+  /** Injected in tests; the app uses the configured client. */
+  client?: ProgressClient;
+  resilient?: ResilientOptions;
+}
+
+/** Live Pipeline on SSE. Opens the review screen on `done` unless the user has scrolled. */
+export function Processing({ client, resilient }: ProcessingProps = {}) {
   useDocumentTitle(processing.title);
   const { jobId = '' } = useParams();
-  const { data: job, isPending, isError } = useJob(jobId);
+  const navigate = useNavigate();
+  const { isPending, isError, state, degraded } = useJobProgress(jobId, client, resilient);
 
-  return (
-    <>
-      <h1>{processing.title}</h1>
-      {isPending ? (
+  // An unexpected navigation while the user is reading is worse than a click.
+  const userScrolled = useRef(false);
+  useEffect(() => {
+    // Only a scroll away from the top counts: browsers also fire scroll events for layout changes.
+    const onScroll = (): void => {
+      if (window.scrollY > 0) userScrolled.current = true;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const doneStatus = state?.doneStatus ?? null;
+  const reviewPath = `/jobs/${encodeURIComponent(jobId)}/review`;
+  useEffect(() => {
+    const reviewable = doneStatus === 'needs_review' || doneStatus === 'confirmed';
+    if (reviewable && !userScrolled.current) navigate(reviewPath);
+  }, [doneStatus, navigate, reviewPath]);
+
+  if (isPending) {
+    return (
+      <>
+        <h1>{processing.title}</h1>
         <p role="status" className="mt-4 text-ink-muted">
           {common.loading}
         </p>
-      ) : isError ? (
+      </>
+    );
+  }
+  if (isError || !state) {
+    return (
+      <>
+        <h1>{processing.title}</h1>
         <div className="mt-4">
           <EmptyState title={common.loadFailed} />
         </div>
-      ) : (
-        <div className="mt-4 flex flex-col items-start gap-4">
-          <p aria-live="polite" className="text-lg text-ink-strong">
-            {processing.progress(job.pages_done, job.page_count)}
+      </>
+    );
+  }
+
+  const { counters } = state;
+  return (
+    <>
+      <h1>{processing.title}</h1>
+      <div className="mt-4 flex flex-col gap-4">
+        <p aria-live="polite" className="text-lg text-ink-strong">
+          {doneStatus ? processing.finished : processing.progress(counters.pagesDone, counters.pagesTotal)}
+        </p>
+        {degraded ? (
+          <p className="rounded-md bg-state-neutral-bg p-3 text-sm text-state-neutral-fg">
+            {processing.pollingNotice}
           </p>
-          <p className="text-sm text-ink-muted">
-            {processing.pagesTitle}: {ltr(`${job.pages_done}/${job.page_count}`)}
-          </p>
-          <Link to={`/jobs/${encodeURIComponent(jobId)}/review`} className={buttonClasses('primary')}>
+        ) : null}
+        <LivePipeline pages={state.pages} counters={counters} />
+        <div>
+          <Link to={reviewPath} className={buttonClasses(doneStatus ? 'primary' : 'secondary')}>
             {processing.goToReview}
           </Link>
         </div>
-      )}
+      </div>
     </>
   );
 }
