@@ -52,3 +52,14 @@ class OcrPort(Protocol):
         upright, or None when the page is too sparse to tell. Never raises.
         """
         ...
+
+
+@runtime_checkable
+class OcrProbePort(Protocol):
+    """An OCR reader that can say which language packs it has, so readiness is a fact and not a
+    hope. The Hebrew pack missing makes every page read as empty without any error."""
+
+    def languages(self) -> list[str] | None:
+        """Installed language codes (e.g. ["eng", "heb", "osd"]), or None when the engine cannot
+        be reached. Never raises."""
+        ...

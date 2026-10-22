@@ -11,11 +11,13 @@ from pathlib import Path
 from typing import Any, Final
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 import structlog
 
 from backend.api.deps import get_container, get_store, require_api_key
 from backend.container import Container
 from backend.jobs import JobStore
+from backend.readiness import ocr_readiness
 
 log = structlog.get_logger()
 
@@ -29,28 +31,24 @@ EVAL_LATEST: Final = Path(__file__).resolve().parents[2] / "eval" / "results" / 
 async def health(
     request: Request,
     container: Container = Depends(get_container),
-) -> dict[str, Any]:
-    """Liveness and adapter readiness check.
-
-    Returns per-adapter status. API keys are never exposed —
-    only credential counts and circuit state.
-    """
+) -> JSONResponse:
+    """Liveness and readiness. 200 with `status: ok` when the engine can read a form, 503 with
+    `status: unready` when it cannot (a missing Hebrew language pack, an unreachable Tesseract).
+    API keys are never exposed, only credential counts and circuit state."""
     settings = container.settings
+    ocr = ocr_readiness(container)
 
-    # OCR readiness — real adapter checks the tesseract binary; fake always ready
-    ocr_status = _probe_ocr(container)
-
-    # Vision provider health (None when LOCAL_ONLY)
     providers: dict[str, Any] = {}
     if container.vision is not None:
         ph = container.vision.health()
         providers[ph.name] = {"credentials": ph.credentials, "state": ph.state}
 
     response: dict[str, Any] = {
-        "status": "ok",
-        "ocr": ocr_status["status"],
+        "status": "ok" if ocr.ready else "unready",
+        "ocr": "ready" if ocr.ready else "unavailable",
         "ocr_reader": container.ocr_printed.name,
-        "ocr_langs": ocr_status.get("langs", []),
+        "ocr_langs": ocr.installed,
+        "ocr_missing": ocr.missing,
         "models": {
             "trocr": "loaded" if container.ocr_digits is not None else "not_loaded",
             "yolo": "not_loaded",  # loaded in T16 when the experiment runs
@@ -60,26 +58,8 @@ async def health(
         "queue_size": request.app.state.job_queue.qsize,
     }
 
-    log.info("health_check", status=response["status"], ocr=ocr_status["status"])
-    return response
-
-
-def _probe_ocr(container: Container) -> dict[str, Any]:
-    """Check OCR readiness. Returns status and language list.
-
-    Fake adapters are always ready with a synthetic lang list.
-    Real Tesseract health probing is implemented in T9 TesseractAdapter
-    and surfaced here once that adapter exposes a .health() method.
-    """
-    name = container.ocr_printed.name
-    if name.startswith("fake_"):
-        # Fake adapter — report as ready with a synthetic language list
-        return {"status": "ready", "langs": ["heb", "eng"]}
-
-    # Real adapter health check delegates to the adapter in T9.
-    # For now, report ready without probing to avoid direct pytesseract import
-    # from the API layer (only adapters may import tesseract — §8 layering rule).
-    return {"status": "ready", "langs": []}
+    log.info("health_check", status=response["status"], missing=len(ocr.missing))
+    return JSONResponse(response, status_code=200 if ocr.ready else 503)
 
 
 @router.get("/metrics", dependencies=[Depends(require_api_key)])
