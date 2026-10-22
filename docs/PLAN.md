@@ -2030,7 +2030,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 27 ◐ | Security hardening and test suite | Ahuba | P7 | D8 | 2h ⚠ | 18,22,24 |
 | 28 ◐ | Deployment — **M5** | Ahuba | P7 | **D9** | 1h ⚠ | 22,23,27 |
 | 29 | Docs and the 60-second video | Shira | P8 | D8–9 | **3h** | 26,28 |
-| 30 | Final evaluation, freeze, submit — **M6** | Both | P8 | D9 | 2h+2h | all |
+| 30 ◐ | Final evaluation, freeze, submit — **M6** | Both | P8 | D9 | 2h+2h | all |
 
 **Totals.** Ahuba 13 own tasks + 3 shared halves = **39 h**; Shira 14 own tasks + 3 shared halves
 = **39 h**. Plus 4 h reviews and 2 h buffer each → **45 h committed of the 51 h budget**, leaving
@@ -4478,6 +4478,23 @@ git tag v1.0-freeze && python -m eval.run_eval --gold eval/gold.csv --split held
 # -> local close rate .... | cloud calls .... | measured cost $....
 python scripts/check_submission.py          # -> 14/14 checks passed
 ```
+
+> **◐ Prepared — 2026-10-22. The final evaluation has NOT been run: no held-out numbers exist, nothing is
+> frozen, M6 is NOT declared.** Ahuba's part (held-out run, ablation, `final_report`) is tooling only.
+> Built and unit-tested (fake evaluator): `eval/final.py` runs the full system and every ablation of
+> `run_eval.ABLATIONS` on the held-out split and writes `final_report.{json,md}`; it **refuses** unless HEAD is
+> the commit tagged `v1.0-freeze`, unless no earlier run read the held-out pages (`eval/heldout_log.py`:
+> an append-only, counts-only log that `run_eval --split heldout|all` now writes before it reads), and unless
+> the ablation table is complete and held-out. `--no-freeze-check` is a rehearsal and says so in the report.
+> `scripts/check_submission.py` is the machine-checkable subset of the checklist (nothing forbidden is
+> tracked, required files exist); the 11 items that need a person or the network are printed as MANUAL.
+> Tests: `backend/tests/unit/test_final_eval.py` (`test_held_out_split_used_exactly_once`,
+> `test_ablation_table_complete`) and `test_check_submission.py` (`test_checklist_complete`). They are under
+> `backend/tests` because `testpaths` collects only there, not the `eval/tests/` the plan names.
+> **Not done:** the run itself (needs `eval/gold.csv`, `held_out.txt`, the freeze tag, T17), the augmented
+> variants (need Shira's T25 stress augmenter), `ADR-017-final-results.md` (no results to record),
+> `scripts/check_docs.py::test_readme_numbers_match_final_report` and the README/limitations/ablation-table
+> updates (Shira, step 3), the personal answers (each developer, alone), the video, the key rotation.
 
 ---
 
