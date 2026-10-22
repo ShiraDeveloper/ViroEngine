@@ -270,6 +270,7 @@ export interface RunReport {
   provider_failovers: string[];
   engine_version: string;
   prompt_version: string;
+  cloud_consent?: boolean;
 }
 
 export interface SenderSpec {
@@ -342,6 +343,11 @@ export interface SseRowData {
 export interface SseRowEvent {
   event: "row";
   data: SseRowData;
+}
+
+/** `POST /v1/jobs/{id}/stress`: which degradations to apply (PLAN §10.3). */
+export interface StressRequest {
+  ops: string[];
 }
 
 export interface UploadResponse {

@@ -73,6 +73,7 @@ def build_report(
     page_count: int,
     intake_ms: int,
     prompt_version: str,
+    cloud_consent: bool = False,
 ) -> RunReport:
     """Counters only: no value, name, ID or date ever enters the report (project rule §7).
     `fields_closed_local` counts fields that are not level D and did not leave the machine."""
@@ -111,6 +112,7 @@ def build_report(
         provider_failovers=failovers,
         engine_version=ENGINE_VERSION,
         prompt_version=prompt_version,
+        cloud_consent=cloud_consent,
     )
 
 

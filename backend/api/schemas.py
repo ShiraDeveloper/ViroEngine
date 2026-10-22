@@ -40,6 +40,12 @@ class FieldEditRequest(Strict):
         return self
 
 
+class StressRequest(Strict):
+    """`POST /v1/jobs/{id}/stress`: which degradations to apply (PLAN §10.3)."""
+
+    ops: list[str] = Field(min_length=1, max_length=8)
+
+
 class JobView(Strict):
     """The job as the UI sees it: no file paths, no internal refs."""
 

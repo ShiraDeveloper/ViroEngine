@@ -6,17 +6,23 @@ Keys and credential values are NEVER included in the response — only labels an
 
 from __future__ import annotations
 
-from typing import Any
+import json
+from pathlib import Path
+from typing import Any, Final
 
 from fastapi import APIRouter, Depends, Request
 import structlog
 
-from backend.api.deps import get_container
+from backend.api.deps import get_container, get_store, require_api_key
 from backend.container import Container
+from backend.jobs import JobStore
 
 log = structlog.get_logger()
 
 router = APIRouter(tags=["meta"])
+
+# Structural: where `eval/run_eval.py --emit-json` writes the latest report (git-ignored).
+EVAL_LATEST: Final = Path(__file__).resolve().parents[2] / "eval" / "results" / "latest.json"
 
 
 @router.get("/health")
@@ -76,21 +82,31 @@ def _probe_ocr(container: Container) -> dict[str, Any]:
     return {"status": "ready", "langs": []}
 
 
-@router.get("/metrics")
+@router.get("/metrics", dependencies=[Depends(require_api_key)])
 async def metrics(
     container: Container = Depends(get_container),
+    store: JobStore = Depends(get_store),
 ) -> dict[str, Any]:
-    """Process-level aggregated counters — no PII.
-
-    Full metrics are populated in T22/T24. Skeleton returns zeros.
-    """
+    """Process-level aggregated counters since start-up. Counters only: no value, no PII."""
+    m = store.metrics
     return {
-        "jobs_total": 0,
-        "jobs_active": 0,
-        "fields_total": 0,
-        "fields_closed_local": 0,
-        "fields_escalated": 0,
-        "fields_flagged": 0,
-        "cloud_calls": 0,
+        "jobs_total": m.jobs_total,
+        "jobs_active": store.active_count(),
+        "fields_total": m.fields_total,
+        "fields_closed_local": m.fields_closed_local,
+        "fields_escalated": m.fields_escalated,
+        "fields_flagged": m.fields_flagged,
+        "cloud_calls": m.cloud_calls,
         "local_only": container.settings.local_only,
     }
+
+
+@router.get("/metrics/eval", dependencies=[Depends(require_api_key)])
+async def metrics_eval() -> dict[str, Any]:
+    """The latest evaluation report (`eval/results/latest.json`), or `{"available": false}` when
+    no run has produced one. The report holds counts and rates, never a field value."""
+    try:
+        data = json.loads(EVAL_LATEST.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"available": False}
+    return {"available": True, "report": data}

@@ -468,6 +468,7 @@ def process_page(
         page_role=cls.page_role,
         sender=cls.sender,
         sha256=raw.sha256,
+        color_image=page.color,
         page_number=sequence[0] if sequence else None,
         page_total=sequence[1] if sequence else None,
         corrections=list(page.corrections_applied),
@@ -527,6 +528,8 @@ def iter_outcomes(
 
 Assembler = Callable[[Sequence[PageOutcome]], Assembly]
 Labeler = Callable[[PageRaw], str | None]
+# Told, once rows exist, which pages were read and what each produced (the API keeps the images).
+PagesDone = Callable[[Sequence[PageRaw], Sequence[PageOutcome]], None]
 
 
 def apply_labels(raws: Sequence[PageRaw], label_for: Labeler | None) -> list[PageRaw]:
@@ -561,6 +564,8 @@ async def run_job(
     assemble: Assembler | None = None,
     label_for: Labeler | None = None,
     cloud_consent: bool = False,
+    known_hashes: frozenset[str] = frozenset(),
+    on_done: PagesDone | None = None,
 ) -> JobRecord:
     """S0..S9 for a batch, then rows, report and a final status.
 
@@ -583,6 +588,7 @@ async def run_job(
             documents=c.documents,
             storage=c.storage,
             job_id=job.job_id,
+            known_hashes=known_hashes,
         )
     except SafeLineError as exc:
         log.warning("job_refused", job_id=job.job_id, stage="S0", code=exc.code)
@@ -656,6 +662,8 @@ async def run_job(
     )
     rows, groups, orphans = (assemble or (lambda outs: assemble_rows(outs, ctx=row_ctx)))(outcomes)
     errors.extend(accounting_errors(len(outcomes), groups, orphans))
+    if on_done is not None:
+        on_done(raws, outcomes)
     for row in rows:
         flagged_fields = [k for k, f in row.fields.items() if f.level is ConfidenceLevel.D]
         row_data = SseRowData(
@@ -672,6 +680,7 @@ async def run_job(
         page_count=total,
         intake_ms=intake_ms,
         prompt_version=c.pipeline.classify.prompt_version,
+        cloud_consent=cloud_consent,
     )
     status = final_status(outcomes, rows, orphans, errors)
     emit(_done(status, flagged_field_count(rows), started))

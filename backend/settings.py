@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     job_ttl_minutes: int = Field(default=30, ge=1, le=1440)
     # S11 (PLAN §4): after the artefacts are purged the job answers `purged` for this long so the
     # UI can show a message instead of a 404; the sweeper looks for expired jobs this often.
+    # SSE (PLAN §3.4): a `: ping` comment this often keeps proxies from closing an idle stream; a
+    # stream never outlives the ceiling, whatever the job does.
+    sse_ping_seconds: int = Field(default=15, ge=1, le=120)
+    sse_max_seconds: int = Field(default=600, ge=1, le=3600)
+    # Stress Mode (PLAN §10.3): the seed that makes a degradation reproducible across machines.
+    stress_seed: int = 20261018
     purged_visible_minutes: int = Field(default=10, ge=0, le=1440)
     purge_sweep_minutes: int = Field(default=5, ge=1, le=60)
     render_dpi: int = Field(default=300, ge=100, le=600)
