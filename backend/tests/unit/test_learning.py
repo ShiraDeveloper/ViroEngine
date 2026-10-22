@@ -1,4 +1,4 @@
-﻿"""The learning layer: what is remembered, when it is used and what it changes (PLAN §7, T24)."""
+"""The learning layer: what is remembered, when it is used and what it changes (PLAN §7, T24)."""
 
 from __future__ import annotations
 

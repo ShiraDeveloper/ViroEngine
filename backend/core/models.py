@@ -277,7 +277,7 @@ class RunReport(Strict):
     provider_failovers: list[str]
     engine_version: str
     prompt_version: str
-    # PLAN ?8.5: the job's consent to send crops of documents that are not known samples.
+    # PLAN §8.5: the job's consent to send crops of documents that are not known samples.
     cloud_consent: bool = False
 
 
@@ -412,7 +412,7 @@ class ProviderHealth(Strict):
 
 class LayoutObservation(Strict):
     """Locations and abstracted shapes only. Deliberately has NO value field: adding one must
-    break `core.learning.assert_pii_free` and the reflection test that guards it (PLAN ?7.1)."""
+    break `core.learning.assert_pii_free` and the reflection test that guards it (PLAN §7.1)."""
 
     sender: str
     field: FieldKey
@@ -425,7 +425,7 @@ class LayoutObservation(Strict):
 
 
 class RunMetric(Strict):
-    """Counters of one finished job for the learning curve (PLAN ?7.2 `run_metric`). No values."""
+    """Counters of one finished job for the learning curve (PLAN §7.2 `run_metric`). No values."""
 
     at: datetime
     fields_total: int

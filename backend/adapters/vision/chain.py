@@ -191,6 +191,10 @@ class VisionChainAdapter:
         log.warning("providers_exhausted", stage="S9", job_id=request.job_id, hops=len(failovers))
         raise ProviderExhausted("every provider failed", failovers=tuple(failovers))
 
+    def purge_expired(self) -> int:
+        """Delete the cached answers past their lifetime; the number removed. Never raises."""
+        return self._cache.purge_expired()
+
     def health(self) -> ProviderHealth:
         """Credential labels and the circuit state. Never a key."""
         labels = [f"{s.name}:{lab}" for s in self._slots for lab in s.provider.ring.labels]

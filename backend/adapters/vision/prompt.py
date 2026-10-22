@@ -73,6 +73,8 @@ def _fill(template: str, values: dict[str, str]) -> str:
 
 def _sections(text: str) -> dict[str, str]:
     marks = list(_SECTION.finditer(text))
+    if not marks or "SYSTEM" not in {m.group(1) for m in marks}:
+        raise ValueError("prompt file has no SYSTEM section")
     out: dict[str, str] = {}
     for i, mark in enumerate(marks):
         end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
@@ -98,7 +100,7 @@ def render_prompt(
     Raises FileNotFoundError when the version has no prompt file and ValueError for a bad
     version string."""
     path = prompt_path(request, prompts_dir or DEFAULT_PROMPTS_DIR)
-    sections = _sections(path.read_text(encoding="utf-8"))
+    sections = _sections(path.read_text(encoding="utf-8-sig"))
     requested = [c.field.value for c in request.crops]
     values = {
         "sender": _clean(request.sender) if request.sender else "null",

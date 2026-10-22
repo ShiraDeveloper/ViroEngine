@@ -29,6 +29,7 @@ from backend.core.errors import TooLarge, UnsupportedMedia
 from backend.core.pipeline.s0_intake import UploadedBlob
 from backend.jobs import JobEntry, JobStore
 from backend.queue import JobQueue
+from backend.security import limit_uploads
 
 log = structlog.get_logger()
 
@@ -113,7 +114,12 @@ async def _accept(
     return _response(entry, replay=False)
 
 
-@router.post("/documents", status_code=201, response_model=UploadResponse)
+@router.post(
+    "/documents",
+    status_code=201,
+    response_model=UploadResponse,
+    dependencies=[Depends(limit_uploads)],
+)
 async def create_document(
     file: Annotated[UploadFile, File()],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
@@ -137,7 +143,12 @@ async def create_document(
     )
 
 
-@router.post("/batches", status_code=201, response_model=UploadResponse)
+@router.post(
+    "/batches",
+    status_code=201,
+    response_model=UploadResponse,
+    dependencies=[Depends(limit_uploads)],
+)
 async def create_batch(
     files: Annotated[list[UploadFile], File()],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,

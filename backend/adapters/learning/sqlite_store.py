@@ -43,6 +43,19 @@ _CONFIDENCE_SATURATION_HITS: Final = 10
 
 ProposalKind = Literal["label", "sender"]
 
+# Fixed statements, never built from a string: nothing a caller passes becomes SQL text.
+_APPROVE: Final = {
+    "label": "UPDATE label_synonym SET approved = 1 WHERE id = ?",
+    "sender": "UPDATE sender_proposal SET approved = 1 WHERE id = ?",
+}
+_DUMP: Final = {
+    "layout_hint": "SELECT * FROM layout_hint",
+    "pattern_hint": "SELECT * FROM pattern_hint",
+    "label_synonym": "SELECT * FROM label_synonym",
+    "sender_proposal": "SELECT * FROM sender_proposal",
+    "run_metric": "SELECT * FROM run_metric",
+}
+
 
 class SqliteLearningStore:
     """LearningStorePort over SQLite. Connections are short-lived, one per operation, so the store
@@ -143,10 +156,9 @@ class SqliteLearningStore:
     def approve(self, kind: ProposalKind, proposal_id: int) -> bool:
         """Mark a label synonym or a sender proposal approved (an explicit human act). Returns
         False when there is no such proposal."""
-        table = "label_synonym" if kind == "label" else "sender_proposal"
+        statement = _APPROVE[kind]
         with self._connect() as db:
-            cursor = db.execute(f"UPDATE {table} SET approved = 1 WHERE id = ?", (proposal_id,))  # noqa: S608
-            return cursor.rowcount > 0
+            return db.execute(statement, (proposal_id,)).rowcount > 0
 
     def record_run(self, metric: RunMetric) -> None:
         """Append one finished job's counters to the learning curve."""
@@ -320,12 +332,6 @@ class SqliteLearningStore:
         date or form value)."""
         out: dict[str, list[dict[str, Any]]] = {}
         with self._connect() as db:
-            for table in (
-                "layout_hint",
-                "pattern_hint",
-                "label_synonym",
-                "sender_proposal",
-                "run_metric",
-            ):
-                out[table] = [dict(r) for r in db.execute(f"SELECT * FROM {table}")]  # noqa: S608
+            for table, statement in _DUMP.items():
+                out[table] = [dict(r) for r in db.execute(statement)]
         return out
