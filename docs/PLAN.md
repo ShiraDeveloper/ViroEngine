@@ -2530,6 +2530,19 @@ python -m eval.make_gold --pick-held-out --gold eval/gold.csv --out eval/held_ou
 Reference: `samples_part1.pdf` p.9 (six highlights) vs p.20 (almost none) — the contrast that
 makes runtime use of the highlighting impossible.
 
+> **◐ Tooling done — 2026-10-22 (D5). Labelling NOT done, so Task 7 is not complete.**
+> Ahuba's tooling half: `eval/make_gold.py` (`--propose`, `--finalize`, `--pick-held-out`,
+> `--cross-check`), `config/gold_families.json` (labels per family, no values),
+> `tests/unit/test_make_gold.py`, `eval/make_gold.py` forbidden from `backend/core` by
+> `scripts/check_layering.py` (`eval` added; `test_core_does_not_import_eval`).
+> Verified: `--propose` over both PDFs wrote a 336-row, 48-page draft; tests, ruff, mypy,
+> layering green. Not verified: `--propose --locate` (field assignment of highlights) because
+> `build_container` imports `backend.adapters.learning.sqlite_store`, which is T24; without
+> `--locate` every highlight is unassigned.
+> **Still to do by hand:** confirm all 336 rows (Ahuba A1–A26, Shira B1–B22), the two
+> cross-checks, then `--finalize` and `--pick-held-out`; fill `faint_stamp` and `fax_grade` in
+> `config/gold_families.json`. `eval/held_out.txt` therefore does not exist yet.
+
 ---
 
 ### Task 8 — Validators and confusable repair
