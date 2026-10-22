@@ -1,13 +1,15 @@
 """Orchestrator - runs S0-S8 over a batch and reports on it (PLAN §13 T15).
 
 `process_page` is the per-page pipeline: S1 measure -> S2 correct -> S3 read -> S4 regions ->
-S5 classify -> S4 again with the sender's labels -> S6 candidates -> S7 second read -> S8 score.
+S5 classify -> S4 again with the sender's labels -> S6 candidates -> S7 second read -> S8 score ->
+S9 escalate.
 `iter_outcomes` runs it over many pages, one page in memory at a time, and isolates failures:
 a page that raises becomes a `failed` outcome and the batch continues. `run_job` wraps both with
 intake (S0), progress events, row assembly and the `RunReport`.
 
-S9 (cloud escalation, T18) does not exist yet: a vision port is accepted but nothing is
-escalated, and under LOCAL_ONLY the vision port is never touched even if one is present.
+S9 (cloud escalation, T18) runs after S8 and re-scores what the model read. The vision port is
+touched only when `LOCAL_ONLY` is off and the page is a known sample or the job has consent
+(`cloud_consent`, PLAN §8.5); otherwise it is never called, even if one is present.
 Everything here reaches the outside world only through ports, so the same code runs against the
 fake adapters in CI and the real ones in production.
 """
@@ -74,6 +76,12 @@ from backend.core.pipeline.s6_candidates import LabInputs, generate_candidates
 from backend.core.pipeline.s6_candidates_identity import IdentityConfig
 from backend.core.pipeline.s7_second_read import SecondReadConfig, second_read
 from backend.core.pipeline.s8_score import FieldEvaluation, evaluate_field
+from backend.core.pipeline.s9_escalate import (
+    EscalationConfig,
+    EscalationStats,
+    escalate,
+    flag_for_review,
+)
 from backend.core.ports.barcode import BarcodePort
 from backend.core.ports.clock import ClockPort
 from backend.core.ports.document import DocumentPort
@@ -89,7 +97,6 @@ from backend.core.scoring import (
     DEFAULT_WEIGHTS,
     ScoringConfig,
     ScoringWeights,
-    reason_text,
     scoring_from_mapping,
 )
 from backend.settings import Settings
@@ -102,7 +109,7 @@ SseEvent = SsePageEvent | SseCountersEvent | SseRowEvent | SseDoneEvent | SseErr
 ENGINE_VERSION: Final = "0.1.0"
 
 # Structural: the stages `process_page` runs, in order. S0 is the batch-level intake.
-PAGE_STAGES: Final = ("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8")
+PAGE_STAGES: Final = ("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9")
 
 # Structural: S5 reports how it found the sender; the model path is the only cloud one.
 _SENDER_READER: Final = {"text": ReaderName.tesseract, "logo": ReaderName.tesseract}
@@ -126,6 +133,7 @@ class PipelineConfig(Strict):
     classify: ClassifyConfig = Field(default_factory=ClassifyConfig)
     identity: IdentityConfig = Field(default_factory=IdentityConfig)
     second_read: SecondReadConfig = Field(default_factory=SecondReadConfig)
+    escalation: EscalationConfig = Field(default_factory=EscalationConfig)
     layers: PipelineLayers = Field(default_factory=PipelineLayers)
 
     @classmethod
@@ -139,6 +147,7 @@ class PipelineConfig(Strict):
             classify=ClassifyConfig.model_validate(data.get("classify", {})),
             identity=IdentityConfig.model_validate(data.get("identity", {})),
             second_read=SecondReadConfig.model_validate(data.get("second_read", {})),
+            escalation=EscalationConfig.model_validate(data.get("escalation", {})),
             layers=PipelineLayers.model_validate(data.get("layers", {})),
         )
 
@@ -232,6 +241,16 @@ def _cropper(services: PipelineServices) -> Callable[[ImageRef, Box], ImageRef]:
     return crop
 
 
+def _png_cropper(services: PipelineServices) -> Callable[[ImageRef, Box], bytes]:
+    """Cut `box` out of a stored image and return the PNG bytes without storing them: the piece
+    exists only to be put in a request. Raises RenderFailed (recoverable)."""
+
+    def crop(image: ImageRef, box: Box) -> bytes:
+        return services.imaging.crop(services.storage.get(image), box).data
+
+    return crop
+
+
 def _sender_candidates(cls: Classification) -> list[Candidate]:
     """S5's one sender candidate (PLAN §4 S6, `sender` row). Empty when unresolved: the sender is
     never invented. On a SAP screenshot the value was read from a screen, elsewhere from print."""
@@ -262,14 +281,6 @@ def _first_read_step(cands: Sequence[Candidate]) -> ReadingTrailStep:
         duration_ms=0,
         cloud=False,
     )
-
-
-def _flag_for_review(evaluation: FieldEvaluation, code: str) -> FieldEvaluation:
-    """The same reading, forced to level D with a closed-set reason. Evidence is dropped so
-    calibration treats the field as flagged whatever its score."""
-    r = evaluation.result
-    flagged = r.model_copy(update={"level": ConfidenceLevel.D, "reason": reason_text(code)})
-    return FieldEvaluation(result=flagged, signals=evaluation.signals, evidence=None)
 
 
 def _decide_fields(
@@ -327,7 +338,7 @@ def _decide_fields(
             trail=trail,
         )
         if key is FieldKey.sender and "multiple_candidates" in cls.sender_flags:
-            evaluation = _flag_for_review(evaluation, "multiple_candidates")
+            evaluation = flag_for_review(evaluation, "multiple_candidates")
         evaluations[key] = evaluation
     return evaluations
 
@@ -337,16 +348,21 @@ def process_page(
     *,
     services: PipelineServices,
     progress: Callable[[str], None] | None = None,
+    cloud_consent: bool = False,
 ) -> PageOutcome:
-    """S1-S8 for one page. `progress` is told the name of each stage as it starts. May raise:
-    `iter_outcomes` is what isolates a failing page from its batch."""
+    """S1-S9 for one page. `progress` is told the name of each stage as it starts.
+    `cloud_consent` is the per-job consent of PLAN §8.5: a page that is not a known sample is
+    processed locally unless it is True. May raise: `iter_outcomes` is what isolates a failing
+    page from its batch."""
     cfg = services.pipeline
     settings = services.settings
     timer = _Timer(progress)
     learning: LearningStorePort = services.learning if cfg.layers.learning else _NoLearning()
     # LOCAL_ONLY is enforced here as well as in the container: a vision port that slipped through
-    # must still never be called (project rule §5).
-    vision = None if settings.local_only else services.vision
+    # must still never be called (project rule §5). So is the §8.5 gate: an unknown document
+    # without consent never reaches a provider, S5's letterhead question included.
+    cloud_allowed = raw.known_sample or cloud_consent
+    vision = None if settings.local_only or not cloud_allowed else services.vision
     logo = services.logo if cfg.layers.logo else None
 
     timer.begin("S1")
@@ -389,7 +405,7 @@ def process_page(
         services.senders,
         vision=vision,
         logo=logo,
-        crop=_cropper(services) if vision is not None else None,
+        crop=_png_cropper(services) if vision is not None else None,
         barcodes=barcodes,
         config=cfg.classify,
     )
@@ -418,6 +434,28 @@ def process_page(
         lab=LabInputs(settings=settings, clock=services.clock, size=page_size(page)),
     )
     evaluations = _decide_fields(page, cls, spec, candidates, measurement, services, timer)
+    escalation = EscalationStats()
+    if not settings.local_only and services.vision is not None and cls.page_role != "blank":
+        timer.begin("S9")
+        escalated = escalate(
+            evaluations,
+            page=page,
+            regions=regions,
+            page_role=cls.page_role,
+            spec=spec,
+            vision=services.vision,
+            imaging=services.imaging,
+            storage=services.storage,
+            clock=services.clock,
+            settings=settings,
+            weights=cfg.weights,
+            scoring=cfg.scoring,
+            measurement=measurement,
+            config=cfg.escalation,
+            prompt_version=cfg.classify.prompt_version,
+            cloud_allowed=cloud_allowed,
+        )
+        evaluations, escalation = escalated.evaluations, escalated.stats
     return PageOutcome(
         page_id=raw.page_id,
         label=raw.label,
@@ -429,6 +467,7 @@ def process_page(
         corrections=list(page.corrections_applied),
         durations_ms=timer.millis(),
         evaluations=evaluations,
+        escalation=escalation,
     )
 
 
@@ -448,10 +487,12 @@ def iter_outcomes(
     *,
     services: PipelineServices,
     progress: Callable[[PageRaw, str], None] | None = None,
+    cloud_consent: bool = False,
 ) -> Iterator[PageOutcome]:
     """Process pages in order, yielding each outcome as soon as it exists so only one page is
     ever held. A page that raises becomes a `failed` outcome carrying a stable code (the
-    exception's own for a SafeLineError, `INTERNAL` otherwise) and the batch continues."""
+    exception's own for a SafeLineError, `INTERNAL` otherwise) and the batch continues.
+    `cloud_consent` is the job's per-job consent to send crops of unknown documents (§8.5)."""
     interval = services.settings.gc_interval_pages
     for n, raw in enumerate(raws, start=1):
 
@@ -460,7 +501,9 @@ def iter_outcomes(
                 progress(page, stage)
 
         try:
-            outcome = process_page(raw, services=services, progress=announce)
+            outcome = process_page(
+                raw, services=services, progress=announce, cloud_consent=cloud_consent
+            )
         except Exception as exc:
             code = exc.code if isinstance(exc, SafeLineError) else "INTERNAL"
             log.warning(
@@ -511,6 +554,8 @@ def build_report(
     for outcome in outcomes:
         durations.update(outcome.durations_ms)
     total = len(results)
+    stats = [o.escalation for o in outcomes]
+    failovers = list(dict.fromkeys(hop for s in stats for hop in s.failovers))
     return RunReport(
         job_id=job_id,
         started_at=started_at,
@@ -521,16 +566,20 @@ def build_report(
         fields_closed_local=closed,
         fields_escalated=sum(1 for r in results if r.escalated),
         fields_flagged=levels.get(ConfidenceLevel.D.value, 0),
-        tier1_calls=0,
-        tier2_calls=0,
+        tier1_calls=sum(s.calls for s in stats),
+        tier2_calls=0,  # no full-page tier exists: only crops ever leave the machine
         local_close_rate=closed / total if total else 0.0,
         level_histogram={lv.value: levels.get(lv.value, 0) for lv in ConfidenceLevel},
         stage_durations_ms=dict(durations),
         corrections_histogram=dict(Counter(c for o in outcomes for c in o.corrections)),
         cost=CostCounters(
-            provider_calls=0, cache_hits=0, input_tokens=0, output_tokens=0, estimated_usd=0.0
+            provider_calls=sum(s.calls for s in stats),
+            cache_hits=sum(s.cache_hits for s in stats),
+            input_tokens=sum(s.input_tokens for s in stats),
+            output_tokens=sum(s.output_tokens for s in stats),
+            estimated_usd=round(sum(s.estimated_usd for s in stats), 6),
         ),
-        provider_failovers=[],
+        provider_failovers=failovers,
         engine_version=ENGINE_VERSION,
         prompt_version=cfg.classify.prompt_version,
     )
@@ -566,15 +615,17 @@ async def run_job(
     on_event: Callable[[SseEvent], None] | None = None,
     assemble: Assembler | None = None,
     label_for: Labeler | None = None,
+    cloud_consent: bool = False,
 ) -> JobRecord:
-    """S0..S8 for a batch, then rows, report and a final status.
+    """S0..S9 for a batch, then rows, report and a final status.
 
     Emits `page` (each stage, then done or failed), `counters` (per page), `error` (per failed
     page), `row` (per row) and `done`, in that order. Never raises for a single-page failure:
     the page is recorded in `job.errors` and the batch continues. An upload that S0 refuses
     outright (unsupported, too large, encrypted) ends the job as `failed` with its code in
     `errors`. CPU-bound work runs in a worker thread, one page at a time, so the event loop
-    stays free. `assemble` groups pages into rows; the default is the interim one-row-per-page
+    stays free. `cloud_consent` lets crops of documents that are not known samples reach a
+    provider (PLAN §8.5); it defaults to False. `assemble` groups pages into rows; the default is the interim one-row-per-page
     assembler until S10 (T20) exists. Artefacts are left in storage for review; the TTL purge
     (T22) removes them."""
     emit: Callable[[SseEvent], None] = on_event or (lambda event: None)
@@ -609,7 +660,7 @@ async def run_job(
 
     total = len(raws) + len(intaken.failures)
     loop = asyncio.get_running_loop()
-    progress = {"done": len(intaken.failures), "closed": 0}
+    progress = {"done": len(intaken.failures), "closed": 0, "crops": 0}
 
     def pct(stage: str) -> int:
         step = PAGE_STAGES.index(stage) if stage in PAGE_STAGES else 0
@@ -623,7 +674,7 @@ async def run_job(
         loop.call_soon_threadsafe(emit, SsePageEvent(event="page", data=data))
 
     outcomes: list[PageOutcome] = []
-    iterator = iter_outcomes(raws, services=c, progress=on_stage)
+    iterator = iter_outcomes(raws, services=c, progress=on_stage, cloud_consent=cloud_consent)
     labels = {r.page_id: r.label for r in raws}
     while (outcome := await asyncio.to_thread(next, iterator, None)) is not None:
         outcomes.append(outcome)
@@ -632,10 +683,11 @@ async def run_job(
         progress["closed"] += sum(
             1 for r in outcome.results.values() if r.level is not ConfidenceLevel.D
         )
+        progress["crops"] += outcome.escalation.crops_sent
         page_data = SsePageData(
             page_id=outcome.page_id,
             label=labels.get(outcome.page_id),
-            stage="S8",
+            stage=PAGE_STAGES[-1],
             status="failed" if failed else "done",
             pct=pct("S1"),
         )
@@ -647,7 +699,7 @@ async def run_job(
             pages_done=progress["done"],
             pages_total=total,
             fields_closed_local=progress["closed"],
-            crops_sent=0,
+            crops_sent=progress["crops"],
         )
         emit(SseCountersEvent(event="counters", data=counters))
 

@@ -44,6 +44,14 @@ export interface CostCounters {
   estimated_usd: number;
 }
 
+/** One crop that leaves the machine (PLAN §13 T18). `png` holds the pixels of `box` only. */
+export interface CropPayload {
+  field: FieldKey;
+  png: string;
+  region_kind: RegionKind;
+  box: Box;
+}
+
 /** Exactly one of `value` (None clears the field) or `pick_candidate_index`. */
 export interface FieldEditRequest {
   value?: string | null;
@@ -195,6 +203,7 @@ export interface ProviderHealth {
   name: string;
   credentials: number;
   state: "ok" | "open" | "half_open" | "exhausted";
+  labels?: string[];
 }
 
 /** Provider readiness by count and state, never by key. */
@@ -349,18 +358,32 @@ export interface ValidationOutcome {
   repaired_from?: string | null;
 }
 
-/** Crop + context sent to a cloud vision provider. Clinical regions never appear here. */
+/** The validated answer for one field. There is no confidence here by design: the model is never asked how sure it is, and S8 computes confidence from independent signals. */
+export interface VisionAnswer {
+  values?: string[];
+  source?: SourceKind;
+  box?: Box | null;
+  alts?: string[];
+  note?: string | null;
+}
+
+/** What one page sends to a cloud vision provider: crops, never the page (PLAN §6.4). `page_thumb` is the redacted 512 px layout thumbnail, present only when a field needs page context. `candidates` is what the code already found, so the model chooses rather than invents. `task` selects the prompt: `fields` is the S9 extraction (`crops` hold one crop per unresolved field), `sender` is S5's letterhead question answered from `sender_options`. The plan's `schema` field is called `response_schema` because `schema` shadows a pydantic attribute. */
 export interface VisionRequest {
   job_id: string;
   page_id: string;
-  field: FieldKey;
-  crop: ImageRef;
-  context_text?: string | null;
+  task?: "fields" | "sender";
+  page_thumb?: string | null;
+  crops: CropPayload[];
   sender?: string | null;
+  sender_options?: string[];
+  label_synonyms?: string[];
+  candidates?: Partial<Record<FieldKey, string[]>>;
+  barcode_candidates?: string[];
   prompt_version: string;
+  response_schema?: Record<string, unknown>;
 }
 
-/** Schema-validated provider response. The model never assigns its own confidence. */
+/** Schema-validated provider response. The model never assigns its own confidence. `answers` carries the S9 extraction per requested field; `raw_text`/`candidates` carry the S5 sender answer. `failovers` lists "from->to" hops that happened before this answer; `cache_hit` is True when it came from the local cache and no provider was called. */
 export interface VisionResponse {
   raw_text: string;
   candidates: string[];
@@ -368,6 +391,12 @@ export interface VisionResponse {
   model_id: string;
   prompt_version: string;
   duration_ms: number;
+  answers?: Partial<Record<FieldKey, VisionAnswer>>;
+  ambiguities?: string[];
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_hit?: boolean;
+  failovers?: string[];
 }
 
 export type SseEvent = SsePageEvent | SseCountersEvent | SseRowEvent | SseDoneEvent | SseErrorEvent;

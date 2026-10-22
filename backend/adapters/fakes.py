@@ -193,6 +193,10 @@ class FakeImaging:
         """Returns the input unchanged."""
         return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
 
+    def fill_boxes(self, image: bytes, boxes: Sequence[Box], *, gray_level: int) -> EncodedImage:
+        """Returns the input unchanged (the fake raster has nothing to redact)."""
+        return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
+
 
 # ---------------------------------------------------------------------------
 # VisionLLMPort fake

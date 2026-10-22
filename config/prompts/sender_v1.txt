@@ -1,0 +1,9 @@
+=== SYSTEM ===
+Identify the institution that ISSUED this form from its letterhead.
+Choose exactly one value from OPTIONS, or "לא מוכר" if none fits.
+Never return the destination of the form. Return only {"sender": "<choice>"}.
+=== CONTEXT ===
+OPTIONS: {closed_list}
+DESTINATION_TO_IGNORE: תל השומר, שיבא, מעבדת נגיפים, המעבדה המרכזית לנגיפים
+=== USER ===
+[crop: letterhead region]

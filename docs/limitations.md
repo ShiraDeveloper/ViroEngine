@@ -105,6 +105,24 @@ and KGI.
 | React, Vite, Tailwind, Radix, TanStack | MIT | |
 | Our own code | MIT | See [`LICENSE`](../LICENSE) |
 
+## Cloud provider layer (T18)
+
+- **Not exercised against a live provider.** The Gemini, OpenRouter and Groq request shapes are
+  written from the providers' public REST documentation and tested against a fake transport only.
+  Gemini's `responseJsonSchema` field and `thinkingBudget: 0` have not been confirmed live; a
+  provider that rejects either answers 4xx, which the chain treats as `rejected` and skips. Run the
+  48 sample pages once with a real key before relying on the escalation numbers.
+- **No OpenRouter or Groq model is pinned.** The free model lists change weekly. Set
+  `OPENROUTER_VISION_MODEL` (and `GROQ_VISION_MODEL` if Groq lists a vision model that day) or the
+  provider is reported unavailable and skipped.
+- **S5's letterhead question is a second request.** When text and logo matching both fail, S5 asks
+  the model to choose the sender from the closed list (a letterhead crop only). It is a separate
+  request from S9's field request, so a page can make two provider calls; both are cached.
+- **The cached answer is patient data.** It holds values read from crops, never an image. It expires
+  after `JOB_TTL_MINUTES` unless `VISION_CACHE_TTL_MINUTES` is set deliberately.
+- **Planning cost only.** `estimated_usd` uses Gemini Flash list prices (an assumption, PLAN §6.5);
+  free-tier fallbacks are counted as zero.
+
 ## Reported results versus targets
 
 _Filled in Task 30 from the held-out run. Where a target was missed, the real value appears here
