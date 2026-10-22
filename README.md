@@ -64,9 +64,7 @@ The decision to escalate comes from a **combined score** built from seven indepe
 from the OCR engine's own confidence — on handwriting Tesseract reports high confidence for values
 it invented, which is exactly how a wrong number reaches a spreadsheet unnoticed.
 
-<!-- Task 29 adds the exported diagram here:
 ![Architecture](assets/architecture.png)
--->
 
 Full design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
 Complete plan: [`docs/PLAN.md`](docs/PLAN.md)

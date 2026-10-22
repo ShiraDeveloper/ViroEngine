@@ -1,8 +1,10 @@
 # Limitations and third-party notices
 
-> **Status: skeleton.** Completed in **Task 29**, updated with final numbers in **Task 30**.
-> The challenge guidelines ask for an honest report. This file is that report, and it is written
-> before the results are known so that it cannot be quietly trimmed afterwards.
+> **Status: complete for Task 29 (2026-10-22); the results table at the end is filled by Task 30.**
+> The challenge guidelines ask for an honest report. This file is that report, and it was written
+> before the results were known so that it cannot be quietly trimmed afterwards. Every number here
+> carries its data split; nothing in it is a target presented as an achievement.
+> `python scripts/check_docs.py` fails if one of the eight required topics disappears.
 
 ## What does not work well
 
