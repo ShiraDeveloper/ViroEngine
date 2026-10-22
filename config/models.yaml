@@ -78,6 +78,13 @@ yolo:
   max_model_mb: 15
   classes: [central_sticker, receipt_stamp, patient_box, commitment_label]
 
+# --- Bake-off (T17) ----------------------------------------------------------
+# Read by eval/bakeoff.py only. The T16 limits a region challenger must stay under, over the
+# rule-based baseline, per page (ADR-012). Vision model ids are GEMINI_MODEL / GEMINI_MODEL_LITE.
+bakeoff:
+  region_max_added_ms: 400
+  region_max_added_mb: 120
+
 # --- Cloud providers (T18) ---------------------------------------------------
 # Read by backend/adapters/vision/config.py; ProvidersConfig defaults must equal these (a test
 # enforces it). The chain order is `primary`, then `fallback_order`. A provider with no key, or

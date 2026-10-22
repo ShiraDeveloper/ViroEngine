@@ -47,7 +47,7 @@ and a negative result is recorded just as fully as a positive one.
 | 010 | Learning stores locations and shapes, never values | accepted | T24 |
 | 011 | React + FastAPI rather than Streamlit | accepted | T4 |
 | 012 | YOLOv8n as a measured experiment, not a commitment | accepted | T16 |
-| 013 | Reader selection | **pending** | T17 bake-off |
+| 013 | Reader selection | **open** - harness built, bake-off not run | T17 bake-off |
 | 014 | Hosting: stay on Render or move to the Space | **pending** | Day-3 measurement |
 | 015 | Does the sticker barcode equal the printed digits? Decides whether level A exists | **pending** | T5 |
 | 016 | Region detector: rule-based or YOLO | **open** - experiment prepared, not run (no model, no held-out numbers) | T16 |

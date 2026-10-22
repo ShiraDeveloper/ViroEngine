@@ -38,7 +38,7 @@ SYNTHETIC_FAMILIES: dict[str, list[str]] = {
     "handwriting_heavy": ["A17", "A18", "B10", "B11"],
     "faint_stamp": ["A5", "B8"],
     "fax_grade": ["A12", "B3"],
-    "multi_central": ["A9", "A14"],
+    "multi_central": ["A9", "A14", "A10"],
     "multi_commitment": ["A25", "B20"],
     "no_commitment": ["A17", "A21"],
     "letter_commitment": ["B14", "B15"],

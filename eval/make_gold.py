@@ -19,7 +19,7 @@ a field value (project rule §7).
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 import csv
 from dataclasses import dataclass
 import hashlib
@@ -46,6 +46,7 @@ from backend.core.pipeline.orchestrator import apply_labels, iter_outcomes
 from backend.core.pipeline.s0_intake import UploadedBlob, intake
 from backend.core.ports.document import DocumentPort
 from backend.settings import Settings
+from eval.bakeoff import HARD_PAGES
 from eval.run_eval import (
     DEFAULT_HELD_OUT,
     DEFAULT_PDFS,
@@ -554,6 +555,7 @@ def pick_held_out(
     seed: int = HELD_OUT_SEED,
     *,
     families: Mapping[str, Sequence[str]] | None = None,
+    exclude: Collection[str] = HARD_PAGES,
 ) -> list[str]:
     """Choose `n` held-out page labels stratified over the families of PLAN §10.2 (HELD_OUT_QUOTAS
     plus ordinary printed pages for the rest) and write them one per line to `out`, natural order.
@@ -561,7 +563,8 @@ def pick_held_out(
     families are filled first. Raises EvalInputError when a family has fewer unused pages than its
     quota (never fills it with an unrelated page) or `n` is smaller than the quotas."""
     family_map = dict(load_families() if families is None else families)
-    labels = {r.page for r in read_rows(gold)}
+    # The bake-off's hard pages (T17) must stay in the development split: never pick them.
+    labels = {r.page for r in read_rows(gold)} - set(exclude)
     ordinary_quota = n - sum(HELD_OUT_QUOTAS.values())
     if ordinary_quota < 0:
         raise EvalInputError(f"n={n} is smaller than the {sum(HELD_OUT_QUOTAS.values())} quotas")
@@ -573,8 +576,15 @@ def pick_held_out(
     for name in sorted(quotas, key=lambda f: (len(pools[f]), f)):
         free = sorted((x for x in pools[name] if x not in chosen), key=lambda x: _rank(x, seed))
         if len(free) < quotas[name]:
+            blocked = sorted(set(family_map.get(name, ())) & set(exclude))
+            hint = (
+                f"; {', '.join(blocked)} are bake-off hard pages (T17) and must stay in dev - "
+                "add a non-hard page to the family or change the hard-page list"
+                if blocked and name in HELD_OUT_QUOTAS
+                else ""
+            )
             raise EvalInputError(
-                f"family {name}: needs {quotas[name]} page(s), only {len(free)} available"
+                f"family {name}: needs {quotas[name]} page(s), only {len(free)} available{hint}"
             )
         chosen += free[: quotas[name]]
     picked = sorted(chosen, key=_natural)
