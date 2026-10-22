@@ -55,10 +55,17 @@ readers:
   digit_ocr: trocr                   # "trocr" | "tesseract" — bake-off decides (T17)
   region_detector: rule-based        # "rule-based" | "yolov8n-onnx" — ADR-016 decides (T16)
 
-# --- TrOCR (handwritten digits) -------------------------------------------
+# --- TrOCR (handwritten digits, T13) --------------------------------------
+# Read at runtime from Settings (TROCR_* in .env); mirrored here for calibrate.py.
 trocr:
-  model_path: models/trocr-small-digits.onnx   # git-ignored; see models/README.md
-  max_sequence_length: 12
+  source_model: microsoft/trocr-small-handwritten
+  revision: b4648cfa171985a6745f37ddd637e98c0da958ac
+  vision_file: models/trocr_small_encoder_int8.onnx   # git-ignored; see models/README.md
+  text_file: models/trocr_small_decoder_int8.onnx
+  vocab_file: models/trocr_small_vocab.json
+  max_length: 12          # tokens; a digit field is a dozen at most
+  candidates: 5           # beam width = readings returned
+  max_model_mb: 80        # larger file sets are refused at load
 
 # --- YOLOv8n region detector (experimental, T16) --------------------------
 yolo:

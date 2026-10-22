@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     # sideways caption sits this close to its barcode; the next unrelated label does not.
     proximity_radius: float = Field(default=0.06, gt=0.0, le=1.0)
     bars_retry_scale: float = Field(default=2.0, ge=1.0, le=4.0)  # retry of an undecoded barcode
+    # Receipt-stamp re-read (T13): the page pass reads at most the stamp's small lab-name lines.
+    # The area around them, this share of the page diagonal on every side, is read again; the
+    # stamp's date sits above those lines (A1: ~0.08 diagonal above "המרכזית").
+    stamp_reread_reach: float = Field(default=0.10, gt=0.0, le=1.0)
+    stamp_reread_max: int = Field(default=2, ge=0, le=10)  # crops per page; 0 disables
 
     # --- S4 regions (T11) -------------------------------------------------
     # Printed sideways, so OCR is imperfect: one wrong letter of five scores 80. Measured on the
@@ -110,6 +115,23 @@ class Settings(BaseSettings):
     letterhead_fraction: float = Field(default=0.22, gt=0.0, le=1.0)  # top share of the page
     # Learned layout hints compete with detections instead of overriding them.
     learned_region_score: float = Field(default=0.40, ge=0.0, le=1.0)
+
+    # --- S6 candidates: central number and receipt date (T13) -----------
+    # A handwritten receipt date counts when it lies this share of the page diagonal from a
+    # central sticker (PLAN T13); farther dates are the form's own.
+    receipt_date_radius: float = Field(default=0.10, gt=0.0, le=1.0)
+
+    # --- TrOCR handwritten-digit reader (T13) -----------------------------
+    # Files inside models_dir, written by tools/export_trocr.py (provenance: models/README.md).
+    # vision = the image encoder, text = the token decoder; the names avoid "CODE" and "TOKEN",
+    # which check_env_example.py treats as secrets.
+    trocr_vision_file: str = "trocr_small_encoder_int8.onnx"
+    trocr_text_file: str = "trocr_small_decoder_int8.onnx"
+    trocr_vocab_file: str = "trocr_small_vocab.json"
+    trocr_max_length: int = Field(default=12, ge=1, le=64)  # a digit field is a dozen tokens
+    trocr_candidates: int = Field(default=5, ge=1, le=10)  # beam width = candidates returned
+    # The pair must fit beside OpenCV and Tesseract on a 512 MB host; larger is refused.
+    trocr_max_model_mb: float = Field(default=80.0, gt=0.0, le=1000.0)
 
     # --- Paths ------------------------------------------------------------
     tesseract_cmd: str = "/usr/bin/tesseract"

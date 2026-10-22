@@ -10,7 +10,7 @@ Regeneration procedures: [`.kiro/skills/train-yolo/SKILL.md`](../.kiro/skills/tr
 
 | File | Purpose | Size budget | Used by |
 |---|---|---|---|
-| `trocr_small_decoder_int8.onnx` + encoder | Handwritten **digit** reader (S7) | whole model < 80 MB | `adapters/ocr/trocr_digits.py` |
+| `trocr_small_encoder_int8.onnx` + `trocr_small_decoder_int8.onnx` + `trocr_small_vocab.json` | Handwritten **digit** reader (S7) | whole model < 80 MB (enforced: a larger set is refused at load) | `adapters/ocr/trocr_digits.py` |
 | `yolov8n_regions_int8.onnx` | Region detector (S4), **only if it won the bake-off** | < 15 MB | `adapters/regions/yolo_onnx.py` |
 
 Both are loaded lazily and cached, so a batch with no handwriting never pays the load cost. A
@@ -26,12 +26,18 @@ Selection is in `config/models.yaml`, never hard-coded.
 
 | | |
 |---|---|
-| Source model | `microsoft/trocr-small-handwritten` (Hugging Face, MIT) |
-| Export | `optimum.onnxruntime.ORTModelForVision2Seq`, then int8 dynamic quantization |
-| Exported on | _date_ |
-| File size | _MB_ |
-| SHA-256 | _checksum_ |
-| Bake-off result (T17) | _handwritten-digit accuracy, top-5 candidate recall, p50 latency_ |
+| Source model | `microsoft/trocr-small-handwritten` (Hugging Face, MIT), revision `b4648cfa171985a6745f37ddd637e98c0da958ac` |
+| Source weights | `pytorch_model.bin`, 245,933,041 bytes, sha256 `1b83102cbc1520dee1c3937ac334da83da18cf4683d46ebd1bd4e93ebe584dd7` (from the Hub's own file metadata) |
+| Export | `python -m tools.export_trocr --out models --revision b4648cfa171985a6745f37ddd637e98c0da958ac` — `torch.onnx.export` (opset 17, decoder without KV cache), then `onnxruntime.quantization.quantize_dynamic` QUInt8 on both graphs. Needs `torch`, `transformers`, `sentencepiece`, `onnx` (export-time only, not runtime dependencies) |
+| Exported on | 2026-10-21, locally (torch 2.12, transformers 5.12, onnxruntime 1.20.1) |
+| File size | encoder 23.0 MB · decoder 40.2 MB · vocabulary 0.8 MB — **64.0 MB total** (budget 80) |
+| SHA-256 | encoder `7663c04eedadcab03969d17421bbfd7d28b3cf938133fc3bde70ccc1ebbfbcf8` · decoder `9accf3c260a6b3102647f4aab42ae4e60dff91d66b1dce6cc5470aab5144b3f7` · vocabulary `de3a2e969ab3d836f777701d8bfddb54332537f560db4849263e3e23487247de` |
+| Fidelity (int8 vs fp32) | identical unconstrained text on 9 of 15 rendered strings (3 fonts × 5 values). Whitelisted top-5: the rendered 6-digit number in **9 of 9** (8 in first place); the rendered dates in **0 of 6** (`/` read as `1`, `.` dropped) |
+| Measured on real handwriting (T13, 2026-10-21) | **0 of 7** hand-cropped sample values in the top-5 (A2 `939158` → `954158`, `932158`, `934158` …; dates' slashes read as `1`) — see PLAN T13. Bake-off (T17) still to confirm |
+
+The network filter on the development machine (NetFree) blocks the Hub's file CDN with `418`;
+the export above ran from an unfiltered network. The Hub's own file metadata gives the source
+weights' sha256, so a copy from anywhere can be verified before use.
 
 **Assumption on record:** trained on Latin handwriting; digit glyphs are largely shared with
 Hebrew handwriting, so it should transfer for numbers and not for letters. Measured in T17; the
@@ -62,6 +68,7 @@ reader is dropped per the cut list if it loses to escalating.
 ```bash
 ls -lh models/
 sha256sum models/*.onnx          # compare against the table above
+python -m pytest backend/tests/unit/test_trocr.py::test_model_size_under_budget   # < 80 MB
 python -c "import onnxruntime as ort; s=ort.InferenceSession('models/yolov8n_regions_int8.onnx'); \
 print([i.name for i in s.get_inputs()], [o.name for o in s.get_outputs()])"
 ```

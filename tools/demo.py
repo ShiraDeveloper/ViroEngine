@@ -2,6 +2,7 @@
 
     python -m tools.demo measure A3 A1 --pdf reference/samples_part1.pdf
     python -m tools.demo regions A9 A2 --pdf reference/samples_part1.pdf
+    python -m tools.demo candidates A1 A9 A2 B6 --fields central_number,receipt_date
 
 A label such as ``A3`` selects page 3 (1-based) of the PDF given; the letter is informational.
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from datetime import date
 import logging
 from pathlib import Path
 import re
@@ -24,23 +26,31 @@ import tempfile
 import structlog
 
 from backend.adapters.barcode.zxing import ZxingAdapter
+from backend.adapters.clock.system import SystemClock
 from backend.adapters.fakes import FakeLearningStore
 from backend.adapters.imaging.cv import CvImaging
 from backend.adapters.imaging.pdf import DocumentReader
 from backend.adapters.ocr.tesseract import TesseractAdapter
 from backend.adapters.regions.rule_based import RuleBasedDetector
 from backend.adapters.storage.tempdir import TmpdirStorage
-from backend.core.geometry import contains
-from backend.core.models import NormalizedPage, PageRaw, RegionKind
+from backend.core.geometry import contains, page_size
+from backend.core.models import Candidate, FieldKey, NormalizedPage, PageRaw, RegionKind, SourceKind
+from backend.core.normalize import format_date
 from backend.core.pipeline.s0_intake import UploadedBlob, intake
 from backend.core.pipeline.s1_measure import measure
 from backend.core.pipeline.s2_correct import correct
 from backend.core.pipeline.s3_read_page import read_page
 from backend.core.pipeline.s4_regions import detect_regions
+from backend.core.pipeline.s6_candidates import candidates_central, candidates_receipt_date
 from backend.settings import Settings
 
 _LABEL = re.compile(r"^[A-Za-z]+(\d+)$")
 _JOB_ID = "demo"
+# Sample files by label letter (reference/README.md).
+_SAMPLE_PDFS = {
+    "A": Path("reference/samples_part1.pdf"),
+    "B": Path("reference/samples_part2.pdf"),
+}
 
 
 def _parse_labels(labels: list[str]) -> dict[str, int] | None:
@@ -164,6 +174,90 @@ def _describe(
     return ", ".join(parts) if parts else "no regions"
 
 
+def run_candidates(labels: list[str], pdf: Path | None, fields: set[FieldKey]) -> int:
+    """Run S0-S4 and the T13 branches of S6 on the labelled pages; one line each.
+
+    Without `pdf`, a label's letter picks the sample file: A -> part 1, B -> part 2.
+    """
+    structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING))
+    by_pdf: dict[Path, list[str]] = {}
+    for label in labels:
+        source = pdf or _SAMPLE_PDFS.get(label[:1].upper())
+        if source is None or not source.exists():
+            print(f"ERROR: no PDF for {label} (pass --pdf)", file=sys.stderr)
+            return 1
+        by_pdf.setdefault(source, []).append(label)
+    with tempfile.TemporaryDirectory() as workdir:
+        settings = Settings(_env_file=None, data_dir=workdir)  # type: ignore[call-arg]
+        storage = TmpdirStorage(settings=settings)
+        imaging = CvImaging(settings=settings)
+        ocr = TesseractAdapter(settings=settings, storage=storage)
+        barcode = ZxingAdapter(settings=settings, storage=storage)
+        detector = RuleBasedDetector(settings=settings, storage=storage)
+        clock = SystemClock()
+        for source, group in by_pdf.items():
+            pages = _rendered_pages(group, source, settings, storage)
+            if not pages:
+                return 2
+            for label, raw in pages.items():
+                if raw is None:
+                    print(f"{label}: not rendered (page missing or failed)")
+                    continue
+                m = measure(
+                    raw,
+                    settings=settings,
+                    ocr=ocr,
+                    barcode=barcode,
+                    imaging=imaging,
+                    storage=storage,
+                )
+                page = correct(raw, m, settings=settings, imaging=imaging, storage=storage)
+                words, hits = read_page(
+                    page,
+                    settings=settings,
+                    ocr=ocr,
+                    barcode=barcode,
+                    imaging=imaging,
+                    storage=storage,
+                )
+                regions = detect_regions(
+                    page,
+                    words,
+                    hits,
+                    settings=settings,
+                    sender=None,
+                    learning=FakeLearningStore(),
+                    detector=detector,
+                )
+                size = page_size(page)
+                parts: list[str] = []
+                if FieldKey.central_number in fields:
+                    central = candidates_central(hits, words, regions, settings=settings, size=size)
+                    parts.append(
+                        "central=[" + ", ".join(_describe_candidate(c) for c in central) + "]"
+                    )
+                if FieldKey.receipt_date in fields:
+                    dates = candidates_receipt_date(
+                        words, regions, settings=settings, clock=clock, size=size
+                    )
+                    parts.append("date=[" + ", ".join(_describe_candidate(c) for c in dates) + "]")
+                print(f"{label}: {' '.join(parts)}")
+            storage.purge_job(_JOB_ID)
+    return 0
+
+
+def _describe_candidate(candidate: Candidate) -> str:
+    """'939376 barcode', '18/06/2026 stamp', plus any reason notes."""
+    value = candidate.value
+    if candidate.region is RegionKind.receipt_stamp or candidate.source is SourceKind.handwritten:
+        try:
+            value = format_date(date.fromisoformat(value))
+        except ValueError:
+            pass  # a central number, or a date the calendar rejected: shown as read
+    notes = f" ({', '.join(candidate.notes)})" if candidate.notes else ""
+    return f"{value} {candidate.source.value}{notes}"
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description="Run pipeline stages on sample pages.")
@@ -175,8 +269,23 @@ def main(argv: list[str] | None = None) -> int:
         cmd = stages.add_parser(name, help=helptext)
         cmd.add_argument("labels", nargs="+", help="page labels, e.g. A3 A1")
         cmd.add_argument("--pdf", required=True, type=Path, help="source PDF")
+    cand = stages.add_parser("candidates", help="S0-S6: central number and receipt date")
+    cand.add_argument("labels", nargs="+", help="page labels, e.g. A1 A9 B6")
+    cand.add_argument("--pdf", type=Path, default=None, help="source PDF (default: by letter)")
+    cand.add_argument(
+        "--fields",
+        default="central_number,receipt_date",
+        help="comma-separated: central_number, receipt_date",
+    )
     args = parser.parse_args(argv)
 
+    if args.stage == "candidates":
+        try:
+            fields = {FieldKey(f.strip()) for f in args.fields.split(",") if f.strip()}
+        except ValueError:
+            print(f"ERROR: unknown field in {args.fields!r}", file=sys.stderr)
+            return 1
+        return run_candidates(args.labels, args.pdf, fields)
     if not args.pdf.exists():
         print(f"ERROR: PDF not found: {args.pdf}", file=sys.stderr)
         return 1

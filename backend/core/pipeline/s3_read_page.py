@@ -12,6 +12,9 @@ symbology and any payload length. Empty output is valid (a blank page, a failed 
 * That caption is printed sideways, and a full-page pass reads it as Latin noise (measured on
   the sample forms). So the strip beyond each end of every barcode is read again, turned to
   make the text upright, and the Hebrew words found are added to the page's words.
+* The receipt stamp is faint, overprinted and set in a large display face: the page pass reads
+  at most its small lab-name lines, never its date (measured on A1, T13). So the area around
+  every group of stamp words is read again as sparse text, and the words found are added.
 
 No payload is filtered by length or shape anywhere in this module.
 """
@@ -29,11 +32,14 @@ from backend.core.geometry import (
     Size,
     center,
     clamp,
+    contains,
     diagonal,
     distance_to_box,
     from_crop,
+    grow,
     iou,
     page_size,
+    union,
     unrotate_box,
 )
 from backend.core.models import BarcodeHit, Box, NormalizedPage, OcrResult, OcrWord
@@ -42,6 +48,7 @@ from backend.core.ports.imaging import ImagingPort
 from backend.core.ports.ocr import OcrPort
 from backend.core.ports.storage import StoragePort
 from backend.core.reading_order import group_lines, has_hebrew
+from backend.core.text_match import best_similarity, similarity
 from backend.settings import Settings
 
 log = structlog.get_logger()
@@ -69,6 +76,18 @@ _STRIP_CROSS_OF_RADIUS: Final = 0.25
 # word read twice.
 _SAME_WORD_IOU: Final = 0.5
 
+# The printed words of the lab's receipt stamp ("התקבל" / "המעבדה המרכזית לנגיפים" /
+# "המרכז הרפואי המשולב"), one token each: the page pass reads them as separate words, if at all.
+STAMP_WORDS: Final = ("התקבל", "המעבדה", "המרכזית", "לנגיפים", "המשולב")
+# The sticker caption is a near match for "המרכזית"; a word closer to it is a caption, not a
+# stamp word.
+_CENTRAL_CAPTION: Final = "מרכזי"
+# Sparse-text mode for the stamp re-read: the stamp mixes a display word, gapped digits and
+# small lines, and a block mode drops the gapped digits (measured on A1).
+STAMP_PSM: Final = 11
+# Stamp words closer than this many proximity radii belong to one stamp.
+_STAMP_CLUSTER_RADII: Final = 2.0
+
 
 def read_page(
     page: NormalizedPage,
@@ -91,14 +110,16 @@ def read_page(
     size = page_size(page)
     radius_px = settings.proximity_radius * diagonal(size)
     words = list(raw.words)
-    if hits:
-        binarized = storage.get(page.gray_bin)
-        for hit in hits:
-            for extra in _caption_words(
-                page, hit, binarized, radius_px, size, settings, ocr, imaging, storage
-            ):
-                if not _already_read(extra, words):
-                    words.append(extra)
+    binarized = storage.get(page.gray_bin)
+    for hit in hits:
+        for extra in _caption_words(
+            page, hit, binarized, radius_px, size, settings, ocr, imaging, storage
+        ):
+            if not _already_read(extra, words):
+                words.append(extra)
+    for extra in _stamp_words(page, words, binarized, size, settings, ocr, imaging, storage):
+        if not _already_read(extra, words):
+            words.append(extra)
 
     lines = group_lines(
         [w for w in words if w.confidence >= settings.ocr_min_word_confidence],
@@ -197,6 +218,69 @@ def _caption_words(
             if has_hebrew(word.text):
                 box = from_crop(unrotate_box(word.box, turn), area)
                 found.append(word.model_copy(update={"box": box}))
+    return found
+
+
+def stamp_areas(words: Sequence[OcrWord], size: Size, settings: Settings) -> list[Box]:
+    """Areas to re-read for a receipt stamp: each group of stamp words grown by the stamp
+    reach on every side, best-supported group first, at most ``stamp_reread_max`` of them.
+
+    A group is found from its printed words alone, never from a date or a number. An area that
+    lies inside one already chosen is not read twice.
+    """
+    anchors = [
+        w
+        for w in words
+        if (score := best_similarity(w.text, STAMP_WORDS)) >= settings.receipt_stamp_fuzz
+        and score > similarity(w.text, _CENTRAL_CAPTION)
+    ]
+    gap_px = _STAMP_CLUSTER_RADII * settings.proximity_radius * diagonal(size)
+    groups: list[list[OcrWord]] = []
+    for word in anchors:
+        joined = [
+            g
+            for g in groups
+            if any(distance_to_box(center(word.box), o.box, size) <= gap_px for o in g)
+        ]
+        merged = [word] + [w for g in joined for w in g]
+        groups = [g for g in groups if g not in joined] + [merged]
+    groups.sort(key=len, reverse=True)
+    reach_px = settings.stamp_reread_reach * diagonal(size)
+    dy, dx = reach_px / size[1], reach_px / size[0]
+    areas: list[Box] = []
+    for group in groups:
+        area = grow(union(w.box for w in group), top=dy, left=dx, bottom=dy, right=dx)
+        if any(contains(a, area) for a in areas):
+            continue
+        areas.append(area)
+        if len(areas) >= settings.stamp_reread_max:
+            break
+    return areas
+
+
+def _stamp_words(
+    page: NormalizedPage,
+    words: Sequence[OcrWord],
+    binarized: bytes,
+    size: Size,
+    settings: Settings,
+    ocr: OcrPort,
+    imaging: ImagingPort,
+    storage: StoragePort,
+) -> list[OcrWord]:
+    """Words read again in the stamp areas, placed back on the page frame. Every word is kept
+    (the stamp's date is digits); confidence is left for the text-stream floor. Never raises."""
+    if not binarized:
+        return []
+    found: list[OcrWord] = []
+    for area in stamp_areas(words, size, settings):
+        try:
+            crop = imaging.crop(binarized, area)
+        except RenderFailed:
+            continue
+        ref = storage.put_page_image(page.raw.image.job_id, page.raw.page_id, crop.data, "crop")
+        for word in ocr.read_crop(ref, psm=STAMP_PSM, langs=settings.ocr_langs).words:
+            found.append(word.model_copy(update={"box": from_crop(word.box, area)}))
     return found
 
 

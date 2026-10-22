@@ -138,25 +138,24 @@ either way, then set `config/models.yaml` accordingly.
 
 ## Appendix — Exporting TrOCR-small to ONNX (Task 13)
 
-Same notebook pattern, no training — export only.
+No training — export only, with the repository's own script so the file names, the graph inputs
+and the vocabulary file match what `adapters/ocr/trocr_digits.py` loads. Any machine whose
+network reaches the Hugging Face file CDN works (the development network blocks it: `418 Blocked
+by NetFree`). On Colab/Kaggle, upload or clone the repository, then:
 
 ```python
-!pip -q install transformers optimum[onnxruntime]
-
-from optimum.onnxruntime import ORTModelForVision2Seq
-m = ORTModelForVision2Seq.from_pretrained("microsoft/trocr-small-handwritten", export=True)
-m.save_pretrained("trocr_small_onnx")
+!pip -q install torch transformers sentencepiece protobuf onnx==1.17.0 onnxruntime==1.20.1
+!python -m tools.export_trocr --out models --revision b4648cfa171985a6745f37ddd637e98c0da958ac
 ```
 
-```python
-from onnxruntime.quantization import quantize_dynamic, QuantType
-# quantize the decoder, which dominates the size
-quantize_dynamic("trocr_small_onnx/decoder_model.onnx",
-                 "trocr_small_decoder_int8.onnx", weight_type=QuantType.QUInt8)
-```
+It exports the encoder and the decoder (opset 17, decoder without a key/value cache — a digit
+field is a dozen tokens), int8-quantizes both, writes `trocr_small_vocab.json`, and prints each
+file's size and SHA-256. **It fails when the set reaches 80 MB**, the budget that fits the 512 MB
+host alongside OpenCV and Tesseract (the adapter refuses a larger set at load, too).
 
-**Target: the whole model under 80 MB** so it fits the 512 MB host budget alongside OpenCV and
-Tesseract. Record the checksum in `models/README.md`.
+Download the three files into `models/` and record the date, sizes and checksums in
+`models/README.md`. `pytest backend/tests/unit/test_trocr.py::test_model_size_under_budget`
+then runs instead of skipping.
 
 **ASSUMPTION to test, not to trust.** TrOCR-small-handwritten is trained on Latin handwriting.
 Digit glyphs are largely shared with Hebrew handwriting, so it should transfer for **numbers** and

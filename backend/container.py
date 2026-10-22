@@ -123,7 +123,7 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     from backend.adapters.imaging.pdf import DocumentReader  # T9
     from backend.adapters.learning.sqlite_store import SqliteLearningStore  # T24
     from backend.adapters.ocr.tesseract import TesseractAdapter  # T11
-    from backend.adapters.ocr.trocr_digits import TrOcrDigitsAdapter  # T13
+    from backend.adapters.ocr.trocr_digits import TrOcrDigits  # T13
     from backend.adapters.regions.rule_based import RuleBasedDetector  # T11
     from backend.adapters.senders.loader import SenderIndex  # T6
     from backend.adapters.senders.logo_match import OrbLogoMatcher  # T10
@@ -139,7 +139,7 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     return Container(
         settings=settings,
         ocr_printed=TesseractAdapter(settings=settings, storage=storage),
-        ocr_digits=TrOcrDigitsAdapter(settings=settings),
+        ocr_digits=TrOcrDigits(settings=settings, storage=storage),
         barcode=ZxingAdapter(settings=settings, storage=storage),
         regions=RuleBasedDetector(settings=settings, storage=storage),
         vision=vision,

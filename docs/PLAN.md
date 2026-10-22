@@ -2008,24 +2008,14 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 6 ✅ | Senders closed list | Shira | P1 | D2 | 2h | 2 |
 | 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
 | 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
-| 9 | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
-| 10 ✅ | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
-| 11 | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
-| 12 ✅ | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
-| 8 | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
+| 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
 | 9 ✅ | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
-| 10 | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
+| 10 ✅ | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
 | 11 ✅ | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
-| 12 | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
-| 13 | S6–S7 central number, receipt date, TrOCR | Ahuba | P3 | D4 | 4h | 8,11 |
+| 12 ✅ | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
+| 13 ✅ | S6–S7 central number, receipt date, TrOCR | Ahuba | P3 | D4 | 4h | 8,11 |
 | 14 ✅ | S8 scoring, ladder, calibration | Shira | P3 | D4 | 3h | 8 · **12,13 at runtime only** |
 | 15 ✅ | Orchestrator and evaluation runner — **M3** | Shira | P3 | D4–5 | 3h | 9–14 |
-| 16 | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
-| 17 | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
-| 18 | S9 provider layer with failover | Ahuba | P4 | D5–6 | 4h | 14,15,17 |
-| 19 | Export adapters: Excel, CSV, JSON | Shira | P4 | D5–6 | **4h** | 2 · **15 at runtime only** |
-| 20 | S10 grouping and rows — **M4** | Ahuba | P4 | D6–7 | 3h | 15,18 |
-| 21 | Screens: login, upload, processing, export | Shira | P5 | D6–7 | 3h | 4 · **22 at runtime only** |
 | 22 | Full API: SSE, edits, audit, TTL | Ahuba | P5 | D7–8 | **6h** | 3,20 |
 | 23 | Review workspace with Evidence Lens | Shira | P5 | D7 | 5h | 4 · **22 at runtime only** |
 | 24 | Learning layer | Ahuba | P6 | D8 | 2h | 20,22 |
@@ -3072,6 +3062,65 @@ python -m tools.demo candidates A1 A9 A2 B6 --fields central_number,receipt_date
 **VERIFY against the source.** B6 appears to carry **both** a stamp (bottom-right) and a
 handwritten date; B7 is the page with no stamp. Earlier drafts had this reversed. Confirm in T5/T7
 before relying on either page as a test fixture.
+
+> **✅ Done 2026-10-21 (Ahuba) — code complete; Done-when criteria partly met. The misses are real
+> and listed below.**
+> Added: `core/pipeline/s6_candidates.py` (central + date branches only — Shira's T12 branches are
+> not touched), `core/text_match.py` (stdlib fuzzy matching for the core), `adapters/ocr/trocr_digits.py`
+> (`TrOcrDigits`: lazy, cached, beam search with up to 5 candidates, whitelist-constrained decoding,
+> missing/over-budget model → empty result), `tools/export_trocr.py`, `tools/demo.py candidates`,
+> `tests/unit/{test_candidates_central,test_candidates_date,test_trocr}.py` (the 16 named tests plus
+> 15). Changed: `s3_read_page.py` (stamp re-read, below) + 3 tests in `test_read_page.py`,
+> `settings.py`/`.env.example` (+9 settings), `container.py`, `config/models.yaml`, `models/README.md`,
+> the train-yolo skill's TrOCR appendix.
+> Verified: 387 tests pass, 1 skipped (POSIX permissions) — the installed-model size test runs ·
+> core coverage 97% · `ruff` check + format, `mypy backend`, `mypy --strict backend/core`,
+> `check_layering.py`, `check_env_example.py` clean · no digit-count filter, no central↔date check.
+> **Measured on all 48 sample pages, 2026-10-21** (Tesseract 5.4 `heb+eng`; *not* a held-out split;
+> truth read *by eye* from contact sheets — `eval/gold.csv` does not exist yet, T7):
+> | Criterion | Result |
+> |---|---|
+> | **A1 date = stamp 18/06/2026, header 15.06.2026 ignored (hard gate)** | ✅ `18/06/2026 stamp`, the only candidate |
+> | All multi-central pages return every value | ✅ A9: 937309, 937310, 937311 · A24, B12: both · ❌ A14: 944963 only (S4 formed no region for 944964) |
+> | Pages with ≥ 1 correct central candidate | **33 of 48**. Missed: 4 sticker pages where S4 formed no sticker region (A13, A16, A21, B13 — T11's known misses) and **all 11 handwritten pages** |
+> | **Handwritten SAP central numbers (hard gate)** | ❌ **0 of 11** (A2, A3, A4, A7, A10, A11, A19, A25, B20, B21, B22). The page OCR reads neither the handwritten "מספר מרכזי" nor the number, so S6 has no token to propose; source 3 works when the caption is readable (unit-tested) |
+> | Receipt date | ❌ correct on **1 page (A1)**. Stamp regions now found on A1 and A5 (was A5 only); A5's stamp reads `01/06/2026` (the "2" of the gapped `2 1` is lost by OCR; truth 21/06). Single wrong candidates on A15, B14, B18 (a printed letter/admission date near the sticker; truth is the faint stamp) — tagged `handwritten`, so S8 must not close them alone. Most stamps are faint, tilted or highlighted and are not read even by a sparse whole-page pass (probed A6, A8, B6) |
+> | TrOCR local-close count | ❌ **0.** Exported (64.0 MB int8, checksums in `models/README.md`) and run on 7 hand-cropped handwritten values (A2, B6, A12, A19, B19): the true value is in the top-5 for **none**, raw or binarized (A2 `939158` → `954158`/`932158`/`934158`; slashes in dates read as `1`). On rendered digits it works (9 of 9 numbers in the top-5), so the export is sound — the Latin-handwriting assumption does not hold for these hands. Evidence for the T17 bake-off and the cut list |
+> | Noise | Single-digit tokens beside the bars (A9 `7`, `1`; B10, B16 …) become low-evidence `printed` candidates; left to S8's margin and agreement signals rather than filtered by length |
+> | S3 latency with the stamp re-read | median 5.5 s vs 5.1 s without (8 pages, laptop) |
+> **Decisions and deviations — read before building on this:**
+> 1. *Stamp re-read in S3 (T11 code, mine).* The page pass never reads the stamp's date. S3 now finds
+>    the stamp's printed words (`התקבל`, `המעבדה`, `המרכזית`, `לנגיפים`, `המשולב`, fuzzy ≥ 80, a word
+>    closer to the "מרכזי" caption excluded), grows each group by `stamp_reread_reach` (0.10 × diagonal)
+>    and re-reads it `psm 11` from `gray_bin`, at most `stamp_reread_max` (2) per page. This is what
+>    makes A1 pass. It finds anchors on 34 pages, but most are address lines, not stamps.
+> 2. *Signatures take `settings` and `size`* (keyword-only) besides the plan's arguments: thresholds
+>    come from Settings and distances are in pixels.
+> 3. *Decoy vocabulary extended, by label only:* dates — the plan's five plus `הופק`/`הודפס` (B2, A20
+>    print dates) and `לידה`; central — `התחייבות`, `ת.ז`, `זהות`, `דרישה`, `מקרה`, `הפניה`, `טלפון`,
+>    `פקס`, `ביקור`. Any decoy in a label position (same line to the right within 0.18 page widths, or
+>    above within the proximity radius) rejects the value.
+> 4. *A date-shaped token in a sticker region is not a central candidate* — it is the handwritten
+>    receipt date (date source 2). Tokens read off the bars themselves are ignored.
+> 5. *Invalid dates are emitted, not dropped:* the value plus `date_impossible`/`date_future` in
+>    `notes` (closed-set codes), so S8 flags instead of reporting "not found". Stamp ≠ handwritten →
+>    both carry `stamp_and_handwritten_differ`.
+> 6. *TrOCR scores.* `OcrResult.candidates` is `list[str]` (frozen contract, T2), so only the best
+>    reading carries a confidence (its `OcrWord`); the others are ordered best first. Per-candidate
+>    scores need a contract change — Shira's call.
+> 7. *TrOCR export.* NetFree blocks the Hub's file CDN (`418`, ModelScope's too); the export ran from
+>    an unfiltered network with `tools/export_trocr.py` pinned to revision `b4648cf…`. Two further
+>    local attempts failed and are recorded so they are not repeated: a frame-based stamp locator
+>    (contours + `minAreaRect`) picked the patient-box frame on A1 and A8 and no stamp elsewhere; the
+>    caption re-read cannot recover A13, A14's second, A16, B13 (caption unread or tilted ~30°) or A21
+>    (caption cut off by the scan).
+> 8. Settings avoid `CODE`/`TOKEN` in names (`TROCR_VISION_FILE`, `TROCR_TEXT_FILE`,
+>    `TROCR_MAX_LENGTH`), which `check_env_example.py` treats as secrets.
+> **Follow-ups:** (a) **T17:** TrOCR-small is the reader to beat or drop — on this measurement it
+> loses to escalation; (b) **T16:** stamp and handwritten-block localization are exactly what the YOLO experiment should
+> be judged on — without a box, neither TrOCR (S7) nor the provider (S9) has a crop to read on the
+> 11 SAP pages; (c) **T12/T15 (Shira):** the thin `s6_candidates` dispatcher and S7's TrOCR call
+> through `OcrPort` are hers; (d) re-check every number here on the dev/held-out split once T7 exists.
 
 ---
 
