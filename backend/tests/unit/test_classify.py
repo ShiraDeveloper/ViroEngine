@@ -131,8 +131,8 @@ class ScriptedLogo:
         return self.hit
 
 
-def crop_stub(image: ImageRef, box: Box) -> ImageRef:
-    return image.model_copy(update={"kind": "crop"})
+def crop_stub(image: ImageRef, box: Box) -> bytes:
+    return b"png-letterhead"
 
 
 def run(

@@ -2006,35 +2006,31 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 4 ✅ | Frontend skeleton and design system | Shira | P0 | D1 | 3h | 2 |
 | 5 ✅ | Page inventory and the barcode question | Ahuba | P1 | D2 | 3h | 3 |
 | 6 ✅ | Senders closed list | Shira | P1 | D2 | 2h | 2 |
-| 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
+| 7 ◐ | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
 | 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
-| 9 | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
-| 10 ✅ | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
-| 11 | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
-| 12 ✅ | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
-| 8 | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
+| 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
 | 9 ✅ | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
-| 10 | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
+| 10 ✅ | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
 | 11 ✅ | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
-| 12 | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
-| 13 | S6–S7 central number, receipt date, TrOCR | Ahuba | P3 | D4 | 4h | 8,11 |
+| 12 ✅ | S6–S7 ID, names, commitment, sender | Shira | P3 | D3–4 | 4h | 8,10 · **11 at runtime only** |
+| 13 ✅ | S6–S7 central number, receipt date, TrOCR | Ahuba | P3 | D4 | 4h | 8,11 |
 | 14 ✅ | S8 scoring, ladder, calibration | Shira | P3 | D4 | 3h | 8 · **12,13 at runtime only** |
 | 15 ✅ | Orchestrator and evaluation runner — **M3** | Shira | P3 | D4–5 | 3h | 9–14 |
-| 16 | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
-| 17 | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
-| 18 | S9 provider layer with failover | Ahuba | P4 | D5–6 | 4h | 14,15,17 |
+| 16 ◐ | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
+| 17 ◐ | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
+| 18 ◐ | S9 provider layer with failover | Ahuba | P4 | D5–6 | 4h | 14,15,17 |
 | 19 ✅ | Export adapters: Excel, CSV, JSON | Shira | P4 | D5–6 | **4h** | 2 · **15 at runtime only** |
-| 20 | S10 grouping and rows — **M4** | Ahuba | P4 | D6–7 | 3h | 15,18 |
+| 20 ◐ | S10 grouping and rows — **M4** | Ahuba | P4 | D6–7 | 3h | 15,18 |
 | 21 ✅ | Screens: login, upload, processing, export | Shira | P5 | D6–7 | 3h | 4 · **22 at runtime only** |
-| 22 | Full API: SSE, edits, audit, TTL | Ahuba | P5 | D7–8 | **6h** | 3,20 |
+| 22 ◐ | Full API: SSE, edits, audit, TTL | Ahuba | P5 | D7–8 | **6h** | 3,20 |
 | 23 | Review workspace with Evidence Lens | Shira | P5 | D7 | 5h | 4 · **22 at runtime only** |
-| 24 | Learning layer | Ahuba | P6 | D8 | 2h | 20,22 |
+| 24 ◐ | Learning layer | Ahuba | P6 | D8 | 2h | 20,22 |
 | 25 | Augmentation and Stress Mode | Shira | P6 | D8 | 1h | 15,22 |
 | 26 | Metrics dashboard and ablation UI | Shira | P6 | D8 | 2h | 15,25 · **24 at runtime only** |
-| 27 | Security hardening and test suite | Ahuba | P7 | D8 | 2h ⚠ | 18,22,24 |
-| 28 | Deployment — **M5** | Ahuba | P7 | **D9** | 1h ⚠ | 22,23,27 |
+| 27 ◐ | Security hardening and test suite | Ahuba | P7 | D8 | 2h ⚠ | 18,22,24 |
+| 28 ◐ | Deployment — **M5** | Ahuba | P7 | **D9** | 1h ⚠ | 22,23,27 |
 | 29 | Docs and the 60-second video | Shira | P8 | D8–9 | **3h** | 26,28 |
-| 30 | Final evaluation, freeze, submit — **M6** | Both | P8 | D9 | 2h+2h | all |
+| 30 ◐ | Final evaluation, freeze, submit — **M6** | Both | P8 | D9 | 2h+2h | all |
 
 **Totals.** Ahuba 13 own tasks + 3 shared halves = **39 h**; Shira 14 own tasks + 3 shared halves
 = **39 h**. Plus 4 h reviews and 2 h buffer each → **45 h committed of the 51 h budget**, leaving
@@ -2533,6 +2529,19 @@ python -m eval.make_gold --pick-held-out --gold eval/gold.csv --out eval/held_ou
 ```
 Reference: `samples_part1.pdf` p.9 (six highlights) vs p.20 (almost none) — the contrast that
 makes runtime use of the highlighting impossible.
+
+> **◐ Tooling done — 2026-10-22 (D5). Labelling NOT done, so Task 7 is not complete.**
+> Ahuba's tooling half: `eval/make_gold.py` (`--propose`, `--finalize`, `--pick-held-out`,
+> `--cross-check`), `config/gold_families.json` (labels per family, no values),
+> `tests/unit/test_make_gold.py`, `eval/make_gold.py` forbidden from `backend/core` by
+> `scripts/check_layering.py` (`eval` added; `test_core_does_not_import_eval`).
+> Verified: `--propose` over both PDFs wrote a 336-row, 48-page draft; tests, ruff, mypy,
+> layering green. Not verified: `--propose --locate` (field assignment of highlights) because
+> `build_container` imports `backend.adapters.learning.sqlite_store`, which is T24; without
+> `--locate` every highlight is unassigned.
+> **Still to do by hand:** confirm all 336 rows (Ahuba A1–A26, Shira B1–B22), the two
+> cross-checks, then `--finalize` and `--pick-held-out`; fill `faint_stamp` and `fax_grade` in
+> `config/gold_families.json`. `eval/held_out.txt` therefore does not exist yet.
 
 ---
 
@@ -3073,6 +3082,85 @@ python -m tools.demo candidates A1 A9 A2 B6 --fields central_number,receipt_date
 handwritten date; B7 is the page with no stamp. Earlier drafts had this reversed. Confirm in T5/T7
 before relying on either page as a test fixture.
 
+> **✅ Done 2026-10-21 (Ahuba) — code complete; Done-when criteria partly met. The misses are real
+> and listed below.**
+> Added: `core/pipeline/s6_candidates_lab.py` (central + date, per the §13 split; Shira's
+> dispatcher `s6_candidates.py` routes to it through an optional `lab: LabInputs`),
+> `core/text_match.py` (stdlib fuzzy matching for the core), `adapters/ocr/trocr_digits.py`
+> (`TrOcrDigits`: lazy, cached, beam search with up to 5 candidates, whitelist-constrained decoding,
+> missing/over-budget model → empty result), `tools/export_trocr.py`, `tools/demo.py candidates`,
+> `tests/unit/{test_candidates_central,test_candidates_date,test_trocr}.py` (the 16 named tests plus
+> 15). Changed: `s3_read_page.py` (stamp re-read, below) + 3 tests in `test_read_page.py`,
+> `settings.py`/`.env.example` (+9 settings), `container.py`, `config/models.yaml`, `models/README.md`,
+> the train-yolo skill's TrOCR appendix.
+> **Integrated 2026-10-22 with Shira's T10/T12/T14/T15** and measured end to end (S0→S8 through
+> her orchestrator, `LOCAL_ONLY`, all 48 pages, truth by eye — not a held-out split):
+> | Field, end to end | Result |
+> |---|---|
+> | Central number closed (A/B/C) and right | **24 of 43** pages that have one (was 11 before the readable-line read below) · **0 closed wrong** |
+> | Central number in the candidates | 33 of 43; the other pages are flagged D, none guessed |
+> | Receipt date closed and right | **0 of 18** · **0 closed wrong** (was 1 wrong at radius 0.10). A1's correct stamp date is D: Shira's S7 re-reads it with no whitelist and its Hebrew noise becomes a rival (`readers_disagree`) |
+> | Multi-central pages (A9, A24, B12) | every value is a candidate; S8 picks one per field, so they are D `multiple_candidates` — the multi-value row is S10's (T20) |
+> Two further T13 changes came from this run: (9) *the number printed under each barcode is read
+> on its own upright band of the colour page* (`psm 6`, digits + A–Z, `READABLE_LINE_*`), so the
+> barcode gets an independent printed reading — this is what lifts 11 → 24 to level A; and on a
+> printed sticker only that band yields `printed` candidates (no more `1`/`7` from the caption);
+> (10) *`receipt_date_radius` 0.10 → 0.04*, measured: printed decoys stood at 0.06–0.09 from the
+> sticker (A15, B18), the handwritten notes within 0.01.
+> Integration edits in Shira's files, for her review: `s6_candidates.py` (routes the lab fields,
+> as its docstring anticipated) and one call in `orchestrator.py` (passes `LabInputs`).
+> Verified: 551 tests pass, 1 skipped (POSIX permissions) — the installed-model size test runs ·
+> core coverage 97% · `ruff` check + format, `mypy backend`, `mypy --strict backend/core`,
+> `check_layering.py`, `check_env_example.py` clean · no digit-count filter, no central↔date check.
+> **Measured on all 48 sample pages, 2026-10-21** (Tesseract 5.4 `heb+eng`; *not* a held-out split;
+> truth read *by eye* from contact sheets — `eval/gold.csv` does not exist yet, T7):
+> | Criterion | Result |
+> |---|---|
+> | **A1 date = stamp 18/06/2026, header 15.06.2026 ignored (hard gate)** | ✅ `18/06/2026 stamp`, the only candidate |
+> | All multi-central pages return every value | ✅ A9: 937309, 937310, 937311 · A24, B12: both · ❌ A14: 944963 only (S4 formed no region for 944964) |
+> | Pages with ≥ 1 correct central candidate | **33 of 48**. Missed: 4 sticker pages where S4 formed no sticker region (A13, A16, A21, B13 — T11's known misses) and **all 11 handwritten pages** |
+> | **Handwritten SAP central numbers (hard gate)** | ❌ **0 of 11** (A2, A3, A4, A7, A10, A11, A19, A25, B20, B21, B22). The page OCR reads neither the handwritten "מספר מרכזי" nor the number, so S6 has no token to propose; source 3 works when the caption is readable (unit-tested) |
+> | Receipt date | ❌ correct on **1 page (A1)**. Stamp regions now found on A1 and A5 (was A5 only); A5's stamp reads `01/06/2026` (the "2" of the gapped `2 1` is lost by OCR; truth 21/06). Single wrong candidates on A15, B14, B18 (a printed letter/admission date near the sticker; truth is the faint stamp) — tagged `handwritten`, so S8 must not close them alone. Most stamps are faint, tilted or highlighted and are not read even by a sparse whole-page pass (probed A6, A8, B6) |
+> | TrOCR local-close count | ❌ **0.** Exported (64.0 MB int8, checksums in `models/README.md`) and run on 7 hand-cropped handwritten values (A2, B6, A12, A19, B19): the true value is in the top-5 for **none**, raw or binarized (A2 `939158` → `954158`/`932158`/`934158`; slashes in dates read as `1`). On rendered digits it works (9 of 9 numbers in the top-5), so the export is sound — the Latin-handwriting assumption does not hold for these hands. Evidence for the T17 bake-off and the cut list |
+> | Noise | Single-digit tokens beside the bars (A9 `7`, `1`; B10, B16 …) become low-evidence `printed` candidates; left to S8's margin and agreement signals rather than filtered by length |
+> | S3 latency with the stamp re-read | median 5.5 s vs 5.1 s without (8 pages, laptop) |
+> **Decisions and deviations — read before building on this:**
+> 1. *Stamp re-read in S3 (T11 code, mine).* The page pass never reads the stamp's date. S3 now finds
+>    the stamp's printed words (`התקבל`, `המעבדה`, `המרכזית`, `לנגיפים`, `המשולב`, fuzzy ≥ 80, a word
+>    closer to the "מרכזי" caption excluded), grows each group by `stamp_reread_reach` (0.10 × diagonal)
+>    and re-reads it `psm 11` from `gray_bin`, at most `stamp_reread_max` (2) per page. This is what
+>    makes A1 pass. It finds anchors on 34 pages, but most are address lines, not stamps.
+> 2. *Signatures take `settings` and `size`* (keyword-only) besides the plan's arguments: thresholds
+>    come from Settings and distances are in pixels.
+> 3. *Decoy vocabulary extended, by label only:* dates — the plan's five plus `הופק`/`הודפס` (B2, A20
+>    print dates) and `לידה`; central — `התחייבות`, `ת.ז`, `זהות`, `דרישה`, `מקרה`, `הפניה`, `טלפון`,
+>    `פקס`, `ביקור`. Any decoy in a label position (same line to the right within 0.18 page widths, or
+>    above within the proximity radius) rejects the value.
+> 4. *A date-shaped token in a sticker region is not a central candidate* — it is the handwritten
+>    receipt date (date source 2). Tokens read off the bars themselves are ignored.
+> 5. *Invalid dates are emitted, not dropped:* the value plus `date_impossible`/`date_future` in
+>    `notes` (closed-set codes), so S8 flags instead of reporting "not found". Stamp ≠ handwritten →
+>    both carry `stamp_and_handwritten_differ`.
+> 6. *TrOCR scores.* `OcrResult.candidates` is `list[str]` (frozen contract, T2), so only the best
+>    reading carries a confidence (its `OcrWord`); the others are ordered best first. Per-candidate
+>    scores need a contract change — Shira's call.
+> 7. *TrOCR export.* NetFree blocks the Hub's file CDN (`418`, ModelScope's too); the export ran from
+>    an unfiltered network with `tools/export_trocr.py` pinned to revision `b4648cf…`. Two further
+>    local attempts failed and are recorded so they are not repeated: a frame-based stamp locator
+>    (contours + `minAreaRect`) picked the patient-box frame on A1 and A8 and no stamp elsewhere; the
+>    caption re-read cannot recover A13, A14's second, A16, B13 (caption unread or tilted ~30°) or A21
+>    (caption cut off by the scan).
+> 8. Settings avoid `CODE`/`TOKEN` in names (`TROCR_VISION_FILE`, `TROCR_TEXT_FILE`,
+>    `TROCR_MAX_LENGTH`), which `check_env_example.py` treats as secrets.
+> **Follow-ups:** (a) **T17:** TrOCR-small is the reader to beat or drop — on this measurement it
+> loses to escalation; (b) **T16:** stamp and handwritten-block localization are exactly what the YOLO experiment should
+> be judged on — without a box, neither TrOCR (S7) nor the provider (S9) has a crop to read on the
+> 11 SAP pages; (c) **Shira (S7, T12):** give `receipt_date` and `central_number` a
+> digits-and-separators whitelist in `whitelist_for` — today the unwhitelisted re-read of A1's
+> stamp invents a Hebrew rival and demotes a correct date to D; (d) **T18:** every field left at
+> D here (handwritten SAP numbers, faint stamps) is what the provider must read — the crops exist;
+> (e) re-check every number here on the dev/held-out split once T7 exists.
+
 ---
 
 ### Task 14 — S8: combined scoring, ladder, calibration
@@ -3271,6 +3359,24 @@ python -m tools.demo regions A14 --detector yolo_onnx --compare rule_based
 # -> verdict written to docs/decisions/ADR-016-region-detector.md
 ```
 
+> **◐ Prepared — 2026-10-22 (D5). The experiment has NOT been run: no model, no held-out numbers, no
+> decision.** Owner: Ahuba.
+> Built and unit-tested (fake ONNX session, synthetic images): `eval/build_yolo_dataset.py` (page-level
+> split, held-out excluded, refuses to run without `held_out.txt`); `eval/make_gold.py --propose` now also
+> writes `gold_boxes.csv` (**draft** boxes from the highlighter, patient block merged: a human must review
+> them); `backend/adapters/regions/yolo_onnx.py` (`YoloRegionDetector`: onnxruntime only, lazy, 15 MB
+> budget, boxes normalised, never raises; `YoloPreferred`: per-class replacement, falls back to
+> rule-based when the model is missing); `REGION_DETECTOR` / `YOLO_*` settings and container selection;
+> `docs/decisions/ADR-016-region-detector.md` (status **open**), AGPL note in `docs/limitations.md`,
+> `models/README.md` marked not trained. `config/models.yaml` keeps `rule_based`.
+> Tests: `backend/tests/unit/test_yolo_adapter.py` has the 7 named tests plus 20 more; the named
+> `test_onnx_model_under_size_budget` skips until a model is installed.
+> **Not done, needs others:** the reviewed gold boxes and `held_out.txt` (T7 labelling, both developers),
+> the Colab/Kaggle training run, and the IoU/latency/memory comparison on held-out. The Step-5 commands in
+> the skill (`tools.demo regions`, `run_eval --detector`) are **not built**. Dataset caveat: boxes are in
+> the raw render's frame, and some SAP pages are sideways there.
+> **For Shira:** nothing to do for T16; `s4_regions` already takes whatever the container injects.
+
 ---
 
 ### Task 17 — Reader bake-off and decision record
@@ -3319,6 +3425,26 @@ column -s, -t eval/results/bakeoff.csv
 # -> contestant | printed acc | handwritten acc | silent err | p50 ms | MB
 # -> "winner (printed): tesseract | winner (handwritten digits): <measured>"
 ```
+
+> **◐ Harness built — 2026-10-22 (D5). The bake-off has NOT been run: no numbers, no winners, ADR-013 is
+> `open`.** Shared task; this part (the harness, step 1) by Ahuba, for review by Shira.
+> Built and unit-tested (fake evaluator, no OCR or keys): `eval/bakeoff.py` — one baseline container, each
+> contestant changes only its own stage; `--isolate` runs each in its own process (own memory peak);
+> `--owner ahuba|shira` splits the contestants as in Steps 2–3; skipped contestants are rows with a reason,
+> never zeros; the decision rule (lowest silent error, tie → local → faster; region challengers also held to
+> the T16 400 ms / 120 MB limits, thresholds in `models.yaml: bakeoff`); the T13 TrOCR-assumption verdict
+> (confirmed / refuted / undetermined). `run_eval.evaluate` gained `pages`, `known_hashes`, `cloud_consent`
+> (needed to run a subset and to let a vision contestant reach the provider for known samples only).
+> `backend/tests/unit/test_bakeoff.py` holds the four named tests (it lives under `backend/tests` because
+> `testpaths` only collects there, not in `eval/tests/`).
+> **Found:** every `multi_central` page in `config/gold_families.json` (A9, A14, A24, B12) is a hard page, so
+> the held-out quota cannot be met while the hard pages stay in dev. `pick_held_out` now excludes the hard
+> pages and stops with a message naming the family. A person must add a non-hard page to that family while
+> labelling (T7) or change the hard-page list.
+> **Cannot run now:** Surya, Mistral OCR and Azure DI have **no adapter**; YOLO has no model; Gemini needs a key;
+> and `eval/gold.csv` / `eval/held_out.txt` do not exist yet. **For Shira:** run
+> `python -m eval.bakeoff --owner shira --isolate` once gold exists; the OCR contestants without an adapter
+> (Surya, Mistral, Azure) are hers to build or to drop with a recorded reason.
 
 ---
 
@@ -3414,6 +3540,26 @@ GEMINI_API_KEYS=bad1,bad2 OPENROUTER_API_KEY= GROQ_API_KEY= python -m tools.demo
 # -> 'k1' 429 -> 'k2' 429 -> openrouter unavailable -> groq unavailable
 # -> ProviderExhausted handled: 2 fields flagged orange, run completed
 ```
+
+> **◐ Implemented — 2026-10-22 (D5). Not live-verified, so the "Done when" list is not fully met.**
+> Built: `core/pipeline/s9_escalate.py` (wired into `process_page` as stage S9, run report and SSE
+> counters updated), `core/vision_schema.py` (strict answer schema, no confidence field),
+> `adapters/vision/{base,gemini,chat_completions,openrouter,groq,chain,cache,rate_limit,circuit,
+> ring,transport,prompt,config,errors}.py`, `config/prompts/{v1,sender_v1}.txt` + changelog,
+> `providers`/`escalation` sections of `config/models.yaml`, `ImagingPort.fill_boxes`,
+> `ESCALATION_SEND_THUMBNAIL`, regenerated `frontend/src/api/types.ts`. The shared pytest fixtures
+> moved from `tests/unit/conftest.py` to `tests/conftest.py` so the security and resilience suites
+> can use them.
+> Verified: 81 new tests, 700 pass / 3 skipped / 0 fail in `backend/tests`; `mypy --strict
+> backend/core`, `mypy backend/adapters/vision`, `check_layering` (0), `check_env_example`,
+> `check_docs` clean. Hard gate `test_all_providers_down_flags_fields_and_run_completes` passes at
+> stage level and through `iter_outcomes`; the re-run of a batch makes zero provider calls
+> (`test_rerun_of_the_same_batch_makes_zero_provider_calls`).
+> **Not verified:** any call to a real provider, the 48-page run with a real key, and therefore the
+> escalation rate, call count and measured cost the PR must show; Gemini's `responseJsonSchema` and
+> `thinkingBudget` parameters; the OCR-based thumbnail test (skipped where Tesseract is absent).
+> Not built: the `tools.demo escalate` command. No OpenRouter/Groq model id is pinned (see
+> `docs/limitations.md`). Ahuba to run the 48 pages with a key and record the numbers here.
 
 ---
 
@@ -3543,6 +3689,36 @@ python -m tools.demo rows --pdf reference/samples_part2.pdf --pages B20,B19,A9,A
 # -> g4 [A17] rows 1   commitment=<empty, flagged: לא נמצא בטופס>
 # -> pages 4 = grouped 4 + orphans 0
 ```
+
+> **◐ Implemented — 2026-10-22 (D5). Not run on the 48 real pages, so M4 is NOT declared.**
+> Built: `core/pipeline/s10_rows.py` (`group_pages`, `rows_from_group`, `assemble_rows`,
+> `pages_accounted_for`; `RowContext`, `RowsConfig`, `SameFormResolver`), `s11_finalize.py`
+> (`build_report`, `final_status`, `purge_schedule`, `accounting_errors`; moved out of the
+> orchestrator), `page_sequence.py` (explicit "עמוד N מתוך M"). `run_job` now assembles with S10
+> by default; `interim_rows.py` is deleted. `PageOutcome` gained `sha256`, `page_number`,
+> `page_total`; `CommitmentRow` gained the optional `merge_suggestion` (additive contract change,
+> `types.ts` regenerated — **Shira: the review screen may show it**); `models.yaml` gained `rows:`;
+> `Settings` gained `purged_visible_minutes` / `purge_sweep_minutes` for T22.
+> Behaviour: a central number or stamp date ties pages only if it survives *alone* at level A–C
+> (a stray `7` beside a barcode never does); the status is decided from the rows the reviewer
+> sees, so a multi-central page that is level D at page level no longer flags a job.
+> Verified: 89 new tests (grouping 31, rows 22, page marker 14, finalize 21, one `run_job`
+> integration test), including all 13 named in the task; 781 pass / 0 fail in `backend/tests`;
+> `mypy --strict backend/core`, `check_layering`, `check_docs` clean.
+> **Not verified / not built:** the 48-page row structure against gold (needs `build_container`,
+> which imports the T24 learning store, and the gold set from T7); the cloud confirmation of an
+> ambiguous page (the `SameFormResolver` hook exists, nothing is wired: an ambiguous page stays an
+> orphan, never guessed); `tools.demo rows`. A page whose commitments the S6 candidates already
+> merged into one reading cannot be split by S10.
+> **Measured on the 48 real pages, 2026-10-22 (local engine, `LOCAL_ONLY`, Tesseract 5.4 with
+> `tessdata_fast` Hebrew, not a held-out split, no gold yet):** 8 groups · 40 orphan pages · 14 rows ·
+> 24 of 336 fields closed locally (7.1%). S10 is not the bottleneck: S5 classified **36 of the 48
+> pages `unknown`**, 8 `primary_form`, 3 `lab_report`, 1 `sap_screen`, because S4 finds no
+> `patient_box` or `commitment_label` region on them, and only primary forms open a group. M4 is
+> **not** declared and the "row structure matches gold" criterion is **not met**. Next step is
+> region detection and role classification on real pages (T11 regions: Ahuba; S5: Shira), not S10.
+> (This Windows machine's Tesseract shipped without `heb`; without it every page reads as empty.
+> Install `tessdata` Hebrew and set `TESSDATA_PREFIX` before measuring.)
 
 ---
 
@@ -3693,6 +3869,29 @@ curl -s -H "X-API-Key: $API_KEY" localhost:8000/v1/jobs/$JOB/audit
 # -> one edit entry with old_value, new_value, actor, timestamp
 ```
 
+> **◐ Implemented — 2026-10-22 (D5). Verified over fake adapters only; two Done-when items open.**
+> Built: `backend/jobs.py` (job registry: idempotency, event replay, audit log, per-row undo, TTL
+> purge with tombstone, sweeper), `backend/runner.py` (queue → `run_job`, progress kept current),
+> `api/{documents,jobs,review,export,stress,errors}.py`, `api/deps.py` (constant-time API key and
+> access code), `core/review.py` (edit validation with the two hard rules, row level recomputed), `app.py` wiring + sweeper, `/v1/metrics` and `/v1/metrics/eval`, regenerated `docs/openapi.json`
+> (CI staleness check already present) and `types.ts`. Core touched: `run_job` takes `known_hashes`
+> and `on_done`; `PageOutcome.color_image`; `RunReport.cloud_consent` (additive, §8.5).
+> Verified: 75 new tests (contract 38, audit 27, TTL 10) covering every test the task names;
+> 856 pass / 0 fail in `backend/tests`; `mypy` on core/api/jobs/runner/app/container,
+> `check_layering`, `check_env_example`, `check_docs` clean; a real uvicorn server proves the `: ping`
+> comments; the TTL is also applied on access, so a lost timer cannot serve a stale job.
+> **Not verified:** a `curl`-only run on a real PDF (the pipeline ran with fake OCR/barcodes), and
+> the frontend against this API with `VITE_USE_MOCK=0` — **Shira to try it**. Not built:
+> `job.json` flushed after every page (§3.5; a restart loses jobs together with their artefacts, by
+> design), upload streamed straight to disk (bytes are held in memory, bounded by `MAX_UPLOAD_MB`),
+> per-route rate limits (T27). `/v1/learning/seed` and `/v1/metrics/learning` and the hand-off to
+> the learning layer on `/confirm` are T24. `POST /jobs/{id}/stress` is complete but answers 501
+> until Shira's T25 registers `eval/augment.py` as `app.state.stress_augmenter` (one line in
+> `container`/`app`). `config/sample_hashes.json` does not exist yet (T27), so until then no upload
+> is a known sample: it is processed locally unless the job carries `cloud_consent`.
+> Auth: with `API_KEY` empty every route is open and the app logs `auth_disabled` at start-up;
+> deployments must set it (T27/T28).
+
 ---
 
 ### Task 23 — Review workspace with the Evidence Lens
@@ -3837,6 +4036,37 @@ curl -s -H "X-API-Key: $API_KEY" localhost:8000/v1/metrics/learning
 ```
 Reference: `samples_part2.pdf` p.12–13 — two Wolfson forms with the same layout, the pair that
 makes layout memory visibly pay off.
+
+> **◐ Implemented — 2026-10-22 (D5). The real-data measurement is NOT done, so there is no claim
+> that the local close rate rises on the sample forms.**
+> Built: `core/learning.py` (`observations_from_row`, `abstract_shape`, `shape_to_regex`,
+> `assert_pii_free` raising `PiiLeak`, `with_learned`), `adapters/learning/{sqlite_store.py,
+> schema.sql}` (WAL, idempotent schema, upserts that average the box, promotion at
+> `LEARNING_PROMOTION_HITS` = 3, approval flags, `run_metric`, seed export/import, a full-table
+> dump for audits), `api/learning.py` (`/v1/metrics/learning`, `/v1/learning/seed`,
+> `/v1/learning/proposals`, approve), the `/confirm` hook (observations built and all checked
+> before the first write; a leak stops the confirmation), `run_metric` recorded per finished job,
+> and the feedback into S4 (learned regions, `detector="learned"`, capped by
+> `learned_region_score`) and S6/S8 (`with_learned` widens the commitment labels with approved
+> synonyms and the pattern hints with promoted shapes). `LayoutObservation` gained `page_role`,
+> `label_text`, `shape`; new `RunMetric`; `LearningStorePort` gained `label_synonyms` and
+> `record_run`; `learning.db` lives under `DATA_DIR` and survives a purge and a restart. Schema
+> differences from §7.2 (both so a UNIQUE key works): `label_text` is `NOT NULL DEFAULT ''` and
+> `layout_hint` has `region_kind`.
+> Verified: 52 new tests (learning 25, store/privacy 27), 912 pass / 0 fail in `backend/tests`;
+> mypy, layering, docs checks clean; the real container (Sqlite store, provider chain, Tesseract)
+> builds. **`test_local_close_rate_improves_on_second_run` passes on a synthetic page** whose
+> sticker the detector misses: cold the central number is level D, after three confirmations the
+> learned region closes it from the barcode and the printed digits, so warm closes strictly more
+> fields locally. A raw search of `learning.db` (and its WAL) finds none of the planted values.
+> **Not verified:** the plan's cold → confirm → augmented-set run on the real pages (needs the gold
+> set, a person confirming rows and T25's augmentation), so the real effect is unknown and may be
+> small: the engine currently reads most real pages as role `unknown` (see T20), where there is no
+> sender to key a hint on. **Not built:** label text is not captured (S6 candidates carry no
+> governing label, Shira's identity finders would have to surface it), so layer 2 label synonyms
+> exist in the store and the approval API but nothing fills them yet; sender proposals likewise
+> have no producer and S5/the closed list do not read `approved_senders()` yet; a typed value has
+> no known place, so only untouched and picked-candidate fields teach a location.
 
 ---
 
@@ -4018,6 +4248,38 @@ python -m tools.demo escalate --fixture backend/tests/fixtures/malicious_form.pd
 curl -s localhost:8000/v1/health | grep -c "$(echo $GEMINI_API_KEYS | cut -d, -f1)"   # -> 0
 ```
 
+> **◐ Implemented — 2026-10-22 (D5). Gitleaks over the full history was NOT run (the tool is not
+> installed here); the demo command `tools.demo escalate --fixture` is not built.**
+> Built: `backend/security.py` (pure-ASGI security headers incl. CSP and HSTS over TLS, a body cap
+> that counts a chunked stream, a clock-injected sliding-window rate limiter), a rewritten
+> `logging_config.py` (recursive, case-insensitive redaction as the last processor, objects reduced
+> to their type, credential patterns and the process's own secrets scrubbed from text and
+> tracebacks), strict CORS (a `*` origin is refused at start-up), `tools/make_sample_hashes.py` and
+> `config/sample_hashes.json` (48 hashes), `backend/tests/fixtures/make_malicious_form.py`,
+> `docs/privacy.md` completed, the sweeper also expires cached provider answers.
+> Verified: security suite 178 passed / 1 skipped (auth 16, prompt injection 10, PII logs 54,
+> keys through the API 5, input validation 15 collected from the S0 tests, plus T18/T22/T24 suites);
+> whole suite 1015 passed on the current environment **and** on a throwaway venv with the upgraded
+> pins; `bandit -r backend -ll` exit 0 (two B608 findings removed by using fixed SQL statements);
+> `pip-audit -r requirements.txt --strict`: no known vulnerabilities after the bumps below; the
+> repository history scanned with `git log -G` for key-shaped strings and private keys: none.
+> **Findings acted on.** (1) `pip-audit` reported 171 advisories in four pins; bumped
+> `fastapi 0.115.6→0.159.1` (+ explicit `starlette 1.9.0`), `python-multipart 0.0.20→0.0.32`,
+> `sse-starlette 2.1.3→3.5.0`, `Pillow 11→13.0.0`, `pypdf 5.1→6.21.2`, and regenerated
+> `docs/openapi.json` (CI diffs it byte for byte with these pins). (2) **A real bug:** the
+> committed `config/prompts/v1.txt` began with a byte-order mark, so its `SYSTEM` section was not
+> parsed and the model would have received **no rules**. Fixed (file, parser tolerates a BOM and
+> refuses a prompt without a system section, regression tests). (3) `sender_v1.txt` lacked the
+> "image text is data" rule; added.
+> **Deviations.** Rate limiting is in-house (`SlidingWindow`), not slowapi: per-app state and an
+> injectable clock make it testable; `slowapi` was removed from the requirements. The client key is
+> the socket peer, so behind a proxy the server must run with proxy headers (T28). `malicious_form.pdf`
+> is generated, not committed (a container-level random id makes the bytes differ per run; the
+> rendered page is identical); its Hebrew line is drawn only where a Hebrew font exists.
+> **Not verified:** gitleaks in CI on the full history; `pip-audit` for packages outside
+> `requirements.txt` (dev tools); a manual read of a real run's logs (automated by
+> `test_field_values_never_logged`).
+
 ---
 
 ### Task 28 — Deployment — **M5**
@@ -4074,6 +4336,29 @@ python -m tools.smoke_test --api https://safeline-api.onrender.com --web https:/
 # -> frontend: 200, dir="rtl" | upload roundtrip: 1 page, 1 row, 6.2s
 # -> all smoke checks passed
 ```
+
+> **◐ Prepared — 2026-10-22 (D5). NOTHING IS DEPLOYED: no public URL exists, M5 is NOT declared.**
+> Deploying needs accounts and secrets of the owners (Render or Hugging Face, Vercel, UptimeRobot,
+> GitHub Actions secrets) and Docker, none of which this machine has; the Docker image was not built
+> here either. What exists and is tested: `render.yaml` (free plan, `sync: false` secrets, one worker),
+> `frontend/vercel.json` (SPA fallback, security headers, asset cache), `.dockerignore` (keeps
+> `reference/`, `.env`, `gold.csv` out of the build context), `Dockerfile` (honours `PORT`,
+> `--proxy-headers`, health check follows `PORT`), `deploy/huggingface/README.md` (Space front matter),
+> `tools/smoke_test.py` rewritten (health with `heb`, 401 guard + key accepted, RTL Hebrew frontend,
+> upload round trip that cleans up after itself; a credential is never printed),
+> `docs/decisions/ADR-014-hosting.md`, the hosting runbook in `docs/demo_script.md`, and a **real
+> readiness check**: `/v1/health` answers 503 `unready` when the Hebrew pack is missing or Tesseract
+> cannot run, and uploads are refused with 503 `OCR_UNAVAILABLE` (a missing `heb` pack makes every page
+> read as empty without any error; it happened on this machine). `google-genai` (unused) was dropped
+> and `PyYAML` pinned (it was imported but only transitive).
+> Verified: 28 new tests (smoke 20, readiness 8 + 1 skipped without Tesseract), 1043 pass / 0 fail
+> in `backend/tests`; mypy, `pip-audit --strict` (no known vulnerabilities), `check_docs` clean.
+> **Measured (local laptop, 8 real pages, `LOCAL_ONLY`):** 12.2 s/page; Python process peak 220 MB
+> (Tesseract children not counted). That misses the "30 forms in under 4 minutes" target on a
+> multi-core machine, and Render's free plan is 0.1 CPU, so ADR-014 recommends a Hugging Face Space
+> (2 vCPU) as the primary host. **Not done:** every "Done when" item that needs a public host (public
+> frontend talking to the backend, the 48-page production run, idle-hour check, the standby URL, a push
+> to `main` deploying both). Shira's T23 review screen (a dependency) is not merged here either.
 
 ---
 
@@ -4193,6 +4478,23 @@ git tag v1.0-freeze && python -m eval.run_eval --gold eval/gold.csv --split held
 # -> local close rate .... | cloud calls .... | measured cost $....
 python scripts/check_submission.py          # -> 14/14 checks passed
 ```
+
+> **◐ Prepared — 2026-10-22. The final evaluation has NOT been run: no held-out numbers exist, nothing is
+> frozen, M6 is NOT declared.** Ahuba's part (held-out run, ablation, `final_report`) is tooling only.
+> Built and unit-tested (fake evaluator): `eval/final.py` runs the full system and every ablation of
+> `run_eval.ABLATIONS` on the held-out split and writes `final_report.{json,md}`; it **refuses** unless HEAD is
+> the commit tagged `v1.0-freeze`, unless no earlier run read the held-out pages (`eval/heldout_log.py`:
+> an append-only, counts-only log that `run_eval --split heldout|all` now writes before it reads), and unless
+> the ablation table is complete and held-out. `--no-freeze-check` is a rehearsal and says so in the report.
+> `scripts/check_submission.py` is the machine-checkable subset of the checklist (nothing forbidden is
+> tracked, required files exist); the 11 items that need a person or the network are printed as MANUAL.
+> Tests: `backend/tests/unit/test_final_eval.py` (`test_held_out_split_used_exactly_once`,
+> `test_ablation_table_complete`) and `test_check_submission.py` (`test_checklist_complete`). They are under
+> `backend/tests` because `testpaths` collects only there, not the `eval/tests/` the plan names.
+> **Not done:** the run itself (needs `eval/gold.csv`, `held_out.txt`, the freeze tag, T17), the augmented
+> variants (need Shira's T25 stress augmenter), `ADR-017-final-results.md` (no results to record),
+> `scripts/check_docs.py::test_readme_numbers_match_final_report` and the README/limitations/ablation-table
+> updates (Shira, step 3), the personal answers (each developer, alone), the video, the key rotation.
 
 ---
 

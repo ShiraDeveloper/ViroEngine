@@ -83,3 +83,12 @@ def make_normalized(
         )
 
     return _make
+
+
+@pytest.fixture(autouse=True)
+def _fresh_sse_state() -> None:
+    """sse-starlette keeps one process-wide exit event bound to the first event loop that served a
+    stream. Every TestClient runs its own loop, so the event is forgotten before each test."""
+    from sse_starlette.sse import AppStatus
+
+    AppStatus.should_exit_event = None

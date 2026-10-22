@@ -1,0 +1,25 @@
+# Keep the build context small AND keep patient-adjacent or secret material out of the image.
+.git
+.github
+.env
+.env.*
+!.env.example
+.tmp
+.venv
+venv
+node_modules
+frontend/node_modules
+frontend/dist
+reference
+eval/results
+eval/gold.csv
+models/*.onnx
+*.pt
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.coverage
+__pycache__
+*.pyc
+docs
+backend/tests

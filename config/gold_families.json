@@ -1,0 +1,13 @@
+{
+  "_note": "Page LABELS per document family, used only by eval/make_gold.py --pick-held-out to stratify the held-out set (PLAN 10.2). Labels only, no field values. Seeded from PLAN 2.3, 2.4 and 2.6, all marked VERIFY there: confirm each list while labelling (T7) and fill faint_stamp and fax_grade, which the plan does not name. A page may carry several tags. Pages with no tag are 'ordinary printed'. Pick-held-out refuses to run while a family has too few pages, instead of guessing.",
+  "families": {
+    "sap": ["A2", "A3", "A4", "A7", "A11", "A25", "B20", "B21", "B22"],
+    "handwriting_heavy": ["A17", "A18", "A21", "B6", "B7", "B10", "B11"],
+    "faint_stamp": [],
+    "fax_grade": [],
+    "multi_central": ["A9", "A14", "A24", "B12"],
+    "multi_commitment": ["A25", "B20"],
+    "no_commitment": ["A17", "A18", "A21"],
+    "letter_commitment": ["B14", "B15"]
+  }
+}

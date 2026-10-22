@@ -40,7 +40,7 @@ flowchart TB
     end
     subgraph AP["API layer · FastAPI /v1 · Render"]
         AUTH["Auth: X-API-Key + X-Access-Code"]
-        RL["Rate limit · slowapi · body cap"]
+        RL["Rate limit · body cap · security headers"]
         RT["Routers: documents batches jobs review export stress metrics"]
         Q["Job queue · asyncio · bounded concurrency"]
     end

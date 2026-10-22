@@ -1,0 +1,43 @@
+# Render blueprint for the backend (PLAN 11, T28). The frontend is on Vercel (frontend/vercel.json).
+#
+# Secrets are NOT in this file: every `sync: false` variable is set once in the Render dashboard.
+# Deploys are triggered by .github/workflows/deploy.yml (the service's deploy hook) after CI passes,
+# never by a push, so a red commit cannot reach production.
+#
+# Free plan: 512 MB RAM and ~750 instance hours a month. One always-on service uses ~744 h, so
+# exactly ONE UptimeRobot monitor (10 minute interval, /v1/health) is configured, never a second.
+services:
+  - type: web
+    name: safeline-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: frankfurt          # nearest Render region to Israel
+    healthCheckPath: /v1/health
+    autoDeploy: false
+    envVars:
+      # --- sizing for 512 MB: one page in memory per worker, one worker ----------------------
+      - key: MAX_CONCURRENCY
+        value: "1"
+      - key: MAX_UPLOAD_MB
+        value: "25"
+      - key: JOB_TTL_MINUTES
+        value: "30"
+      # --- behind Render's proxy the real client address is in X-Forwarded-For -----------------
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      # --- set in the dashboard, never here ------------------------------------------------------
+      - key: API_KEY
+        sync: false
+      - key: APP_ACCESS_CODE
+        sync: false
+      - key: ALLOWED_ORIGINS        # the Vercel URL, e.g. https://safeline.vercel.app
+        sync: false
+      - key: GEMINI_API_KEYS
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_VISION_MODEL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

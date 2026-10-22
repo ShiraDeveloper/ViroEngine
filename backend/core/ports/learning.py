@@ -7,9 +7,9 @@ This port never returns values — only positional and structural hints.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 
-from backend.core.models import LayoutHint, LayoutObservation, PatternHint
+from backend.core.models import LayoutHint, LayoutObservation, PatternHint, RunMetric
 
 
 @runtime_checkable
@@ -34,10 +34,42 @@ class LearningStorePort(Protocol):
         """
         ...
 
+    def label_synonyms(self, sender: str, field: str) -> list[str]:
+        """Return label texts a human approved for (sender, field) after enough confirmations.
+
+        Returns an empty list when there are none. Used only to widen the labels S4/S6 search
+        for; a synonym never creates or rejects a value."""
+        ...
+
+    def record_run(self, metric: RunMetric) -> None:
+        """Append one finished job's counters (no values) to the learning curve."""
+        ...
+
     def pattern_hints(self, sender: str, field: str) -> list[PatternHint]:
         """Return regex-pattern hints for (sender, field) pairs.
 
         Returns an empty list when no patterns are available.
         Patterns adjust the confidence score — they never reject or create a value (§2.1).
         """
+        ...
+
+
+@runtime_checkable
+class LearningAdminPort(Protocol):
+    """What the dashboard and the approval screen read and do. Counters, boxes and shapes only."""
+
+    def run_metrics(self, limit: int = 200) -> list[dict[str, Any]]:
+        """The learning curve, oldest first."""
+        ...
+
+    def proposals(self) -> dict[str, list[dict[str, Any]]]:
+        """Label synonyms and sender proposals, approved or not."""
+        ...
+
+    def approve(self, kind: Literal["label", "sender"], proposal_id: int) -> bool:
+        """Approve one proposal (an explicit human act). False when there is none."""
+        ...
+
+    def seed(self) -> dict[str, list[dict[str, Any]]]:
+        """Promoted layouts and shapes as a PII-free document."""
         ...

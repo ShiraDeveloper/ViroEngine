@@ -87,11 +87,18 @@ class ProviderBadResponse(SafeLineError):
 
 
 class ProviderExhausted(SafeLineError):
-    """Every credential and provider failed. Fields become level D; the run continues."""
+    """Every credential and provider failed. Fields become level D; the run continues.
+
+    `failovers` lists the "from->to" hops and per-provider failures that led here (provider and
+    credential labels only, never a key), so the run report can show them."""
 
     code = "PROVIDER_EXHAUSTED"
     recoverable = True
     http_status = 502
+
+    def __init__(self, detail: str = "", *, failovers: tuple[str, ...] = ()) -> None:
+        super().__init__(detail)
+        self.failovers = failovers
 
 
 class JobPurged(SafeLineError):

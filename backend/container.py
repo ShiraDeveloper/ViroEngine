@@ -56,12 +56,27 @@ def load_pipeline_config(
     """Parse `config/models.yaml` into a PipelineConfig. `layers` overrides entries of the
     `layers:` section (the ablation switches), so a layer is toggled without a code edit.
     Raises FileNotFoundError, yaml.YAMLError or pydantic.ValidationError on a bad file."""
-    import yaml  # type: ignore[import-untyped]  # local: only the composition root reads files
+    import yaml  # type: ignore[import-untyped,unused-ignore]  # local: only the composition root reads files
 
     data: dict[str, Any] = yaml.safe_load((path or DEFAULT_MODELS_PATH).read_text(encoding="utf-8"))
     if layers:
         data["layers"] = {**data.get("layers", {}), **layers}
     return PipelineConfig.from_mapping(data)
+
+
+DEFAULT_SEED_PATH = Path(__file__).resolve().parents[1] / "config" / "learning_seed.json"
+
+
+def load_learning_seed(path: Path | None = None) -> dict[str, Any]:
+    """The committed PII-free layout seed (PLAN §7.4), or an empty seed when there is none or it
+    cannot be read. It only ever fills an empty learning store."""
+    import json
+
+    try:
+        data = json.loads((path or DEFAULT_SEED_PATH).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def build_container(settings: Settings, *, use_fakes: bool = False) -> Container:
@@ -123,30 +138,42 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     from backend.adapters.imaging.pdf import DocumentReader  # T9
     from backend.adapters.learning.sqlite_store import SqliteLearningStore  # T24
     from backend.adapters.ocr.tesseract import TesseractAdapter  # T11
-    from backend.adapters.ocr.trocr_digits import TrOcrDigitsAdapter  # T13
+    from backend.adapters.ocr.trocr_digits import TrOcrDigits  # T13
     from backend.adapters.regions.rule_based import RuleBasedDetector  # T11
     from backend.adapters.senders.loader import SenderIndex  # T6
     from backend.adapters.senders.logo_match import OrbLogoMatcher  # T10
     from backend.adapters.storage.tempdir import TmpdirStorage  # T9
 
     storage = TmpdirStorage(settings=settings)
+    learning = SqliteLearningStore(settings=settings)
+    learning.import_seed(load_learning_seed())
     vision: VisionLLMPort | None = None
     if not settings.local_only:
         from backend.adapters.vision.chain import VisionChainAdapter  # T18
 
         vision = VisionChainAdapter(settings=settings)
 
+    regions: RegionDetectorPort = RuleBasedDetector(settings=settings, storage=storage)
+    if settings.region_detector == "yolo_onnx":
+        from backend.adapters.regions.yolo_onnx import YoloPreferred, YoloRegionDetector  # T16
+
+        regions = YoloPreferred(
+            yolo=YoloRegionDetector(settings=settings, storage=storage),
+            fallback=regions,
+            kinds=settings.yolo_kinds_list,
+        )
+
     return Container(
         settings=settings,
         ocr_printed=TesseractAdapter(settings=settings, storage=storage),
-        ocr_digits=TrOcrDigitsAdapter(settings=settings),
+        ocr_digits=TrOcrDigits(settings=settings, storage=storage),
         barcode=ZxingAdapter(settings=settings, storage=storage),
-        regions=RuleBasedDetector(settings=settings, storage=storage),
+        regions=regions,
         vision=vision,
         storage=storage,
         documents=DocumentReader(settings=settings),
         imaging=CvImaging(settings=settings),
-        learning=SqliteLearningStore(settings=settings),
+        learning=learning,
         clock=SystemClock(),
         exporters={
             "json": JsonExporter(),

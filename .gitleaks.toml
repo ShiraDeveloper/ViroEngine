@@ -6,4 +6,8 @@ useDefault = true
 
 description = "Fake demo values in the plan"
 
-regexes = ['''GEMINI_API_KEYS=bad1,bad2''']
+regexes = [
+    '''GEMINI_API_KEYS=bad1,bad2''',
+    # Fake credentials in the security tests are marked TESTKEY so they can never be mistaken for real ones.
+    '''[A-Za-z_\-]*TESTKEY[A-Za-z0-9_\-]*''',
+]

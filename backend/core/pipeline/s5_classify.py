@@ -24,6 +24,7 @@ from backend.core.models import (
     REASON_TEXT,
     BarcodeHit,
     Box,
+    CropPayload,
     FieldKey,
     ImageRef,
     NormalizedPage,
@@ -37,6 +38,7 @@ from backend.core.models import (
 from backend.core.ports.logo import LogoMatcherPort
 from backend.core.ports.senders import SenderIndexPort
 from backend.core.ports.vision_llm import VisionLLMPort
+from backend.core.vision_schema import SENDER_SCHEMA
 
 log = structlog.get_logger()
 
@@ -306,7 +308,7 @@ def _ask_model(
     regions: Sequence[Region],
     senders: SenderIndexPort,
     vision: VisionLLMPort,
-    crop: Callable[[ImageRef, Box], ImageRef],
+    crop: Callable[[ImageRef, Box], bytes],
     cfg: ClassifyConfig,
 ) -> str | None:
     """Closed-list answer from the model, or None. Only the letterhead crop is sent, never a
@@ -317,10 +319,18 @@ def _ask_model(
     request = VisionRequest(
         job_id=page.raw.image.job_id,
         page_id=page.raw.page_id,
-        field=FieldKey.sender,
-        crop=crop(page.color, box),
-        context_text="\n".join([*names, NOT_RECOGNISED]),
+        task="sender",
+        crops=[
+            CropPayload(
+                field=FieldKey.sender,
+                png=crop(page.color, box),
+                region_kind=RegionKind.letterhead,
+                box=box,
+            )
+        ],
+        sender_options=[*names, NOT_RECOGNISED],
         prompt_version=cfg.prompt_version,
+        response_schema=SENDER_SCHEMA,
     )
     try:
         response = vision.extract(request)
@@ -347,7 +357,7 @@ def _resolve_sender(
     *,
     vision: VisionLLMPort | None,
     logo: LogoMatcherPort | None,
-    crop: Callable[[ImageRef, Box], ImageRef] | None,
+    crop: Callable[[ImageRef, Box], bytes] | None,
 ) -> _Resolved:
     ratio = cfg.sender_min_ratio if cfg.sender_min_ratio is not None else senders.min_ratio
     if role == "sap_screen":
@@ -384,7 +394,7 @@ def classify(
     *,
     vision: VisionLLMPort | None = None,
     logo: LogoMatcherPort | None = None,
-    crop: Callable[[ImageRef, Box], ImageRef] | None = None,
+    crop: Callable[[ImageRef, Box], bytes] | None = None,
     barcodes: Sequence[BarcodeHit] = (),
     config: ClassifyConfig | None = None,
 ) -> Classification:

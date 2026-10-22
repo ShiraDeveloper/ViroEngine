@@ -53,20 +53,43 @@ layers:
 readers:
   primary_ocr: tesseract             # "tesseract" | "surya" — bake-off decides (T17)
   digit_ocr: trocr                   # "trocr" | "tesseract" — bake-off decides (T17)
-  region_detector: rule-based        # "rule-based" | "yolov8n-onnx" — ADR-016 decides (T16)
+  region_detector: rule_based        # "rule_based" | "yolo_onnx" — ADR-016 decides (T16); read from REGION_DETECTOR
 
-# --- TrOCR (handwritten digits) -------------------------------------------
+# --- TrOCR (handwritten digits, T13) --------------------------------------
+# Read at runtime from Settings (TROCR_* in .env); mirrored here for calibrate.py.
 trocr:
-  model_path: models/trocr-small-digits.onnx   # git-ignored; see models/README.md
-  max_sequence_length: 12
+  source_model: microsoft/trocr-small-handwritten
+  revision: b4648cfa171985a6745f37ddd637e98c0da958ac
+  vision_file: models/trocr_small_encoder_int8.onnx   # git-ignored; see models/README.md
+  text_file: models/trocr_small_decoder_int8.onnx
+  vocab_file: models/trocr_small_vocab.json
+  max_length: 12          # tokens; a digit field is a dozen at most
+  candidates: 5           # beam width = readings returned
+  max_model_mb: 80        # larger file sets are refused at load
 
 # --- YOLOv8n region detector (experimental, T16) --------------------------
+# Read at runtime from Settings (YOLO_* in .env); mirrored here for eval tooling. Not trained
+# yet: no model file exists and region_detector stays rule_based (docs/decisions/ADR-016).
 yolo:
-  model_path: models/yolov8n-regions.onnx      # git-ignored; see models/README.md
-  confidence_threshold: 0.60
+  model_path: models/yolov8n_regions_int8.onnx   # git-ignored; see models/README.md
+  confidence_threshold: 0.35
   iou_threshold: 0.45
+  image_size: 1024
+  max_model_mb: 15
+  classes: [central_sticker, receipt_stamp, patient_box, commitment_label]
 
-# --- Cloud providers -------------------------------------------------------
+# --- Bake-off (T17) ----------------------------------------------------------
+# Read by eval/bakeoff.py only. The T16 limits a region challenger must stay under, over the
+# rule-based baseline, per page (ADR-012). Vision model ids are GEMINI_MODEL / GEMINI_MODEL_LITE.
+bakeoff:
+  region_max_added_ms: 400
+  region_max_added_mb: 120
+
+# --- Cloud providers (T18) ---------------------------------------------------
+# Read by backend/adapters/vision/config.py; ProvidersConfig defaults must equal these (a test
+# enforces it). The chain order is `primary`, then `fallback_order`. A provider with no key, or
+# no model id, is skipped and reported as unavailable. Env settings win over the ids below:
+# GEMINI_MODEL, OPENROUTER_VISION_MODEL, GROQ_VISION_MODEL.
 providers:
   primary: gemini
   fallback_order:
@@ -80,6 +103,35 @@ providers:
     base_delay_seconds: 0.5
     max_delay_seconds: 8.0
     jitter_factor: 0.25
+  token_bucket:                   # per provider: stay under published ceilings, not via 429
+    capacity: 10
+    refill_seconds: 6.0           # one token per 6 s = ~10 requests per minute
+  credential_cooldown_seconds: 60 # a 429 cools one Gemini credential for this long
+  max_output_tokens: 800
+  temperature: 0.0
+  request_timeout_seconds: 30.0
+  gemini:
+    model: gemini-2.5-flash
+    thinking_budget: 0            # 2.5 models reason first and would eat the 800-token cap
+  openrouter:
+    # A ":free" vision model id. The free list changes weekly and was NOT verified for this
+    # commit, so none is pinned: set OPENROUTER_VISION_MODEL (or this key) the day you use it.
+    model: null
+  groq:
+    # Only if the Groq console lists a vision model that day (PLAN §6.2). null skips Groq.
+    vision_model: null
+
+# --- S9 escalation (T18) ------------------------------------------------------
+# EscalationConfig defaults in backend/core/pipeline/s9_escalate.py must equal these. The
+# escalation threshold itself is ESCALATION_SCORE_THRESHOLD (also scoring.escalation_score_threshold).
+escalation:
+  crop_pad_fraction: 0.02           # margin around a crop, share of the page diagonal
+  max_candidates_per_field: 5       # code candidates handed to the model per field
+  cloud_reader_confidence: 0.5      # neutral: the model reports none, S8 weights this low
+  context_fields: [central_number]  # a redacted thumbnail is sent only for these ...
+  context_page_roles: [sap_screen]  # ... on these page roles (PLAN §6.4)
+  usd_per_million_input_tokens: 0.30   # ASSUMPTION (PLAN §6.5): Gemini Flash planning prices
+  usd_per_million_output_tokens: 2.50
 
 # --- S5 sender + page-role classification (T10) -----------------------------
 # ClassifyConfig defaults in backend/core/pipeline/s5_classify.py must equal these.
@@ -119,3 +171,8 @@ second_read:
   upscale: 2.5                      # cubic; below 2 the gain disappears, above 3 only cost grows
   psm: 7                            # Tesseract single-line mode
   digit_candidates: 5               # most alternatives taken from the digit reader
+
+# --- S10 grouping and rows (T20) ---------------------------------------------------
+# RowsConfig defaults in backend/core/pipeline/s10_rows.py must equal these.
+rows:
+  same_location_iou: 0.5   # commitment readings whose boxes overlap this much are one commitment

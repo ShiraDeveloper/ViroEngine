@@ -15,7 +15,7 @@ works without `reference/`.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator
 from contextlib import contextmanager, nullcontext
 import csv
 from dataclasses import dataclass, replace
@@ -46,6 +46,7 @@ from backend.core.scoring import SENDER_NOT_LISTED
 from backend.core.validators import parse_il_date
 from backend.settings import Settings
 from eval.calibrate import read_held_out, to_record, write_signals
+from eval.heldout_log import DEFAULT_LOG, record_read
 
 Split = Literal["dev", "heldout", "all"]
 
@@ -494,16 +495,28 @@ def evaluate(
     models: Path | None = None,
     signals_out: Path | None = None,
     today: date | None = None,
+    pages: Collection[str] | None = None,
+    known_hashes: frozenset[str] = frozenset(),
+    cloud_consent: bool = False,
+    heldout_log: Path | None = None,
 ) -> EvalReport:
     """Run the pipeline on the pages of `split` and compare every field with the gold value.
 
     A dev run never processes a held-out page: the pages are chosen from the gold labels
     minus the held-out list before any OCR happens, and a final assertion backs that up.
     `uploads` replaces the sample PDFs (tests); `services` replaces the real container.
+    `pages` narrows the run to those labels (a subset of the split, e.g. the bake-off's hard
+    pages); `known_hashes` marks sample pages so a non-local run may reach the vision port
+    (PLAN §8.5); `cloud_consent` allows it for any page. `heldout_log`, when given, gets one
+    line (counts only) before any held-out page is read - the run-log T30 checks.
     Raises EvalInputError when the gold, the held-out list or the pages are unusable."""
     gold_rows = read_gold(gold)
     held = read_held_out(held_out) | read_split_column(gold)
     labels = set(select_labels(set(gold_rows), split, held))
+    if pages is not None:
+        labels &= set(pages)
+    if heldout_log is not None and labels & held:
+        record_read(heldout_log, split=split, pages=len(labels & held), ablation=ablation)
     if uploads is None:
         present = [p for p in pdfs if p.is_file()]
         if not present:
@@ -521,6 +534,7 @@ def evaluate(
             documents=svc.documents,
             storage=svc.storage,
             job_id=job_id,
+            known_hashes=known_hashes,
         )
         raws = apply_labels(result.pages, lambda r: label_of_page(r.source_file, r.page_index))
         chosen = [r for r in raws if r.label in labels]
@@ -528,7 +542,7 @@ def evaluate(
             raise HeldOutLeak("a held-out page was selected in a dev run")
         guard = deny_network() if local_only else nullcontext(attempts)
         with guard as seen:
-            for outcome in iter_outcomes(chosen, services=svc):
+            for outcome in iter_outcomes(chosen, services=svc, cloud_consent=cloud_consent):
                 outcomes.append((outcome.label or outcome.page_id, outcome))
             attempts = seen
     finally:
@@ -627,6 +641,7 @@ def main(argv: list[str] | None = None) -> int:
                 pdfs=pdfs,
                 models=args.models,
                 signals_out=args.results / "signals.jsonl" if name is None else None,
+                heldout_log=DEFAULT_LOG,
             )
             reports.append(report)
             sys.stdout.write(render(report, per_field=args.per_field) + "\n")
