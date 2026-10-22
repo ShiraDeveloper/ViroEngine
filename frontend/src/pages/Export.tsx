@@ -4,6 +4,7 @@ import { api } from '@/api/client';
 import { common, exportScreen } from '@/copy/he';
 import { buttonClasses } from '@/design/Button';
 import { EmptyState } from '@/design/EmptyState';
+import { useToast } from '@/design/Toast';
 import { useDocumentTitle } from '@/lib/useDocumentTitle';
 import { useJob } from '@/lib/useJob';
 import { flaggedFields } from '@/components/ReviewTable';
@@ -14,9 +15,10 @@ const FORMATS = [
   { fmt: 'json', label: exportScreen.json },
 ] as const;
 
-/** Stub: download wiring (auth on file links, done toast) arrives with T21. */
+/** Summary, a warning while level-D fields remain, three download links and the API note. */
 export function Export() {
   useDocumentTitle(exportScreen.title);
+  const toast = useToast();
   const { jobId = '' } = useParams();
   const { data: job, isPending, isError } = useJob(jobId);
 
@@ -54,6 +56,7 @@ export function Export() {
             key={fmt}
             href={api.exportUrl(jobId, fmt)}
             download
+            onClick={() => toast.push({ tone: 'success', title: exportScreen.done })}
             className={buttonClasses(fmt === 'xlsx' ? 'primary' : 'secondary')}
           >
             {label}
