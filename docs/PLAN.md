@@ -2008,7 +2008,6 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 6 ✅ | Senders closed list | Shira | P1 | D2 | 2h | 2 |
 | 7 ◐ | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
 | 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
-| 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
 | 9 ✅ | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
 | 10 ✅ | S5 sender and page-role classification | Shira | P2 | D3 | 2h | 6 · **11 at runtime only** |
 | 11 ✅ | S3–S4 page OCR, barcode sweep, regions | Ahuba | P2 | D3–4 | 4h | 9 |
@@ -2029,7 +2028,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 26 ✅ | Metrics dashboard and ablation UI | Shira | P6 | D8 | 2h | 15,25 · **24 at runtime only** |
 | 27 ◐ | Security hardening and test suite | Ahuba | P7 | D8 | 2h ⚠ | 18,22,24 |
 | 28 ◐ | Deployment — **M5** | Ahuba | P7 | **D9** | 1h ⚠ | 22,23,27 |
-| 29 | Docs and the 60-second video | Shira | P8 | D8–9 | **3h** | 26,28 |
+| 29 ◐ | Docs and the 60-second video | Shira | P8 | D8–9 | **3h** | 26,28 |
 | 30 ◐ | Final evaluation, freeze, submit — **M6** | Both | P8 | D9 | 2h+2h | all |
 
 **Totals.** Ahuba 13 own tasks + 3 shared halves = **39 h**; Shira 14 own tasks + 3 shared halves
@@ -4414,6 +4413,12 @@ laptop.
 
 **Demo.** `python scripts/check_docs.py`
 → `links: 34 checked, 0 broken | placeholders: none | limitations: 8/8 topics present`
+
+> **◐ Docs done — 2026-10-22 (D8). The video, the GIF and the live link are NOT done, so Task 29 is not complete.**
+> Done: `limitations.md` (8/8 topics), `ARCHITECTURE.md` and `assets/architecture.png`, `demo_script.md` with the recording
+> checklist, `privacy.md`, `scripts/check_docs.py` (20 links, 0 broken). Open: the 60 s Hebrew video with subtitles and
+> offline copy (manual recording), `assets/demo.gif` (< 5 MB), the live URL (needs T28), and the README Results table
+> (needs T30). Nothing was invented to fill them.
 
 ---
 
