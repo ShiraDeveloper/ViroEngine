@@ -87,7 +87,7 @@ def prompt_path(request: VisionRequest, prompts_dir: Path) -> Path:
     (it becomes part of a path)."""
     if _VERSION.fullmatch(request.prompt_version) is None:
         raise ValueError("prompt version must look like v1")
-    stem = "sender_" if request.task == "sender" else ""
+    stem = {"sender": "sender_", "page": "page_", "verify": "verify_"}.get(request.task, "")
     return prompts_dir / f"{stem}{request.prompt_version}.txt"
 
 
@@ -112,10 +112,13 @@ def render_prompt(
             {k.value: [_clean(v) for v in vs] for k, vs in request.candidates.items()}
         ),
         "fields_requested": _json(requested),
+        "page_count": str(len(request.page_images)),
     }
     parts: list[Part] = [TextPart(_fill(sections.get("CONTEXT", ""), values))]
     if request.page_thumb is not None:
         parts += [TextPart(_THUMB_LABEL), ImagePart(request.page_thumb)]
+    for number, image in enumerate(request.page_images, start=1):
+        parts += [TextPart(f"page {number}:"), ImagePart(image)]
     for number, crop in enumerate(request.crops, start=1):
         parts += [
             TextPart(f"crop {number}: field={crop.field.value}, region={crop.region_kind.value}"),

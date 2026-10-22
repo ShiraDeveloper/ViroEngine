@@ -103,16 +103,18 @@ providers:
     base_delay_seconds: 0.5
     max_delay_seconds: 8.0
     jitter_factor: 0.25
-  token_bucket:                   # per provider: stay under published ceilings, not via 429
-    capacity: 10
-    refill_seconds: 6.0           # one token per 6 s = ~10 requests per minute
+  token_bucket:                   # per model slot. Generous: a 429 moves on to the next key or
+    capacity: 30                  # model at once, which beats waiting on one model's bucket
+    refill_seconds: 2.0           # ~30 requests per minute per slot
   credential_cooldown_seconds: 60 # a 429 cools one Gemini credential for this long
-  max_output_tokens: 800
+  max_output_tokens: 4096         # a whole page answer with boxes needs more than a crop answer
   temperature: 0.0
-  request_timeout_seconds: 30.0
+  request_timeout_seconds: 30.0   # a page answers in ~5-10 s; past 30 s the model is stuck - next one
   gemini:
     model: gemini-2.5-flash
-    thinking_budget: 0            # 2.5 models reason first and would eat the 800-token cap
+    thinking_budget: 0            # 2.5 models reason first and would eat the output cap
+    thinking_level: minimal       # Gemini 3: "low" took ~60 s a page, "minimal" ~5 s, same reading
+    media_resolution: MEDIA_RESOLUTION_HIGH   # handwriting needs full detail
   openrouter:
     # A ":free" vision model id. The free list changes weekly and was NOT verified for this
     # commit, so none is pinned: set OPENROUTER_VISION_MODEL (or this key) the day you use it.

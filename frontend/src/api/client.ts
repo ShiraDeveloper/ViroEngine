@@ -1,3 +1,4 @@
+import type { EvalMetricsResponse } from './metrics';
 import { mockClient } from './mockClient';
 import { openEventStream } from './sse';
 import type {
@@ -30,6 +31,12 @@ export interface ApiClient {
   /** The crop image as a Blob. A browser <img> cannot send X-API-Key, so the Lens fetches here. */
   fetchCrop(jobId: string, pageId: string, box: Box, pad?: number): Promise<Blob>;
   exportUrl(jobId: string, fmt: 'xlsx' | 'csv' | 'json'): string;
+  /** The export file. A plain <a href> cannot send X-API-Key, so downloads fetch it here. */
+  fetchExport(jobId: string, fmt: 'xlsx' | 'csv' | 'json'): Promise<Blob>;
+  /** Stress Mode: a new job over the source job's pages, degraded by `ops`. */
+  stress(jobId: string, ops: readonly string[]): Promise<UploadResponse>;
+  /** The latest measured evaluation report, or `{ available: false }` when none exists. */
+  getEvalMetrics(): Promise<EvalMetricsResponse>;
 }
 
 /** A non-2xx API answer. `status` is the HTTP status; the body is never surfaced to the UI. */
@@ -147,6 +154,21 @@ export function createHttpClient(options: HttpClientOptions): ApiClient {
       return response.blob();
     },
     exportUrl: (jobId, fmt) => `${baseUrl}/jobs/${encodeURIComponent(jobId)}/export?format=${fmt}`,
+    async fetchExport(jobId, fmt) {
+      const response = await doFetch(
+        `${baseUrl}/jobs/${encodeURIComponent(jobId)}/export?format=${fmt}`,
+        { headers: keyHeader },
+      );
+      if (!response.ok) throw new ApiError(response.status);
+      return response.blob();
+    },
+    stress: (jobId, ops) =>
+      request<UploadResponse>(`/jobs/${encodeURIComponent(jobId)}/stress`, {
+        method: 'POST',
+        body: JSON.stringify({ ops }),
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    getEvalMetrics: () => request<EvalMetricsResponse>('/metrics/eval'),
   };
 }
 

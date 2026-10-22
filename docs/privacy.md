@@ -19,9 +19,11 @@ diagnosis, requested test and physician notes are detected as `RegionKind.clinic
 ```
 upload  →  job registry (memory) + job directory under DATA_DIR/jobs/<id> (mode 0700)
         →  three page variants: color, gray_bin, thumb          (files, same directory)
-        →  local OCR + barcode decode                            [nothing leaves the machine]
-        →  unresolved fields only: crops (+ one redacted 512px thumbnail when a field needs page
-           context)  →  provider                                 [only if allowed, see below]
+        →  barcode decode                                        [nothing leaves the machine]
+        →  vision-first (default, ADR-017): the page image, then zoomed crops of each value for a
+           blind second read  →  provider                        [unless LOCAL_ONLY, see below]
+        →  cascade (fallback / ENGINE_MODE=cascade): local OCR first, then crops of unresolved
+           fields only (+ one redacted 512px thumbnail)
         →  values in the job record                              (memory)
         →  export rendered on demand                             (never stored)
         →  purge at JOB_TTL_MINUTES (default 30)
@@ -31,7 +33,7 @@ upload  →  job registry (memory) + job directory under DATA_DIR/jobs/<id> (mod
 |---|---|---|
 | Upload | original bytes | memory until the pipeline takes them, then released |
 | Processing | page variants | job directory |
-| Escalation | field crops + at most one redacted thumbnail | in memory and in the request body only |
+| Cloud read | vision-first: the page JPEG and value crops; cascade: field crops + at most one redacted thumbnail | in memory and in the request body only |
 | Provider answers | the values the model read (never an image) | a cache file keyed by content hash under `DATA_DIR`, **deleted after `JOB_TTL_MINUTES`** by the sweeper |
 | Results | extracted values | job registry (memory) |
 | Audit | `ReviewEdit` entries (old and new values) | job registry (memory) |
@@ -42,15 +44,24 @@ which is the intended lifetime.
 
 ## What leaves the machine
 
-Only **crops of fields the engine could not resolve locally**, plus — only when a field needs page
-context — one 512 px thumbnail in which every clinical region **and the patient box** have been
-painted over *before* it is downscaled, so no glyph survives the resample. Never a full page.
-Never a clinical region: that exclusion is an assertion in the request builder, not a convention.
+**Vision-first engine (default since ADR-017):** the page image (a 2000 px JPEG) for the page read,
+then crops around the values for the blind second read. This is a deliberate change from the plan's
+crops-only policy: on handwritten Hebrew forms the local reader cannot locate the fields, so a
+crops-only engine flagged every name and every unfamiliar form. The trade-off is acceptable **only
+for the adapted sample forms** - the free tier may use inputs to train its models. A real
+deployment needs a paid key (inputs are not used for training), a data-processing agreement and MoH
+approval - or `LOCAL_ONLY=true`. The Reading Trail of every field marks the page read as
+`page_sent`, so what left the machine is visible per field.
 
-A **document that is not one of the sample forms** (its page hash is not in
-`config/sample_hashes.json`) is processed locally by default; its crops go to a provider only if the
-job carries an explicit consent, recorded in the run report. Fields that would have escalated are
-flagged for the technician instead, and the Reading Trail shows no cloud step.
+**Cascade engine** (`ENGINE_MODE=cascade`, and the fallback when no strong model answers): only
+**crops of fields the engine could not resolve locally**, plus - only when a field needs page
+context - one 512 px thumbnail in which every clinical region **and the patient box** have been
+painted over *before* it is downscaled. Never a clinical region: that exclusion is an assertion in
+the request builder, not a convention.
+
+`CLOUD_REQUIRES_CONSENT=true` restores the sample-only gate of PLAN §8.5: a document whose page hash
+is not in `config/sample_hashes.json` is then processed locally unless the job carries an explicit
+consent. The default is `false`, because the demo must work on any form a judge uploads.
 
 `LOCAL_ONLY=true` disables every provider. A test patches the socket layer and asserts **zero**
 network connections in this mode, through the chain, the container and the whole pipeline.

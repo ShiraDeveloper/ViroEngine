@@ -122,6 +122,7 @@ export interface JobView {
   rows: CommitmentRow[];
   orphan_page_ids: string[];
   report: RunReport | null;
+  notices?: string[];
 }
 
 /** Approximate region location returned by the learning store. */
@@ -163,6 +164,15 @@ export interface OcrWord {
   text: string;
   box: Box;
   confidence: number;
+}
+
+/** The validated whole-page reading of one page of a `page` request. `page_role` is checked against the pipeline's PageRole by the core; a value outside it is treated as a form. */
+export interface PageAnswer {
+  page: number;
+  page_role: string;
+  address?: string;
+  answers?: Partial<Record<FieldKey, VisionAnswer>>;
+  ambiguities?: string[];
 }
 
 export interface PageGroup {
@@ -393,8 +403,9 @@ export interface VisionAnswer {
 export interface VisionRequest {
   job_id: string;
   page_id: string;
-  task?: "fields" | "sender";
+  task?: "fields" | "sender" | "page" | "verify";
   page_thumb?: string | null;
+  page_images?: string[];
   crops: CropPayload[];
   sender?: string | null;
   sender_options?: string[];
@@ -419,6 +430,8 @@ export interface VisionResponse {
   output_tokens?: number;
   cache_hit?: boolean;
   failovers?: string[];
+  pages?: PageAnswer[];
+  crop_values?: string[][];
 }
 
 export type SseEvent = SsePageEvent | SseCountersEvent | SseRowEvent | SseDoneEvent | SseErrorEvent;

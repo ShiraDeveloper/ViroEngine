@@ -183,7 +183,8 @@
         "אסף הרופא",
         "המרכז הרפואי שמיר",
         "asaf harofe",
-        "shamir"
+        "shamir",
+        "שמיר (אסף הרופא)"
       ],
       "keywords": [
         "שמיר",
@@ -325,7 +326,9 @@
       "aliases": [
         "מאיר",
         "meir",
-        "המרכז הרפואי מאיר"
+        "המרכז הרפואי מאיר",
+        "מאיר (כללית)",
+        "מרכז רפואי מאיר"
       ],
       "keywords": [
         "מאיר",
@@ -497,7 +500,9 @@
       "aliases": [
         "כרמל",
         "carmel",
-        "המרכז הרפואי כרמל"
+        "המרכז הרפואי כרמל",
+        "מרכז רפואי כרמל",
+        "כרמל (כללית)"
       ],
       "keywords": [
         "כרמל"
@@ -609,7 +614,9 @@
       "aliases": [
         "רפואה משפטית",
         "המכון הלאומי לרפואה משפטית",
-        "forensic medicine"
+        "forensic medicine",
+        "המרכז הלאומי לרפואה משפטית",
+        "אבו כביר"
       ],
       "keywords": [
         "המרכז הלאומי לרפואה משפטית",
@@ -1037,6 +1044,32 @@
         "מספר מבחנה"
       ],
       "pattern_hints": [],
+      "barcode_is_commitment": null
+    },
+    {
+      "canonical": "משרד הביטחון",
+      "family": "state_institute",
+      "source": "seed",
+      "aliases": [
+        "משרד הבטחון",
+        "משהב\"ט",
+        "אגף השיקום"
+      ],
+      "keywords": [
+        "משרד הביטחון",
+        "משרד הבטחון"
+      ],
+      "commitment_labels": [
+        "מספר התחייבות"
+      ],
+      "pattern_hints": [],
+      "notes": "SAP screen insurer (A25): several commitment rows.",
+      "commitment_deny": [
+        "מקרה",
+        "מס' ביקור",
+        "מס' קליטה",
+        "מספר מבחנה"
+      ],
       "barcode_is_commitment": null
     }
   ]

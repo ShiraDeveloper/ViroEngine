@@ -1,5 +1,6 @@
-"""A document that is not a known sample is processed locally unless the job has consent
-(PLAN §8.5): its crops never reach a provider, not even S5's letterhead question."""
+"""With CLOUD_REQUIRES_CONSENT on, a document that is not a known sample is processed locally
+unless the job has consent (PLAN §8.5): its crops never reach a provider, not even S5's letterhead
+question. Off (the default since ADR-017), any document may be read by the provider."""
 
 from __future__ import annotations
 
@@ -21,8 +22,13 @@ def make_raw(make_page: Callable[[Pixels], PageRaw], *, known: bool) -> PageRaw:
     return raw.model_copy(update={"known_sample": known})
 
 
-def settings_for(tmp_path: Path) -> Settings:
-    return Settings(_env_file=None, data_dir=str(tmp_path))  # type: ignore[call-arg]
+def settings_for(tmp_path: Path, *, requires_consent: bool = True) -> Settings:
+    return Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        data_dir=str(tmp_path),
+        engine_mode="cascade",
+        cloud_requires_consent=requires_consent,
+    )
 
 
 def test_unknown_document_does_not_call_provider(
@@ -73,3 +79,20 @@ def test_known_sample_reaches_the_provider_without_consent(
     process_page(raw, services=services)
 
     assert vision.requests
+
+
+def test_unknown_document_reaches_the_provider_when_consent_is_not_required(
+    tmp_path: Path,
+    make_page: Callable[[Pixels], PageRaw],
+    storage: TmpdirStorage,
+    imaging: CvImaging,
+) -> None:
+    vision = ScriptedVision()
+    raw = make_raw(make_page, known=False)
+    settings = settings_for(tmp_path, requires_consent=False)
+    services = pipeline_services(settings, storage, imaging, vision, raw.page_id)
+
+    outcome = process_page(raw, services=services)
+
+    assert vision.requests, "the default lets any document be read"
+    assert outcome.escalation.gated is False

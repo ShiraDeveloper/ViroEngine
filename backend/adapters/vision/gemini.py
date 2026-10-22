@@ -14,10 +14,12 @@ from typing import Any, Final
 from backend.adapters.vision.base import (
     ProviderReply,
     check_model_id,
+    image_mime,
     png_b64,
     with_ring,
 )
 from backend.adapters.vision.config import ProvidersConfig
+from backend.adapters.vision.errors import ProviderRejected
 from backend.adapters.vision.prompt import ImagePart, RenderedPrompt, TextPart
 from backend.adapters.vision.ring import Credential, CredentialRing
 from backend.adapters.vision.transport import HttpCaller
@@ -43,6 +45,8 @@ class GeminiProvider:
     ) -> None:
         self._model = check_model_id(model) if model else ""
         self._config = config
+        # Set once the model refused our thinking / media settings: send provider defaults.
+        self._plain = False
         self.ring = CredentialRing(
             keys,
             provider="gemini",
@@ -64,16 +68,27 @@ class GeminiProvider:
                 if part.text:
                     parts.append({"text": part.text})
             elif isinstance(part, ImagePart):
-                parts.append({"inlineData": {"mimeType": "image/png", "data": png_b64(part.png)}})
+                parts.append(
+                    {"inlineData": {"mimeType": image_mime(part.png), "data": png_b64(part.png)}}
+                )
         generation: dict[str, Any] = {
             "temperature": self._config.temperature,
             "maxOutputTokens": self._config.max_output_tokens,
             "responseMimeType": "application/json",
             "responseJsonSchema": schema,
         }
-        budget = self._config.gemini.thinking_budget
-        if budget is not None:
-            generation["thinkingConfig"] = {"thinkingBudget": budget}
+        gemini = self._config.gemini
+        if gemini.media_resolution:
+            # Handwriting and faint stamps need the page at full detail, not the 258-token default.
+            generation["mediaResolution"] = gemini.media_resolution
+        if self._model.startswith("gemini-3"):
+            # Gemini 3 replaces the token budget with a level; "minimal" keeps a page near 5 s.
+            if gemini.thinking_level:
+                generation["thinkingConfig"] = {"thinkingLevel": gemini.thinking_level}
+        elif gemini.thinking_budget is not None:
+            generation["thinkingConfig"] = {"thinkingBudget": gemini.thinking_budget}
+        if self._plain:
+            generation = self._plain_generation(generation)
         return {
             "systemInstruction": {"parts": [{"text": prompt.system}]},
             "contents": [{"role": "user", "parts": parts}],
@@ -92,7 +107,23 @@ class GeminiProvider:
             headers = {"Content-Type": "application/json", "x-goog-api-key": cred.key}
             return caller.post(url, headers, body)
 
-        return _reply(with_ring(self.ring, attempt))
+        try:
+            return _reply(with_ring(self.ring, attempt))
+        except ProviderRejected:
+            # Newer models refuse some thinking levels ("MINIMAL is not supported") or a media
+            # resolution. Retry once with the provider defaults and keep them for this model.
+            generation = body["generationConfig"]
+            if self._plain or not ({"thinkingConfig", "mediaResolution"} & set(generation)):
+                raise
+            self._plain = True
+            body = {**body, "generationConfig": self._plain_generation(generation)}
+            return _reply(with_ring(self.ring, attempt))
+
+    @staticmethod
+    def _plain_generation(generation: dict[str, Any]) -> dict[str, Any]:
+        return {
+            k: v for k, v in generation.items() if k not in ("thinkingConfig", "mediaResolution")
+        }
 
 
 def _reply(data: dict[str, Any]) -> ProviderReply:

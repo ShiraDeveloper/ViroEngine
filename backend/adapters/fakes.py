@@ -190,7 +190,9 @@ class FakeImaging:
         """Returns the input unchanged."""
         return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
 
-    def thumbnail(self, image: bytes, *, max_side: int) -> EncodedImage:
+    def thumbnail(
+        self, image: bytes, *, max_side: int, jpeg_quality: int | None = None
+    ) -> EncodedImage:
         """Returns the input unchanged."""
         return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
 

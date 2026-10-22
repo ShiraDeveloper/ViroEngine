@@ -12,17 +12,14 @@
           "meta"
         ],
         "summary": "Health",
-        "description": "Liveness and adapter readiness check.\n\nReturns per-adapter status. API keys are never exposed —\nonly credential counts and circuit state.",
+        "description": "Liveness and readiness. 200 with `status: ok` when the engine can read a form, 503 with\n`status: unready` when it cannot (a missing Hebrew language pack, an unreachable Tesseract).\nAPI keys are never exposed, only credential counts and circuit state.",
         "operationId": "health_v1_health_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "type": "object",
-                  "title": "Response Health V1 Health Get"
-                }
+                "schema": {}
               }
             }
           }
@@ -981,7 +978,7 @@
           "files": {
             "items": {
               "type": "string",
-              "contentMediaType": "application/octet-stream"
+              "format": "binary"
             },
             "type": "array",
             "title": "Files"
@@ -1002,7 +999,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           },
           "cloud_consent": {
@@ -1454,6 +1451,13 @@
                 "type": "null"
               }
             ]
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notices"
           }
         },
         "additionalProperties": false,
@@ -1868,13 +1872,6 @@
           "type": {
             "type": "string",
             "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
           }
         },
         "type": "object",

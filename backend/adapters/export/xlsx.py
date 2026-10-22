@@ -7,7 +7,7 @@ import io
 
 from openpyxl import Workbook
 from openpyxl.comments import Comment
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -20,10 +20,19 @@ SHEET_AUDIT = "יומן שינויים"
 SHEET_SUMMARY = "סיכום"
 
 # Same hex values as frontend/src/design/tokens.ts (state.verified / single / review, primary.100).
-FILL_VERIFIED = "E8F5E9"
-FILL_SINGLE = "FFF6E5"
+FILL_VERIFIED = "E3F4E5"
+FILL_SINGLE = "F6FBF4"
 FILL_REVIEW = "FFE8D6"
-FILL_HEADER = "E7E6F7"
+FILL_HEADER = "0A1F3D"  # primary.900: the navy of the web app
+FILL_HELPER_HEADER = "33415A"  # the helper columns' header is a step quieter
+FILL_ZEBRA = "F7F9FC"
+BORDER_COLOUR = "DCE4EF"  # surface.border
+FONT_NAME = "Arial"
+HEADER_HEIGHT = 34
+ROW_HEIGHT = 24
+# Readable widths per column (characters), in COLUMNS order; the reason column wraps.
+WIDTHS = (14, 16, 16, 22, 16, 24, 20, 12, 12, 30, 18, 26, 60, 12)
+WRAP_COLUMNS = frozenset({13})
 
 DATE_FORMAT = "DD/MM/YYYY"
 SOURCE_DATE_FORMAT = "%d/%m/%Y"
@@ -42,8 +51,8 @@ COMMENT_SIZE = (320, 110)  # width, height in points
 
 AUDIT_HEADERS = ("זמן", "שורה", "שדה", "ערך קודם", "ערך חדש", "פעולה", "מבצע")
 LEGEND = (
-    (FILL_VERIFIED, "ירוק - נקרא ואומת"),
-    (FILL_SINGLE, "צהוב - קורא יחיד, מומלץ לבדוק"),
+    (FILL_VERIFIED, "ירוק - אומת פעמיים או בברקוד"),
+    (FILL_SINGLE, "ירוק בהיר - זוהה בקריאה אחת ועבר את כל הבדיקות"),
     (FILL_REVIEW, "כתום - נדרשת בדיקה"),
 )
 SUMMARY_LABELS = (
@@ -78,8 +87,14 @@ def _set_text(cell: object, text: str) -> None:
     cell.data_type = "s"  # type: ignore[attr-defined]
 
 
+_THIN = Side(style="thin", color=BORDER_COLOUR)
+_BORDER = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
+
+
 def _write_value(ws: Worksheet, row_idx: int, col_idx: int, key: FieldKey | str, c: Cell) -> None:
     target = ws.cell(row=row_idx, column=col_idx)
+    target.border = _BORDER
+    target.font = Font(name=FONT_NAME, size=11, bold=col_idx <= 7 and bool(c.text))
     parsed = _parse_date(c.text) if key is FieldKey.receipt_date else None
     if parsed is not None:
         target.value = parsed
@@ -91,11 +106,15 @@ def _write_value(ws: Worksheet, row_idx: int, col_idx: int, key: FieldKey | str,
     fill = _fill_for(c.level)
     if fill is not None:
         target.fill = fill
+    elif row_idx % 2 == 1:
+        target.fill = PatternFill("solid", start_color=FILL_ZEBRA, end_color=FILL_ZEBRA)
     if c.comment:
         comment = Comment(c.comment, COMMENT_AUTHOR)
         comment.width, comment.height = COMMENT_SIZE
         target.comment = comment
-    target.alignment = Alignment(horizontal="right", vertical="top", wrap_text=False)
+    target.alignment = Alignment(
+        horizontal="right", vertical="center", wrap_text=col_idx in WRAP_COLUMNS
+    )
 
 
 def _parse_date(text: str) -> datetime | None:
@@ -109,11 +128,20 @@ def _parse_date(text: str) -> datetime | None:
 def _style_header(ws: Worksheet, headers: tuple[str, ...]) -> None:
     for idx, header in enumerate(headers, start=1):
         cell = ws.cell(row=1, column=idx, value=header)
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill("solid", start_color=FILL_HEADER, end_color=FILL_HEADER)
-        cell.alignment = Alignment(horizontal="right")
+        colour = FILL_HEADER if idx <= 7 or len(headers) < 8 else FILL_HELPER_HEADER
+        cell.font = Font(name=FONT_NAME, bold=True, size=11, color="FFFFFF")
+        cell.fill = PatternFill("solid", start_color=colour, end_color=colour)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = _BORDER
+    ws.row_dimensions[1].height = HEADER_HEIGHT
     ws.freeze_panes = "A2"
     ws.sheet_view.rightToLeft = True
+    ws.sheet_view.zoomScale = 110
+    ws.sheet_view.showGridLines = False
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
 
 
 def _fit_widths(ws: Worksheet, column_count: int) -> None:
@@ -134,8 +162,10 @@ def _fill_table(ws: Worksheet, flat_rows: list[FlatRow]) -> None:
     for r_idx, flat in enumerate(flat_rows, start=2):
         for c_idx, ((_, key), cell) in enumerate(zip(COLUMNS, flat.cells, strict=True), start=1):
             _write_value(ws, r_idx, c_idx, key, cell)
+        ws.row_dimensions[r_idx].height = ROW_HEIGHT
     ws.auto_filter.ref = f"A1:{get_column_letter(len(HEADERS))}{max(1, len(flat_rows) + 1)}"
-    _fit_widths(ws, len(HEADERS))
+    for idx, width in enumerate(WIDTHS, start=1):
+        ws.column_dimensions[get_column_letter(idx)].width = width
 
 
 def _fill_audit(ws: Worksheet) -> None:
@@ -144,27 +174,51 @@ def _fill_audit(ws: Worksheet) -> None:
     _fit_widths(ws, len(AUDIT_HEADERS))
 
 
+def _section(ws: Worksheet, row: int, title: str) -> None:
+    cell = ws.cell(row=row, column=1, value=title)
+    cell.font = Font(name=FONT_NAME, bold=True, size=12, color="FFFFFF")
+    for col in (1, 2):
+        ws.cell(row=row, column=col).fill = PatternFill(
+            "solid", start_color=FILL_HEADER, end_color=FILL_HEADER
+        )
+    ws.row_dimensions[row].height = ROW_HEIGHT + 4
+
+
+def _pair(ws: Worksheet, row: int, label: str, value: object, fill: str | None = None) -> None:
+    left = ws.cell(row=row, column=1, value=label)
+    right = ws.cell(row=row, column=2, value=value)
+    for cell in (left, right):
+        cell.font = Font(name=FONT_NAME, size=11)
+        cell.border = _BORDER
+        cell.alignment = Alignment(horizontal="right", vertical="center")
+    if fill is not None:
+        left.fill = PatternFill("solid", start_color=fill, end_color=fill)
+    ws.row_dimensions[row].height = ROW_HEIGHT
+
+
 def _fill_summary(ws: Worksheet, report: RunReport) -> None:
-    """Colour legend and RunReport counters. Counters only - no field values."""
+    """Title, colour legend and RunReport counters. Counters only - no field values."""
     ws.sheet_view.rightToLeft = True
-    ws.cell(row=1, column=1, value="מקרא").font = Font(bold=True)
-    row = 2
+    ws.sheet_view.showGridLines = False
+    title = ws.cell(row=1, column=1, value="שורה בטוחה · סיכום ריצה")
+    title.font = Font(name=FONT_NAME, bold=True, size=16, color=FILL_HEADER)
+    ws.row_dimensions[1].height = 30
+    _section(ws, 3, "מקרא צבעים")
+    row = 4
     for colour, text in LEGEND:
-        ws.cell(row=row, column=1).fill = PatternFill("solid", start_color=colour, end_color=colour)
-        ws.cell(row=row, column=2, value=text)
+        _pair(ws, row, text, None, colour)
         row += 1
     row += 1
-    ws.cell(row=row, column=1, value="נתוני ריצה").font = Font(bold=True)
+    _section(ws, row, "נתוני ריצה")
     row += 1
     for attr, label in SUMMARY_LABELS:
-        ws.cell(row=row, column=1, value=label)
-        ws.cell(row=row, column=2, value=getattr(report, attr))
+        _pair(ws, row, label, getattr(report, attr))
         row += 1
     for level, count in sorted(report.level_histogram.items()):
-        ws.cell(row=row, column=1, value=f"רמה {level}")
-        ws.cell(row=row, column=2, value=count)
+        _pair(ws, row, f"רמה {level}", count)
         row += 1
-    _fit_widths(ws, 2)
+    ws.column_dimensions["A"].width = 34
+    ws.column_dimensions["B"].width = 22
 
 
 class XlsxExporter:

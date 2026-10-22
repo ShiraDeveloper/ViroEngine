@@ -216,24 +216,34 @@ Space. See `PLAN.md` §11 and `ADR-014`.
 
 ## 9. Decision records
 
-One file per decision in [`decisions/`](./decisions/), append-only.
+One file per decision in [`decisions/`](./decisions/), append-only. ADR 001-012 were taken before
+any measurement and are summarised in `PLAN.md` §3.8; 013-017 are written by the task that measures
+them, and a negative or missing result is recorded as fully as a positive one. The status column
+is the single source of truth in [`decisions/README.md`](./decisions/README.md).
 
-| ADR | Decision |
-|---|---|
-| 001 | Hexagonal ports and adapters |
-| 002 | Local-first cascade; cloud only for low-score fields |
-| 003 | Escalation on a combined score, not OCR self-confidence |
-| 004 | Only national standards are hard validations |
-| 005 | No fixed digit lengths; identification by label proximity |
-| 006 | Yellow mask only for the gold set, never at runtime |
-| 007 | API-first; Excel is one export adapter |
-| 008 | Credential rotation then provider failover |
-| 009 | Free tier only: Vercel + Render, Hugging Face as Plan B |
-| 010 | Learning stores locations and shapes, never values |
-| 011 | React + FastAPI rather than Streamlit |
-| 012 | YOLOv8n as a measured experiment |
-| 013 | Reader selection (filled by the Task 17 bake-off) |
-| 014 | Hosting decision (filled by the Day-3 measurement) |
-| 015 | Barcode/print agreement, which decides whether level A exists (Task 5) |
-| 016 | Region detector decision (Task 16) |
-| 017 | Final results (Task 30) |
+| ADR | Decision | Record |
+|---|---|---|
+| 001 | Hexagonal ports and adapters | `PLAN.md` §3.8 |
+| 002 | Local-first cascade; cloud only for low-score fields | `PLAN.md` §3.8 |
+| 003 | Escalation on a combined score, not OCR self-confidence | `PLAN.md` §3.8 |
+| 004 | Only national standards are hard validations | `PLAN.md` §3.8 |
+| 005 | No fixed digit lengths; identification by label proximity | `PLAN.md` §3.8 |
+| 006 | Yellow mask only for the gold set, never at runtime | `PLAN.md` §3.8 |
+| 007 | API-first; Excel is one export adapter | `PLAN.md` §3.8 |
+| 008 | Credential rotation then provider failover | `PLAN.md` §3.8 |
+| 009 | Free tier only: Vercel + Render, Hugging Face as Plan B | `PLAN.md` §3.8 |
+| 010 | Learning stores locations and shapes, never values | `PLAN.md` §3.8 |
+| 011 | React + FastAPI rather than Streamlit | `PLAN.md` §3.8 |
+| 012 | YOLOv8n as a measured experiment | `PLAN.md` §3.8 |
+| 013 | Reader selection (Task 17 bake-off) | [ADR-013](./decisions/ADR-013-reader-selection.md) |
+| 014 | Hosting decision (Day-3 measurement) | [ADR-014](./decisions/ADR-014-hosting.md) |
+| 015 | Barcode/print agreement, which decides whether level A exists (Task 5) | [ADR-015](./decisions/ADR-015-barcode-print-agreement.md) |
+| 016 | Region detector decision (Task 16) | [ADR-016](./decisions/ADR-016-region-detector.md) |
+| 017 | Final results (Task 30) | not yet written: no held-out run exists |
+
+## 10. Diagram
+
+The system diagram of section 2 as an image, for the submission form and the README:
+`assets/architecture.png`, regenerated with `python -m tools.make_architecture_png`.
+
+![Safe Line architecture](../assets/architecture.png)

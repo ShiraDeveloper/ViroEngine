@@ -88,8 +88,11 @@ class ImagingPort(Protocol):
         Raises RenderFailed when the image cannot be decoded."""
         ...
 
-    def thumbnail(self, image: bytes, *, max_side: int) -> EncodedImage:
-        """Downscale so the longest side is at most `max_side` px; never upscales.
+    def thumbnail(
+        self, image: bytes, *, max_side: int, jpeg_quality: int | None = None
+    ) -> EncodedImage:
+        """Downscale so the longest side is at most `max_side` px; never upscales. PNG, or JPEG
+        at `jpeg_quality` (1-100) when given - the vision-first page image.
 
         Raises RenderFailed when the image cannot be decoded."""
         ...

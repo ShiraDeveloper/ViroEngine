@@ -125,4 +125,18 @@ export const mockClient: ApiClient = {
     ),
 
   exportUrl: (jobId, fmt) => `mock://export/${jobId}.${fmt}`,
+  // Demo mode exports the fixture rows as JSON whatever the format: nothing leaves the browser.
+  fetchExport: (jobId) =>
+    Promise.resolve(
+      new Blob([JSON.stringify({ job_id: jobId, rows: job.rows })], {
+        type: 'application/json',
+      }),
+    ),
+
+  // Demo mode has no evaluation run: it reports "no data" rather than invent numbers.
+  getEvalMetrics: () => Promise.resolve({ available: false }),
+
+  // The derived job is the same fixture: enough to exercise the screen without a backend.
+  stress: () =>
+    Promise.resolve({ job_id: `${fixture.job_id}-stress`, status: 'needs_review', page_count: fixture.page_count }),
 };

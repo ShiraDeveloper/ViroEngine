@@ -13,7 +13,11 @@ from dataclasses import dataclass
 import re
 from typing import Any, Final, Protocol
 
-from backend.adapters.vision.errors import ProviderUnavailable
+from backend.adapters.vision.errors import (
+    DAILY_QUOTA_COOLDOWN_SECONDS,
+    ProviderDailyQuota,
+    ProviderUnavailable,
+)
 from backend.adapters.vision.prompt import RenderedPrompt
 from backend.adapters.vision.ring import Credential, CredentialRing
 from backend.adapters.vision.transport import HttpCaller
@@ -69,6 +73,12 @@ def png_b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
+def image_mime(data: bytes) -> str:
+    """Media type of an encoded image from its magic bytes: JPEG for the vision-first page
+    image (a third of the PNG size), PNG for everything else."""
+    return "image/jpeg" if data[:3] == b"\xff\xd8\xff" else "image/png"
+
+
 def with_ring[T](ring: CredentialRing, attempt: Callable[[Credential], T]) -> T:
     """Run `attempt` with the first usable credential, moving on after a 429 (the credential
     cools) or a 401/403 (it dies). Raises the last such error when every credential has been
@@ -77,6 +87,9 @@ def with_ring[T](ring: CredentialRing, attempt: Callable[[Credential], T]) -> T:
     while (cred := ring.next()) is not None:
         try:
             return attempt(cred)
+        except ProviderDailyQuota as exc:
+            ring.cool(cred, DAILY_QUOTA_COOLDOWN_SECONDS)
+            last = exc
         except ProviderRateLimited as exc:
             ring.cool(cred)
             last = exc

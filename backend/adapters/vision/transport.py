@@ -15,7 +15,21 @@ from typing import Any, Final
 
 import httpx
 
-from backend.adapters.vision.errors import ProviderRejected, ProviderUnavailable
+try:  # Verify TLS against the operating system's certificate store, not only certifi's bundle.
+    # A filtering proxy (NetFree in Israeli schools and offices) re-signs HTTPS with a root the
+    # OS trusts but certifi does not, and every provider call then fails certificate checks.
+    import truststore
+
+    truststore.inject_into_ssl()
+except ImportError:  # optional: without it the default bundle is used, as before
+    pass
+
+from backend.adapters.vision.errors import (
+    ProviderDailyQuota,
+    ProviderRejected,
+    ProviderTimedOut,
+    ProviderUnavailable,
+)
 from backend.adapters.vision.rate_limit import TokenBucket
 from backend.core.errors import ProviderBadResponse, ProviderInvalidKey, ProviderRateLimited
 
@@ -25,6 +39,8 @@ _AUTH_REJECTED: Final = (401, 403)
 _SERVER_ERROR_FROM: Final = 500
 _TIMEOUT_OR_BUSY: Final = (408, 409, 425)
 _OK_FROM, _OK_TO = 200, 300
+# Structural: Gemini names a daily free-tier quota "...PerDay..." in a 429 body.
+_DAILY_QUOTA: Final = b"PerDay"
 
 
 @dataclass(frozen=True)
@@ -95,9 +111,13 @@ class HttpCaller:
                 HttpRequest(url=url, headers=headers, body=body, timeout=self.timeout)
             )
         except TransportError as exc:
+            if "Timeout" in str(exc):
+                raise ProviderTimedOut(f"transport failed: {exc}") from None
             raise ProviderUnavailable(f"transport failed: {exc}") from None
         status = reply.status
         if status == _RATE_LIMITED:
+            if _DAILY_QUOTA in reply.body:
+                raise ProviderDailyQuota("provider daily quota exhausted")
             raise ProviderRateLimited("provider answered 429")
         if status in _AUTH_REJECTED:
             raise ProviderInvalidKey(f"provider answered {status}")

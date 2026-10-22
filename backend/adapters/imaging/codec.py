@@ -39,3 +39,16 @@ def encode_png(image: Pixels) -> EncodedImage:
         raise RenderFailed("image could not be encoded")
     height, width = image.shape[:2]
     return EncodedImage(data=encoded.tobytes(), width=int(width), height=int(height))
+
+
+def encode_jpeg(image: Pixels, quality: int) -> EncodedImage:
+    """Encode as JPEG at `quality` (1-100). Used for the page image sent to a vision model, where
+    it is a third of the PNG size at no loss a model can see. Raises RenderFailed on failure."""
+    try:
+        ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
+    except cv2.error as exc:
+        raise RenderFailed("image could not be encoded") from exc
+    if not ok:
+        raise RenderFailed("image could not be encoded")
+    height, width = image.shape[:2]
+    return EncodedImage(data=encoded.tobytes(), width=int(width), height=int(height))

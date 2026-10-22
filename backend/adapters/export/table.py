@@ -36,6 +36,13 @@ FIELD_COLUMN_COUNT = 7
 HEADERS: tuple[str, ...] = tuple(header for header, _ in COLUMNS)
 
 STATUS_TEXT = {"auto": "אוטומטי", "confirmed": "אושר", "edited": "נערך"}
+# The row's confidence in words, with a symbol so it survives printing in black and white.
+ROW_LEVEL_TEXT = {
+    ConfidenceLevel.A: "✔ אומת בברקוד",
+    ConfidenceLevel.B: "✔ אומת",
+    ConfidenceLevel.C: "✔ זוהה",
+    ConfidenceLevel.D: "⚠ לבדיקה",
+}
 SOURCE_TEXT = {
     "barcode": "ברקוד",
     "printed": "מודפס",
@@ -89,6 +96,14 @@ def _field_cell(row: CommitmentRow, key: FieldKey) -> Cell:
     return Cell(text, result.level, _comment(result))
 
 
+def _page_label(page_id: str) -> str:
+    """`file#3` as `file · עמ' 3`: the page the technician opens to check the row."""
+    stem, _, number = page_id.rpartition("#")
+    if not stem or not number.isdigit():
+        return page_id
+    return f"{stem.replace('_', ' ').strip()} · עמ' {number}"
+
+
 def _plain(text: str) -> Cell:
     return Cell(text, None, None)
 
@@ -106,8 +121,8 @@ def flatten(row: CommitmentRow) -> FlatRow:
     helpers = {
         "payer": "",
         "family": "",
-        "source": "; ".join(row.page_ids),
-        "row_level": row.row_level.value,
+        "source": "; ".join(_page_label(p) for p in row.page_ids),
+        "row_level": ROW_LEVEL_TEXT[row.row_level],
         "flagged": "; ".join(header for header, _ in flagged_fields),
         "reasons": "; ".join(f"{header}: {r.reason}" for header, r in flagged_fields if r.reason),
         "status": STATUS_TEXT[row.status],

@@ -41,6 +41,7 @@ from backend.core.scoring import (
     AGREE_NONE,
     SECOND_READ_NOTE,
     SENDER_NOT_LISTED,
+    THIRD_READ_NOTE,
     VALUE_KEPT_REASONS,
     Evidence,
     ScoringConfig,
@@ -103,6 +104,8 @@ class _Hard:
 def _reader_key(c: Candidate) -> str:
     """Identity of an independent reading. A second Tesseract pass at another psm on a tight crop
     counts as its own reader (S7), a repeat of the page read does not."""
+    if THIRD_READ_NOTE in c.notes:
+        return f"{c.reader.value}:third"
     suffix = "second" if SECOND_READ_NOTE in c.notes else "first"
     return f"{c.reader.value}:{suffix}"
 

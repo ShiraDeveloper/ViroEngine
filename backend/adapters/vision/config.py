@@ -33,8 +33,8 @@ class RetryConfig(Strict):
 
 
 class BucketConfig(Strict):
-    capacity: int = Field(default=10, ge=1)
-    refill_seconds: float = Field(default=6.0, gt=0.0)  # one token per 6 s = ~10 req/min
+    capacity: int = Field(default=30, ge=1)
+    refill_seconds: float = Field(default=2.0, gt=0.0)  # ~30 req/min per model slot
 
 
 class GeminiConfig(Strict):
@@ -42,6 +42,10 @@ class GeminiConfig(Strict):
     # Gemini 2.5 spends max_output_tokens on hidden reasoning first; 0 keeps the 800-token cap for
     # the JSON answer. null omits the parameter (models that have no thinking mode reject it).
     thinking_budget: int | None = Field(default=0, ge=0)
+    # Gemini 3 models take a thinking level instead of a budget; null omits it.
+    thinking_level: str | None = "minimal"
+    # Image detail sent to the model; null keeps the provider default (low for 2.5 models).
+    media_resolution: str | None = "MEDIA_RESOLUTION_HIGH"
 
 
 class OpenRouterConfig(Strict):
@@ -59,7 +63,7 @@ class ProvidersConfig(Strict):
     retry: RetryConfig = Field(default_factory=RetryConfig)
     token_bucket: BucketConfig = Field(default_factory=BucketConfig)
     credential_cooldown_seconds: float = Field(default=60.0, ge=0.0)
-    max_output_tokens: int = Field(default=800, ge=1)
+    max_output_tokens: int = Field(default=4096, ge=1)
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     request_timeout_seconds: float = Field(default=30.0, gt=0.0)
     gemini: GeminiConfig = Field(default_factory=GeminiConfig)
