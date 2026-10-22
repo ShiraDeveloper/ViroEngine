@@ -76,7 +76,7 @@ from backend.core.validators import (
     parse_il_date,
     strip_surplus_leading_zeros,
 )
-from backend.core.vision_schema import VERIFY_SCHEMA, page_schema
+from backend.core.vision_schema import VERIFY_SCHEMA, name_label_clear, page_schema
 from backend.settings import Settings
 
 log = structlog.get_logger()
@@ -391,7 +391,11 @@ def _first_reads(page: _Page, response: VisionResponse, services: VisionServices
         page.reads[key] = cands
         page.trails[key] = [_step(response, values[0] if values else None, page_sent=True)]
         if cands and confirmed < len(values) and box is not None:
-            if not _self_validated(key, values, services):
+            # The page-mode second read sees the whole page anyway: checking every field against
+            # it costs no request. A plausible date can still be misread (B5: 18-08 read as
+            # 18-06, level C, unflagged), so nothing is waved through on plausibility alone.
+            whole_page = services.settings.verify_mode == "page"
+            if whole_page or not _self_validated(key, values, services):
                 page.to_verify[key] = box
 
 
@@ -583,6 +587,22 @@ def _flag_twin_names(evaluations: dict[FieldKey, FieldEvaluation]) -> None:
         evaluations[key] = FieldEvaluation(result=shown, signals=flagged.signals, evidence=None)
 
 
+def _flag_unlabelled_names(evaluations: dict[FieldKey, FieldEvaluation], page: _Page) -> None:
+    """A name the page reader found beside a label that is not a name label goes to level D
+    `name_label_unclear`, still showing the reading, in place. Agreement of a second reader does
+    not clear it: both may have taken the same wrong text."""
+    for key in _SHOWN_WHEN_DISPUTED:
+        found = page.answer.answers.get(key) if page.answer is not None else None
+        if found is None or not found.values or name_label_clear(found.note or ""):
+            continue
+        result = evaluations[key].result
+        flagged = flag_for_review(evaluations[key], "name_label_unclear")
+        shown = flagged.result.model_copy(
+            update={"value": result.value, "display_value": result.value}
+        )
+        evaluations[key] = FieldEvaluation(result=shown, signals=flagged.signals, evidence=None)
+
+
 def _show_first_reading(evaluation: FieldEvaluation) -> FieldEvaluation:
     """A disputed name stays level D with its reason, but shows the page reading instead of an
     empty cell, so the technician confirms or corrects it rather than retyping it. Numbers and
@@ -695,6 +715,7 @@ def _outcome(
         evaluations[key] = _settle(key, evaluations[key])
     _flag_shared_numbers(evaluations)
     _flag_twin_names(evaluations)
+    _flag_unlabelled_names(evaluations, page)
     _distrust(evaluations, evaluations[FieldKey.sender].result.value, services)
     for key in _SHOWN_WHEN_DISPUTED:
         evaluations[key] = _show_first_reading(evaluations[key])

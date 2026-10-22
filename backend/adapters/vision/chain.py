@@ -149,11 +149,15 @@ class VisionChainAdapter:
         sleep: Callable[[float], None] = time.sleep,
         rand: Callable[[], float] = random.random,
         gemini_models: Sequence[str] | None = None,
+        cache_scope: str = "",
     ) -> None:
         self._settings = settings
         self._config = config or load_providers_config()
         self._prompts_dir = prompts_dir
         # Solved example pages taught before every page read; none when the directory is absent.
+        # Part of every cache key: the blind verifier must never be handed the page reader's
+        # cached answer for the same page (that is one reading counted twice, a false level B).
+        self._cache_scope = cache_scope
         self._fewshot_dir = (
             Path(settings.vision_fewshot_dir)
             if settings.vision_fewshot_dir
@@ -208,7 +212,9 @@ class VisionChainAdapter:
         if not usable:
             raise ProviderExhausted("no provider is configured", failovers=("none_configured",))
         examples = self._examples(request)
-        prompt = prompt_fingerprint(request, prompts_dir=self._prompts_dir, examples=examples)
+        prompt = self._cache_scope + prompt_fingerprint(
+            request, prompts_dir=self._prompts_dir, examples=examples
+        )
         for slot in usable:
             hit = self._cache.get(cache_key(request, slot.provider.model_id, prompt))
             if hit is not None:

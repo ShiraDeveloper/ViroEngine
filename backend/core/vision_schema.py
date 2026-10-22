@@ -394,15 +394,17 @@ _NAME_LABEL_PARTS: Final = (
 
 
 def label_belongs(key: FieldKey, label: str) -> bool:
-    """False when the label a value was read beside names another field or person, or - for a
-    name - is not a name label at all. An empty label (a sticker, a stamp) is no evidence either
-    way and passes."""
+    """False when the label a value was read beside names another field or person. An empty
+    label (a sticker, a stamp) is no evidence either way and passes."""
     words = {w.strip(".:\"'׳״()") for w in label.replace("/", " ").split()}
-    if words & _FOREIGN_LABEL_WORDS.get(key, frozenset()):
-        return False
-    if key in (FieldKey.first_name, FieldKey.last_name) and label.strip():
-        return any(part in label.lower() for part in _NAME_LABEL_PARTS)
-    return True
+    return not (words & _FOREIGN_LABEL_WORDS.get(key, frozenset()))
+
+
+def name_label_clear(label: str) -> bool:
+    """True when a name was read beside a name label, or with no label (the patient sticker).
+    False for any other label: the name is kept but goes to review, never silently trusted and
+    never silently dropped - on A14 the model reported "שם" as 'ע"ש' beside a correct name."""
+    return not label.strip() or any(part in label.lower() for part in _NAME_LABEL_PARTS)
 
 
 # Words that never form part of a person's name on these forms: tests, specimens, clinical

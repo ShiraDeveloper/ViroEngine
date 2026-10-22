@@ -123,3 +123,13 @@ def test_changing_the_examples_misses_the_cache(tmp_path: Path) -> None:
     with_examples = cache_key(request, "m", prompt_fingerprint(request, examples=examples))
 
     assert without != with_examples
+
+
+def test_the_verifier_never_reuses_the_readers_cached_answer() -> None:
+    request = _page_request()
+    fingerprint = prompt_fingerprint(request)
+
+    reader = cache_key(request, "gemini-3-flash-preview", fingerprint)
+    verifier = cache_key(request, "gemini-3-flash-preview", "verify:" + fingerprint)
+
+    assert reader != verifier

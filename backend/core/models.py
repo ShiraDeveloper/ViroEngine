@@ -92,6 +92,7 @@ REASON_TEXT: dict[str, str] = {
     "providers_exhausted": "לא ניתן לאמת — נדרשת בדיקה",
     "multiple_candidates": "נמצאו כמה אפשרויות",
     "often_corrected": "שדה שתוקן לעיתים קרובות בעבר",
+    "name_label_unclear": "השם לא נקרא ליד תווית של שם",
 }
 
 

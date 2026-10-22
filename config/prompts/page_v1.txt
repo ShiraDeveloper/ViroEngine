@@ -82,6 +82,10 @@ THE SEVEN FIELDS
      "שם", or on the sticker. Read fast cursive letter by letter: cursive Hebrew is still
      writing. Return "" only when the letters truly cannot be made out - never fill in a
      "likely" name, and never a name from another page or an example.
+     HANDWRITING OVER PRINT: when a name is handwritten (blue ink) over, beside or above a
+     printed patient sticker or a printed name, the HANDWRITTEN name is the patient's - it is a
+     correction. Take BOTH names from the handwriting; never mix a printed word (an old first
+     name on the sticker) with the handwritten family name.
   4. SPLITTING. Separate labels decide by themselves. A combined label with an explicit order
      ("שם משפחה ושם פרטי", "שם ומשפחה" = first then family) is split by that order. A bare "שם",
      "מטופל:" or a sticker line: use your knowledge of which Hebrew / Arabic words are given names
