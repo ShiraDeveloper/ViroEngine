@@ -133,6 +133,15 @@ class Settings(BaseSettings):
     # stamp's date sits above those lines (A1: ~0.08 diagonal above "המרכזית").
     stamp_reread_reach: float = Field(default=0.10, gt=0.0, le=1.0)
     stamp_reread_max: int = Field(default=2, ge=0, le=10)  # crops per page; 0 disables
+    # Patient-block re-read: the page pass is unstable on the block's small bold labels beside
+    # blue handwriting (A1: "פרטי המבוטח/ת" and 'ת"ז' are lost, "שם" reads as "DW"), while a
+    # crop of the block reads them. The area around each group of patient-label words found,
+    # this share of the page diagonal on every side, is read again (A1: the header sits ~0.03
+    # diagonal above "שם").
+    patient_reread_reach: float = Field(default=0.06, gt=0.0, le=1.0)
+    # Crops per page; 0 disables. 3, because the provider box ("שם", "כתובת") and a footer line
+    # ("המבוטח/ת") anchor groups of their own (A1).
+    patient_reread_max: int = Field(default=3, ge=0, le=10)
 
     # --- S4 regions (T11) -------------------------------------------------
     # Printed sideways, so OCR is imperfect: one wrong letter of five scores 80. Measured on the
