@@ -2017,7 +2017,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 14 ✅ | S8 scoring, ladder, calibration | Shira | P3 | D4 | 3h | 8 · **12,13 at runtime only** |
 | 15 ✅ | Orchestrator and evaluation runner — **M3** | Shira | P3 | D4–5 | 3h | 9–14 |
 | 16 ◐ | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
-| 17 | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
+| 17 ◐ | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
 | 18 ◐ | S9 provider layer with failover | Ahuba | P4 | D5–6 | 4h | 14,15,17 |
 | 19 ✅ | Export adapters: Excel, CSV, JSON | Shira | P4 | D5–6 | **4h** | 2 · **15 at runtime only** |
 | 20 ◐ | S10 grouping and rows — **M4** | Ahuba | P4 | D6–7 | 3h | 15,18 |
@@ -3425,6 +3425,26 @@ column -s, -t eval/results/bakeoff.csv
 # -> contestant | printed acc | handwritten acc | silent err | p50 ms | MB
 # -> "winner (printed): tesseract | winner (handwritten digits): <measured>"
 ```
+
+> **◐ Harness built — 2026-10-22 (D5). The bake-off has NOT been run: no numbers, no winners, ADR-013 is
+> `open`.** Shared task; this part (the harness, step 1) by Ahuba, for review by Shira.
+> Built and unit-tested (fake evaluator, no OCR or keys): `eval/bakeoff.py` — one baseline container, each
+> contestant changes only its own stage; `--isolate` runs each in its own process (own memory peak);
+> `--owner ahuba|shira` splits the contestants as in Steps 2–3; skipped contestants are rows with a reason,
+> never zeros; the decision rule (lowest silent error, tie → local → faster; region challengers also held to
+> the T16 400 ms / 120 MB limits, thresholds in `models.yaml: bakeoff`); the T13 TrOCR-assumption verdict
+> (confirmed / refuted / undetermined). `run_eval.evaluate` gained `pages`, `known_hashes`, `cloud_consent`
+> (needed to run a subset and to let a vision contestant reach the provider for known samples only).
+> `backend/tests/unit/test_bakeoff.py` holds the four named tests (it lives under `backend/tests` because
+> `testpaths` only collects there, not in `eval/tests/`).
+> **Found:** every `multi_central` page in `config/gold_families.json` (A9, A14, A24, B12) is a hard page, so
+> the held-out quota cannot be met while the hard pages stay in dev. `pick_held_out` now excludes the hard
+> pages and stops with a message naming the family. A person must add a non-hard page to that family while
+> labelling (T7) or change the hard-page list.
+> **Cannot run now:** Surya, Mistral OCR and Azure DI have **no adapter**; YOLO has no model; Gemini needs a key;
+> and `eval/gold.csv` / `eval/held_out.txt` do not exist yet. **For Shira:** run
+> `python -m eval.bakeoff --owner shira --isolate` once gold exists; the OCR contestants without an adapter
+> (Surya, Mistral, Azure) are hers to build or to drop with a recorded reason.
 
 ---
 
