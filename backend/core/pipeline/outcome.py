@@ -9,6 +9,7 @@ from pydantic import Field
 from backend.core.models import CommitmentRow, FieldKey, FieldResult, PageGroup, Strict
 from backend.core.pipeline.s5_classify import PageRole
 from backend.core.pipeline.s8_score import FieldEvaluation
+from backend.core.pipeline.s9_escalate import EscalationStats
 
 
 class PageOutcome(Strict):
@@ -26,6 +27,7 @@ class PageOutcome(Strict):
     corrections: list[str] = Field(default_factory=list)
     durations_ms: dict[str, int] = Field(default_factory=dict)
     evaluations: dict[FieldKey, FieldEvaluation] = Field(default_factory=dict)
+    escalation: EscalationStats = Field(default_factory=EscalationStats)  # S9 counters, no values
 
     @property
     def results(self) -> dict[FieldKey, FieldResult]:

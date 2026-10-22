@@ -1,4 +1,4 @@
-# Safe Line — Execution Plan
+﻿# Safe Line — Execution Plan
 
 Confidence-aware extraction engine for Israeli medical commitment forms. A scanned, photographed,
 rotated or handwritten form goes in; a validated row comes out. Uncertain fields are flagged with
@@ -2018,7 +2018,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 15 ✅ | Orchestrator and evaluation runner — **M3** | Shira | P3 | D4–5 | 3h | 9–14 |
 | 16 | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
 | 17 | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
-| 18 | S9 provider layer with failover | Ahuba | P4 | D5–6 | 4h | 14,15,17 |
+| 18 ◐ | S9 provider layer with failover | Ahuba | P4 | D5–6 | 4h | 14,15,17 |
 | 19 ✅ | Export adapters: Excel, CSV, JSON | Shira | P4 | D5–6 | **4h** | 2 · **15 at runtime only** |
 | 20 | S10 grouping and rows — **M4** | Ahuba | P4 | D6–7 | 3h | 15,18 |
 | 21 ✅ | Screens: login, upload, processing, export | Shira | P5 | D6–7 | 3h | 4 · **22 at runtime only** |
@@ -3502,6 +3502,26 @@ GEMINI_API_KEYS=bad1,bad2 OPENROUTER_API_KEY= GROQ_API_KEY= python -m tools.demo
 # -> 'k1' 429 -> 'k2' 429 -> openrouter unavailable -> groq unavailable
 # -> ProviderExhausted handled: 2 fields flagged orange, run completed
 ```
+
+> **◐ Implemented — 2026-10-22 (D5). Not live-verified, so the "Done when" list is not fully met.**
+> Built: `core/pipeline/s9_escalate.py` (wired into `process_page` as stage S9, run report and SSE
+> counters updated), `core/vision_schema.py` (strict answer schema, no confidence field),
+> `adapters/vision/{base,gemini,chat_completions,openrouter,groq,chain,cache,rate_limit,circuit,
+> ring,transport,prompt,config,errors}.py`, `config/prompts/{v1,sender_v1}.txt` + changelog,
+> `providers`/`escalation` sections of `config/models.yaml`, `ImagingPort.fill_boxes`,
+> `ESCALATION_SEND_THUMBNAIL`, regenerated `frontend/src/api/types.ts`. The shared pytest fixtures
+> moved from `tests/unit/conftest.py` to `tests/conftest.py` so the security and resilience suites
+> can use them.
+> Verified: 81 new tests, 700 pass / 3 skipped / 0 fail in `backend/tests`; `mypy --strict
+> backend/core`, `mypy backend/adapters/vision`, `check_layering` (0), `check_env_example`,
+> `check_docs` clean. Hard gate `test_all_providers_down_flags_fields_and_run_completes` passes at
+> stage level and through `iter_outcomes`; the re-run of a batch makes zero provider calls
+> (`test_rerun_of_the_same_batch_makes_zero_provider_calls`).
+> **Not verified:** any call to a real provider, the 48-page run with a real key, and therefore the
+> escalation rate, call count and measured cost the PR must show; Gemini's `responseJsonSchema` and
+> `thinkingBudget` parameters; the OCR-based thumbnail test (skipped where Tesseract is absent).
+> Not built: the `tools.demo escalate` command. No OpenRouter/Groq model id is pinned (see
+> `docs/limitations.md`). Ahuba to run the 48 pages with a key and record the numbers here.
 
 ---
 

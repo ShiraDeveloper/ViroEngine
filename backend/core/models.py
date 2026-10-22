@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # Normalized y_min, x_min, y_max, x_max, origin top-left, 0.0-1.0.
 Box = tuple[float, float, float, float]
+
+# Structural: the response schema's maxLength for a value or alternative (PLAN Appendix B).
+VISION_TEXT_MAX = 120
 
 
 class Strict(BaseModel):
@@ -318,20 +321,66 @@ class SenderSpec(Strict):
 # ---------------------------------------------------------------------------
 
 
+class CropPayload(Strict):
+    """One crop that leaves the machine (PLAN §13 T18). `png` holds the pixels of `box` only."""
+
+    field: FieldKey
+    png: bytes
+    region_kind: RegionKind  # asserted never `clinical` where the request is built and sent
+    box: Box
+
+
 class VisionRequest(Strict):
-    """Crop + context sent to a cloud vision provider. Clinical regions never appear here."""
+    """What one page sends to a cloud vision provider: crops, never the page (PLAN §6.4).
+
+    `page_thumb` is the redacted 512 px layout thumbnail, present only when a field needs page
+    context. `candidates` is what the code already found, so the model chooses rather than
+    invents. `task` selects the prompt: `fields` is the S9 extraction (`crops` hold one crop per
+    unresolved field), `sender` is S5's letterhead question answered from `sender_options`.
+    The plan's `schema` field is called `response_schema` because `schema` shadows a pydantic
+    attribute.
+    """
 
     job_id: str
     page_id: str
-    field: FieldKey
-    crop: ImageRef
-    context_text: str | None = None
+    task: Literal["fields", "sender"] = "fields"
+    page_thumb: bytes | None = None
+    crops: list[CropPayload]
     sender: str | None = None
+    sender_options: list[str] = Field(default_factory=list)
+    label_synonyms: list[str] = Field(default_factory=list)
+    candidates: dict[FieldKey, list[str]] = Field(
+        default_factory=dict, json_schema_extra={"x-key-type": "FieldKey"}
+    )
+    barcode_candidates: list[str] = Field(default_factory=list)  # decoded from the sent crops
     prompt_version: str
+    response_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class VisionAnswer(Strict):
+    """The validated answer for one field. There is no confidence here by design: the model is
+    never asked how sure it is, and S8 computes confidence from independent signals."""
+
+    values: list[str] = Field(default_factory=list, max_length=10)
+    source: SourceKind = SourceKind.unknown
+    box: Box | None = None
+    alts: list[str] = Field(default_factory=list, max_length=5)
+    note: str | None = Field(default=None, max_length=200)
+
+    @model_validator(mode="after")
+    def _bounded_text(self) -> VisionAnswer:
+        """The schema's maxLength: a pathological response cannot become a value."""
+        if any(len(v) > VISION_TEXT_MAX for v in [*self.values, *self.alts]):
+            raise ValueError(f"a value or alternative is longer than {VISION_TEXT_MAX} characters")
+        return self
 
 
 class VisionResponse(Strict):
-    """Schema-validated provider response. The model never assigns its own confidence."""
+    """Schema-validated provider response. The model never assigns its own confidence.
+
+    `answers` carries the S9 extraction per requested field; `raw_text`/`candidates` carry the
+    S5 sender answer. `failovers` lists "from->to" hops that happened before this answer;
+    `cache_hit` is True when it came from the local cache and no provider was called."""
 
     raw_text: str
     candidates: list[str]
@@ -339,12 +388,21 @@ class VisionResponse(Strict):
     model_id: str
     prompt_version: str
     duration_ms: int
+    answers: dict[FieldKey, VisionAnswer] = Field(
+        default_factory=dict, json_schema_extra={"x-key-type": "FieldKey"}
+    )
+    ambiguities: list[str] = Field(default_factory=list, max_length=10)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_hit: bool = False
+    failovers: list[str] = Field(default_factory=list)
 
 
 class ProviderHealth(Strict):
     name: str
     credentials: int  # count, never the key values
     state: Literal["ok", "open", "half_open", "exhausted"]
+    labels: list[str] = Field(default_factory=list)  # credential labels such as "k1", never keys
 
 
 class LayoutObservation(Strict):

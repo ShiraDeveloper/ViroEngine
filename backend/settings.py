@@ -33,8 +33,12 @@ class Settings(BaseSettings):
 
     # --- Fallback providers -----------------------------------------------
     openrouter_api_key: str = ""
+    # A ":free" vision model id. Empty -> config/models.yaml `providers.openrouter.model`.
     openrouter_vision_model: str = ""
     groq_api_key: str = ""
+    # Only if the Groq console lists a vision model that day. Empty -> config/models.yaml
+    # `providers.groq.vision_model`; empty there too means Groq is skipped.
+    groq_vision_model: str = ""
 
     # --- Engine thresholds (all from config, never hard-coded) ------------
     local_only: bool = False
@@ -44,6 +48,13 @@ class Settings(BaseSettings):
     render_dpi: int = Field(default=300, ge=100, le=600)
     max_concurrency: int = Field(default=2, ge=1, le=16)
     escalation_score_threshold: float = Field(default=0.80, ge=0.0, le=1.0)
+    # S9 (T18): false removes the redacted 512 px context thumbnail from every request, so a
+    # provider receives crops alone. Accuracy with and without it is an ablation row (PLAN §10.5).
+    escalation_send_thumbnail: bool = True
+    # S9 response cache lifetime. A cached response holds the values read from a crop, so it is
+    # patient data: None keeps it for JOB_TTL_MINUTES like every other artefact; raise it
+    # deliberately for development runs on the adapted sample forms only.
+    vision_cache_ttl_minutes: int | None = Field(default=None, ge=1, le=10_080)
     # Orchestrator (T15): pages between forced garbage collections. One page is held in memory
     # at a time; collecting every 10 keeps the 512 MB host budget (PLAN §13 T15 step 3).
     gc_interval_pages: int = Field(default=10, ge=1, le=1000)

@@ -73,7 +73,11 @@ yolo:
   confidence_threshold: 0.60
   iou_threshold: 0.45
 
-# --- Cloud providers -------------------------------------------------------
+# --- Cloud providers (T18) ---------------------------------------------------
+# Read by backend/adapters/vision/config.py; ProvidersConfig defaults must equal these (a test
+# enforces it). The chain order is `primary`, then `fallback_order`. A provider with no key, or
+# no model id, is skipped and reported as unavailable. Env settings win over the ids below:
+# GEMINI_MODEL, OPENROUTER_VISION_MODEL, GROQ_VISION_MODEL.
 providers:
   primary: gemini
   fallback_order:
@@ -87,6 +91,35 @@ providers:
     base_delay_seconds: 0.5
     max_delay_seconds: 8.0
     jitter_factor: 0.25
+  token_bucket:                   # per provider: stay under published ceilings, not via 429
+    capacity: 10
+    refill_seconds: 6.0           # one token per 6 s = ~10 requests per minute
+  credential_cooldown_seconds: 60 # a 429 cools one Gemini credential for this long
+  max_output_tokens: 800
+  temperature: 0.0
+  request_timeout_seconds: 30.0
+  gemini:
+    model: gemini-2.5-flash
+    thinking_budget: 0            # 2.5 models reason first and would eat the 800-token cap
+  openrouter:
+    # A ":free" vision model id. The free list changes weekly and was NOT verified for this
+    # commit, so none is pinned: set OPENROUTER_VISION_MODEL (or this key) the day you use it.
+    model: null
+  groq:
+    # Only if the Groq console lists a vision model that day (PLAN §6.2). null skips Groq.
+    vision_model: null
+
+# --- S9 escalation (T18) ------------------------------------------------------
+# EscalationConfig defaults in backend/core/pipeline/s9_escalate.py must equal these. The
+# escalation threshold itself is ESCALATION_SCORE_THRESHOLD (also scoring.escalation_score_threshold).
+escalation:
+  crop_pad_fraction: 0.02           # margin around a crop, share of the page diagonal
+  max_candidates_per_field: 5       # code candidates handed to the model per field
+  cloud_reader_confidence: 0.5      # neutral: the model reports none, S8 weights this low
+  context_fields: [central_number]  # a redacted thumbnail is sent only for these ...
+  context_page_roles: [sap_screen]  # ... on these page roles (PLAN §6.4)
+  usd_per_million_input_tokens: 0.30   # ASSUMPTION (PLAN §6.5): Gemini Flash planning prices
+  usd_per_million_output_tokens: 2.50
 
 # --- S5 sender + page-role classification (T10) -----------------------------
 # ClassifyConfig defaults in backend/core/pipeline/s5_classify.py must equal these.
