@@ -25,12 +25,17 @@ import structlog
 from backend.adapters.vision.base import Provider, ProviderReply
 from backend.adapters.vision.cache import CACHE_DIRNAME, ResponseCache, cache_key
 from backend.adapters.vision.circuit import CircuitBreaker
-from backend.adapters.vision.config import ProvidersConfig, load_providers_config
+from backend.adapters.vision.config import (
+    DEFAULT_FEWSHOT_DIR,
+    ProvidersConfig,
+    load_providers_config,
+)
 from backend.adapters.vision.errors import ProviderRejected, ProviderTimedOut, ProviderUnavailable
+from backend.adapters.vision.fewshot import ExampleSet, load_examples
 from backend.adapters.vision.gemini import GeminiProvider
 from backend.adapters.vision.groq import GroqProvider
 from backend.adapters.vision.openrouter import OpenRouterProvider
-from backend.adapters.vision.prompt import render_prompt
+from backend.adapters.vision.prompt import prompt_fingerprint, render_prompt
 from backend.adapters.vision.rate_limit import TokenBucket
 from backend.adapters.vision.transport import HttpCaller, Transport, httpx_transport
 from backend.core.errors import (
@@ -148,6 +153,12 @@ class VisionChainAdapter:
         self._settings = settings
         self._config = config or load_providers_config()
         self._prompts_dir = prompts_dir
+        # Solved example pages taught before every page read; none when the directory is absent.
+        self._fewshot_dir = (
+            Path(settings.vision_fewshot_dir)
+            if settings.vision_fewshot_dir
+            else DEFAULT_FEWSHOT_DIR
+        )
         self._sleep = sleep
         self._rand = rand
         chosen = (
@@ -196,8 +207,10 @@ class VisionChainAdapter:
         usable = [s for s in self._slots if s.provider.available()]
         if not usable:
             raise ProviderExhausted("no provider is configured", failovers=("none_configured",))
+        examples = self._examples(request)
+        prompt = prompt_fingerprint(request, prompts_dir=self._prompts_dir, examples=examples)
         for slot in usable:
-            hit = self._cache.get(cache_key(request, slot.provider.model_id))
+            hit = self._cache.get(cache_key(request, slot.provider.model_id, prompt))
             if hit is not None:
                 return hit
         started = time.perf_counter()
@@ -207,14 +220,14 @@ class VisionChainAdapter:
                 failovers.append(f"{slot.name}:circuit_open")
             else:
                 try:
-                    reply, parsed = self._ask(slot, request)
+                    reply, parsed = self._ask(slot, request, examples)
                 except _ProviderFailed as exc:
                     slot.breaker.record_failure()
                     failovers.append(f"{slot.name}:{exc.reason}")
                 else:
                     slot.breaker.record_success()
                     response = self._response(slot, request, reply, parsed, failovers, started)
-                    self._cache.put(cache_key(request, slot.provider.model_id), response)
+                    self._cache.put(cache_key(request, slot.provider.model_id, prompt), response)
                     return response
             if index + 1 < len(usable):
                 failovers.append(f"{slot.name}->{usable[index + 1].name}")
@@ -249,13 +262,21 @@ class VisionChainAdapter:
         base = min(retry.max_delay_seconds, retry.base_delay_seconds * 2.0**attempt)
         return base * (1.0 + retry.jitter_factor * (2.0 * self._rand() - 1.0))
 
-    def _ask(self, slot: _Slot, request: VisionRequest) -> tuple[ProviderReply, Payload]:
+    def _examples(self, request: VisionRequest) -> ExampleSet:
+        """The solved examples for a page read (re-read only when examples.json changes)."""
+        return load_examples(self._fewshot_dir if request.task == "page" else None)
+
+    def _ask(
+        self, slot: _Slot, request: VisionRequest, examples: ExampleSet
+    ) -> tuple[ProviderReply, Payload]:
         """One provider, with its retries. Returns the reply and its validated payload.
         Raises _ProviderFailed."""
         transient = 0
         reminder = False
         while True:
-            prompt = render_prompt(request, prompts_dir=self._prompts_dir, reminder=reminder)
+            prompt = render_prompt(
+                request, prompts_dir=self._prompts_dir, reminder=reminder, examples=examples
+            )
             try:
                 reply = slot.provider.generate(prompt, request.response_schema, caller=slot.caller)
                 return reply, _validate(request, reply.text)

@@ -20,7 +20,7 @@ from backend.adapters.vision.base import (
     with_ring,
 )
 from backend.adapters.vision.config import ProvidersConfig
-from backend.adapters.vision.prompt import ImagePart, RenderedPrompt, TextPart
+from backend.adapters.vision.prompt import ImagePart, Part, RenderedPrompt, TextPart
 from backend.adapters.vision.ring import Credential, CredentialRing
 from backend.adapters.vision.transport import HttpCaller
 from backend.core.errors import ProviderBadResponse
@@ -58,14 +58,11 @@ class ChatCompletionsProvider:
         return bool(self._model) and bool(self.ring.labels)
 
     def _body(self, prompt: RenderedPrompt, schema: dict[str, Any]) -> dict[str, Any]:
-        content: list[dict[str, Any]] = []
-        for part in prompt.parts:
-            if isinstance(part, TextPart):
-                if part.text:
-                    content.append({"type": "text", "text": part.text})
-            elif isinstance(part, ImagePart):
-                url = f"data:{image_mime(part.png)};base64,{png_b64(part.png)}"
-                content.append({"type": "image_url", "image_url": {"url": url}})
+        # Solved examples first, as real user / assistant turns (page reads only).
+        shots: list[dict[str, Any]] = []
+        for shot in prompt.shots:
+            shots.append({"role": "user", "content": _content(shot.parts)})
+            shots.append({"role": "assistant", "content": shot.answer})
         system = (
             f"{prompt.system}\n\nAnswer with ONE JSON object that validates against this JSON "
             f"schema and nothing else:\n{json.dumps(schema, ensure_ascii=False)}"
@@ -76,7 +73,8 @@ class ChatCompletionsProvider:
             "max_tokens": self._config.max_output_tokens,
             "messages": [
                 {"role": "system", "content": system},
-                {"role": "user", "content": content},
+                *shots,
+                {"role": "user", "content": _content(prompt.parts)},
             ],
         }
 
@@ -92,6 +90,19 @@ class ChatCompletionsProvider:
             return caller.post(self.url, headers, body)
 
         return _reply(with_ring(self.ring, attempt))
+
+
+def _content(parts: Sequence[Part]) -> list[dict[str, Any]]:
+    """Chat-completions content of one user turn: text and data-URL images, in order."""
+    content: list[dict[str, Any]] = []
+    for part in parts:
+        if isinstance(part, TextPart):
+            if part.text:
+                content.append({"type": "text", "text": part.text})
+        elif isinstance(part, ImagePart):
+            url = f"data:{image_mime(part.png)};base64,{png_b64(part.png)}"
+            content.append({"type": "image_url", "image_url": {"url": url}})
+    return content
 
 
 def _reply(data: dict[str, Any]) -> ProviderReply:

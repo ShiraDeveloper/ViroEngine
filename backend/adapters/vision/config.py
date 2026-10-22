@@ -18,6 +18,8 @@ from backend.core.models import Strict
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MODELS_PATH = ROOT / "config" / "models.yaml"
 DEFAULT_PROMPTS_DIR = ROOT / "config" / "prompts"
+# Solved example pages for the page read (few-shot). Git-ignored: they are sample forms.
+DEFAULT_FEWSHOT_DIR = ROOT / "reference" / "fewshot"
 
 
 class CircuitConfig(Strict):

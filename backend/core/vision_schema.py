@@ -385,11 +385,24 @@ _FOREIGN_LABEL_WORDS: Final[dict[FieldKey, frozenset[str]]] = {
 _FOREIGN_LABEL_WORDS[FieldKey.last_name] = _FOREIGN_LABEL_WORDS[FieldKey.first_name]
 
 
+# Pieces of a label that make it a NAME label ("שם", "שם משפ'", "שם ומשפחה", "פרטי המבוטח/ת",
+# "מטופל:", "First Name"...). A name must be read beside one of these, or with no label at all
+# (the patient sticker): a "name" beside "ת.ז", "מחלקה" or "בדיקה" was read from another field.
+_NAME_LABEL_PARTS: Final = (
+    "שם", "משפ", "פרטי", "מטופל", "מבוטח", "נבדק", "חולה", "name", "patient",
+)
+
+
 def label_belongs(key: FieldKey, label: str) -> bool:
-    """False when the label a value was read beside names another field or person. An empty
-    label (a sticker, a stamp) is no evidence either way and passes."""
+    """False when the label a value was read beside names another field or person, or - for a
+    name - is not a name label at all. An empty label (a sticker, a stamp) is no evidence either
+    way and passes."""
     words = {w.strip(".:\"'׳״()") for w in label.replace("/", " ").split()}
-    return not (words & _FOREIGN_LABEL_WORDS.get(key, frozenset()))
+    if words & _FOREIGN_LABEL_WORDS.get(key, frozenset()):
+        return False
+    if key in (FieldKey.first_name, FieldKey.last_name) and label.strip():
+        return any(part in label.lower() for part in _NAME_LABEL_PARTS)
+    return True
 
 
 # Words that never form part of a person's name on these forms: tests, specimens, clinical
@@ -399,7 +412,9 @@ _NOT_NAME_WORDS: Final = frozenset(
      "נוגדנים", "PCR", "IgG", "IgM", "HIV", "CMV", "EBV", "HBV", "HCV", "HSV", "אבחנה", "מעבדה",
      "מחלקה", "רופא", "ד\"ר", "פרופ'", "בית", "חולים", "מרכז", "רפואי", "קופת", "שם", "משפחה",
      "פרטי", "כתובת", "טלפון", "תאריך", "חתימה", "מטופל", "מבוטח", "וירולוגיה", "מעבדות",
-     "השומר", "שיבא", "אשפוז", "מחלקת", "מרפאת", "לכבוד"}
+     "השומר", "שיבא", "אשפוז", "מחלקת", "מרפאת", "לכבוד",
+     # HMOs (kupot) and their words: the letterhead, never the patient.
+     "מכבי", "כללית", "מאוחדת", "לאומית", "קופה", "שירותי", "בריאות"}
 )
 
 

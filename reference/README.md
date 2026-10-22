@@ -60,3 +60,12 @@ Copy them in and rename to the four filenames above.
 | `models/*.onnx` | Trained weights; regenerate via `.kiro/skills/train-yolo` |
 
 `eval/held_out.txt` **is** committed: it holds only the 15 reserved page labels, no values.
+
+## `fewshot/` — solved example pages (git-ignored)
+
+`reference/fewshot/examples.json` plus the page images it names are sent to the model as solved
+turns (page image -> exact JSON answer) before every page read, so it learns where each label sits
+on real forms. Each `page` object follows the page schema in `backend/core/vision_schema.py`
+(boxes `[y_min, x_min, y_max, x_max]` on a 0-1000 grid). Images are the live-size JPEG (longest
+side `VISION_PAGE_MAX_SIDE`). An invalid example is skipped, never sent; validate with
+`python -m backend.adapters.vision.fewshot`. Without the folder the read works without examples.

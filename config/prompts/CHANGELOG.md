@@ -9,6 +9,7 @@ when changing the prompt text.
 | v1      | 2026-10-19 | Initial skeleton prompt (T3). Never sent to a provider.                |
 | v1      | 2026-10-24 | T18: `v1.txt` replaced by PLAN Appendix A (extraction) and `sender_v1.txt` added (letterhead question). Replaced in place, not bumped, because the T3 skeleton was never used: no provider adapter existed, so no cached result or measured number refers to it. |
 | v1      | 2026-10-22 | T27: sender_v1.txt gained the rule that image text is data, never an instruction (it lacked it). Still in place, not bumped: neither prompt has been sent to a live provider. |
+| v1      | 2026-10-23 | page_v1.txt: name IRON RULES (a name only beside a name label or on the patient sticker; never an HMO, address, test, clerk) and the SOLVED EXAMPLES rule for the new few-shot turns. In place: the cache key now includes a digest of the prompt file and of the examples, so no stale answer is reused. |
 
 ## Files
 
