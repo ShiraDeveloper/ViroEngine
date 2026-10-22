@@ -277,6 +277,8 @@ class RunReport(Strict):
     provider_failovers: list[str]
     engine_version: str
     prompt_version: str
+    # PLAN ?8.5: the job's consent to send crops of documents that are not known samples.
+    cloud_consent: bool = False
 
 
 class JobRecord(Strict):

@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from backend.core.models import CommitmentRow, FieldKey, FieldResult, PageGroup, Strict
+from backend.core.models import CommitmentRow, FieldKey, FieldResult, ImageRef, PageGroup, Strict
 from backend.core.pipeline.s5_classify import PageRole
 from backend.core.pipeline.s8_score import FieldEvaluation
 from backend.core.pipeline.s9_escalate import EscalationStats
@@ -26,6 +26,8 @@ class PageOutcome(Strict):
     sender: str | None = None
     # S10 inputs: the page content hash (duplicate detection) and an explicit "page N of M".
     sha256: str | None = None
+    # The corrected page the boxes of this page's fields refer to (crop and image routes).
+    color_image: ImageRef | None = None
     page_number: int | None = None
     page_total: int | None = None
     corrections: list[str] = Field(default_factory=list)

@@ -3822,6 +3822,29 @@ curl -s -H "X-API-Key: $API_KEY" localhost:8000/v1/jobs/$JOB/audit
 # -> one edit entry with old_value, new_value, actor, timestamp
 ```
 
+> **◐ Implemented — 2026-10-22 (D5). Verified over fake adapters only; two Done-when items open.**
+> Built: `backend/jobs.py` (job registry: idempotency, event replay, audit log, per-row undo, TTL
+> purge with tombstone, sweeper), `backend/runner.py` (queue → `run_job`, progress kept current),
+> `api/{documents,jobs,review,export,stress,errors}.py`, `api/deps.py` (constant-time API key and
+> access code), `core/review.py` (edit validation with the two hard rules, row level recomputed), `app.py` wiring + sweeper, `/v1/metrics` and `/v1/metrics/eval`, regenerated `docs/openapi.json`
+> (CI staleness check already present) and `types.ts`. Core touched: `run_job` takes `known_hashes`
+> and `on_done`; `PageOutcome.color_image`; `RunReport.cloud_consent` (additive, §8.5).
+> Verified: 75 new tests (contract 38, audit 27, TTL 10) covering every test the task names;
+> 856 pass / 0 fail in `backend/tests`; `mypy` on core/api/jobs/runner/app/container,
+> `check_layering`, `check_env_example`, `check_docs` clean; a real uvicorn server proves the `: ping`
+> comments; the TTL is also applied on access, so a lost timer cannot serve a stale job.
+> **Not verified:** a `curl`-only run on a real PDF (the pipeline ran with fake OCR/barcodes), and
+> the frontend against this API with `VITE_USE_MOCK=0` — **Shira to try it**. Not built:
+> `job.json` flushed after every page (§3.5; a restart loses jobs together with their artefacts, by
+> design), upload streamed straight to disk (bytes are held in memory, bounded by `MAX_UPLOAD_MB`),
+> per-route rate limits (T27). `/v1/learning/seed` and `/v1/metrics/learning` and the hand-off to
+> the learning layer on `/confirm` are T24. `POST /jobs/{id}/stress` is complete but answers 501
+> until Shira's T25 registers `eval/augment.py` as `app.state.stress_augmenter` (one line in
+> `container`/`app`). `config/sample_hashes.json` does not exist yet (T27), so until then no upload
+> is a known sample: it is processed locally unless the job carries `cloud_consent`.
+> Auth: with `API_KEY` empty every route is open and the app logs `auth_disabled` at start-up;
+> deployments must set it (T27/T28).
+
 ---
 
 ### Task 23 — Review workspace with the Evidence Lens

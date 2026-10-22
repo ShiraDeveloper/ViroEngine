@@ -56,7 +56,7 @@ def load_pipeline_config(
     """Parse `config/models.yaml` into a PipelineConfig. `layers` overrides entries of the
     `layers:` section (the ablation switches), so a layer is toggled without a code edit.
     Raises FileNotFoundError, yaml.YAMLError or pydantic.ValidationError on a bad file."""
-    import yaml  # type: ignore[import-untyped]  # local: only the composition root reads files
+    import yaml  # type: ignore[import-untyped,unused-ignore]  # local: only the composition root reads files
 
     data: dict[str, Any] = yaml.safe_load((path or DEFAULT_MODELS_PATH).read_text(encoding="utf-8"))
     if layers:
