@@ -97,11 +97,26 @@ class TesseractAdapter:
     def __init__(self, *, settings: Settings, storage: StoragePort) -> None:
         self._settings = settings
         self._storage = storage
+        self._languages: list[str] | None = None
         configured = settings.tesseract_cmd
         # A container path configured for another OS must not disable OCR on a dev machine.
         pytesseract.pytesseract.tesseract_cmd = (
             configured if Path(configured).exists() else (shutil.which("tesseract") or configured)
         )
+
+    # ------------------------------------------------------------------ OcrProbePort
+
+    def languages(self) -> list[str] | None:
+        """Language packs Tesseract can load, or None when the binary cannot be run. The answer is
+        kept once it is known: packs do not appear while the process runs."""
+        if self._languages is not None:
+            return list(self._languages)
+        try:
+            found = sorted(pytesseract.get_languages(config=""))
+        except (*_ENGINE_ERRORS, OSError):
+            return None
+        self._languages = found
+        return list(found)
 
     # ------------------------------------------------------------------ OcrPort
 

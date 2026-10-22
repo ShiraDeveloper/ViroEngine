@@ -123,6 +123,20 @@ and KGI.
 - **Planning cost only.** `estimated_usd` uses Gemini Flash list prices (an assumption, PLAN §6.5);
   free-tier fallbacks are counted as zero.
 
+## Deployment (T28)
+
+- **Not deployed.** There is no public URL, no measured production latency and no idle-hour check; the
+  configuration (`render.yaml`, `vercel.json`, the Space README, the runbook) is written but
+  untested against a real host, and the Docker image has not been built on the development machine.
+- **Speed.** Measured locally: 12.2 s per page, Python process peak 220 MB (Tesseract children not
+  counted). The target of 30 forms in under 4 minutes is missed on that machine, and Render's free plan
+  (0.1 CPU) is slower still; see ADR-014 for the recommended host.
+- **TrOCR is not in the image** (64 MB, git-ignored, measured to close no local fields); the handwritten
+  digit reader is simply absent in production.
+- **A free host sleeps.** The monitor keeps only the primary warm; the standby is warmed by hand.
+- **Readiness depends on the OCR packs.** Without the Hebrew pack the service reports `unready` (503)
+  and refuses uploads rather than returning empty results.
+
 ## Security hardening (T27)
 
 - **Rate limiting keys on the socket peer.** Behind a reverse proxy every request would share one

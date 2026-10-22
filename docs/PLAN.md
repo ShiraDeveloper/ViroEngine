@@ -2028,7 +2028,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 25 | Augmentation and Stress Mode | Shira | P6 | D8 | 1h | 15,22 |
 | 26 | Metrics dashboard and ablation UI | Shira | P6 | D8 | 2h | 15,25 · **24 at runtime only** |
 | 27 ◐ | Security hardening and test suite | Ahuba | P7 | D8 | 2h ⚠ | 18,22,24 |
-| 28 | Deployment — **M5** | Ahuba | P7 | **D9** | 1h ⚠ | 22,23,27 |
+| 28 ◐ | Deployment — **M5** | Ahuba | P7 | **D9** | 1h ⚠ | 22,23,27 |
 | 29 | Docs and the 60-second video | Shira | P8 | D8–9 | **3h** | 26,28 |
 | 30 | Final evaluation, freeze, submit — **M6** | Both | P8 | D9 | 2h+2h | all |
 
@@ -4298,6 +4298,29 @@ python -m tools.smoke_test --api https://safeline-api.onrender.com --web https:/
 # -> frontend: 200, dir="rtl" | upload roundtrip: 1 page, 1 row, 6.2s
 # -> all smoke checks passed
 ```
+
+> **◐ Prepared — 2026-10-22 (D5). NOTHING IS DEPLOYED: no public URL exists, M5 is NOT declared.**
+> Deploying needs accounts and secrets of the owners (Render or Hugging Face, Vercel, UptimeRobot,
+> GitHub Actions secrets) and Docker, none of which this machine has; the Docker image was not built
+> here either. What exists and is tested: `render.yaml` (free plan, `sync: false` secrets, one worker),
+> `frontend/vercel.json` (SPA fallback, security headers, asset cache), `.dockerignore` (keeps
+> `reference/`, `.env`, `gold.csv` out of the build context), `Dockerfile` (honours `PORT`,
+> `--proxy-headers`, health check follows `PORT`), `deploy/huggingface/README.md` (Space front matter),
+> `tools/smoke_test.py` rewritten (health with `heb`, 401 guard + key accepted, RTL Hebrew frontend,
+> upload round trip that cleans up after itself; a credential is never printed),
+> `docs/decisions/ADR-014-hosting.md`, the hosting runbook in `docs/demo_script.md`, and a **real
+> readiness check**: `/v1/health` answers 503 `unready` when the Hebrew pack is missing or Tesseract
+> cannot run, and uploads are refused with 503 `OCR_UNAVAILABLE` (a missing `heb` pack makes every page
+> read as empty without any error; it happened on this machine). `google-genai` (unused) was dropped
+> and `PyYAML` pinned (it was imported but only transitive).
+> Verified: 28 new tests (smoke 20, readiness 8 + 1 skipped without Tesseract), 1043 pass / 0 fail
+> in `backend/tests`; mypy, `pip-audit --strict` (no known vulnerabilities), `check_docs` clean.
+> **Measured (local laptop, 8 real pages, `LOCAL_ONLY`):** 12.2 s/page; Python process peak 220 MB
+> (Tesseract children not counted). That misses the "30 forms in under 4 minutes" target on a
+> multi-core machine, and Render's free plan is 0.1 CPU, so ADR-014 recommends a Hugging Face Space
+> (2 vCPU) as the primary host. **Not done:** every "Done when" item that needs a public host (public
+> frontend talking to the backend, the 48-page production run, idle-hour check, the standby URL, a push
+> to `main` deploying both). Shira's T23 review screen (a dependency) is not merged here either.
 
 ---
 

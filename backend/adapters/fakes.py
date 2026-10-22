@@ -74,6 +74,10 @@ class FakeOcr:
         """Always abstains: a fake cannot tell which way a page faces."""
         return None
 
+    def languages(self) -> list[str] | None:
+        """A fake always has the packs the product needs."""
+        return ["eng", "heb", "osd"]
+
 
 # ---------------------------------------------------------------------------
 # BarcodePort fake

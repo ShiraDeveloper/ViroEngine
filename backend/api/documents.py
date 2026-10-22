@@ -25,10 +25,11 @@ from backend.api.deps import (
 )
 from backend.api.schemas import UploadResponse
 from backend.container import Container
-from backend.core.errors import TooLarge, UnsupportedMedia
+from backend.core.errors import OcrUnavailable, TooLarge, UnsupportedMedia
 from backend.core.pipeline.s0_intake import UploadedBlob
 from backend.jobs import JobEntry, JobStore
 from backend.queue import JobQueue
+from backend.readiness import ocr_readiness
 from backend.security import limit_uploads
 
 log = structlog.get_logger()
@@ -88,6 +89,13 @@ def _response(entry: JobEntry, *, replay: bool) -> JSONResponse:
     return JSONResponse(body.model_dump(mode="json"), status_code=200 if replay else 201)
 
 
+def require_ocr_ready(container: Container = Depends(get_container)) -> None:
+    """Refuse an upload (503) while the engine cannot read: accepting it would only waste it."""
+    ocr = ocr_readiness(container)
+    if not ocr.ready:
+        raise OcrUnavailable("the OCR engine is not ready: " + ", ".join(ocr.missing))
+
+
 async def _accept(
     uploads: list[UploadFile],
     *,
@@ -118,7 +126,7 @@ async def _accept(
     "/documents",
     status_code=201,
     response_model=UploadResponse,
-    dependencies=[Depends(limit_uploads)],
+    dependencies=[Depends(limit_uploads), Depends(require_ocr_ready)],
 )
 async def create_document(
     file: Annotated[UploadFile, File()],
@@ -147,7 +155,7 @@ async def create_document(
     "/batches",
     status_code=201,
     response_model=UploadResponse,
-    dependencies=[Depends(limit_uploads)],
+    dependencies=[Depends(limit_uploads), Depends(require_ocr_ready)],
 )
 async def create_batch(
     files: Annotated[list[UploadFile], File()],

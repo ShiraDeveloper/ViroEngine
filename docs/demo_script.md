@@ -28,6 +28,40 @@ See `PLAN.md` §15.2 for the second-by-second table. Hebrew narration, burned-in
 opens without registration. **The closing numbers are the real held-out figures** — placeholders
 must never ship.
 
+## Hosting runbook (T28)
+
+Status: **not deployed.** Everything below is written and tested up to the public URL; the URLs are
+filled in by whoever does the first deploy. Why these hosts: `decisions/ADR-014-hosting.md`.
+
+| Piece | Where | Config |
+|---|---|---|
+| Backend (primary, recommended) | Hugging Face Docker Space | `deploy/huggingface/README.md` + `Dockerfile` |
+| Backend (alternative) | Render, Docker | `render.yaml` (free plan is 0.1 CPU: too slow for 30 forms) |
+| Frontend | Vercel | `frontend/vercel.json`; set `VITE_API_BASE` to the backend URL |
+| Warm-up | UptimeRobot, `/v1/health`, every 10 min | exactly **one** monitor, primary backend only |
+
+**First deploy**
+
+1. Create the backend host and set its secrets in the host's dashboard (never in the repo):
+   `API_KEY`, `APP_ACCESS_CODE`, `ALLOWED_ORIGINS` (the Vercel URL), `GEMINI_API_KEYS`,
+   `OPENROUTER_API_KEY`, `OPENROUTER_VISION_MODEL`, `GROQ_API_KEY`.
+2. Create the Vercel project from `frontend/`; set `VITE_API_BASE`.
+3. In GitHub, add the Actions secrets `RENDER_DEPLOY_HOOK`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`,
+   `VERCEL_PROJECT_ID`, `PUBLIC_API_URL`, `PUBLIC_WEB_URL`, `SMOKE_API_KEY`, `SMOKE_ACCESS_CODE`.
+4. Push to `main` with green CI: `deploy.yml` deploys both and runs the smoke test.
+5. By hand: `python -m tools.smoke_test --api <api> --web <web>` (with `API_KEY` and
+   `APP_ACCESS_CODE` exported to include the upload round trip).
+6. Run the 48-page batch once and record latency and peak memory in ADR-014.
+7. Leave it idle for an hour, then check that `/v1/health` answers without a cold start.
+
+**Plan B.** If the smoke test fails or the primary is down: point `VITE_API_BASE` on Vercel at the
+standby backend and redeploy the frontend. Record the standby URL here once it exists:
+`standby URL: (not created yet)`.
+
+**Health means ready.** `/v1/health` answers 503 with `"status":"unready"` when the Hebrew OCR pack is
+missing or Tesseract cannot run, and uploads are refused with 503 `OCR_UNAVAILABLE`. A deployment whose
+health is not `ok` must not be demonstrated.
+
 ## Before the demo
 
 1. **One hour before:** `curl $API/v1/health` → confirm `"tesseract":"ready"` and `heb` in the
