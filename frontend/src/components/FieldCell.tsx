@@ -36,6 +36,7 @@ export function FieldCell({ rowId, field, result, selected, onSelect }: FieldCel
     <Td
       data-level={result.level}
       data-field={field}
+      data-row-id={rowId}
       aria-describedby={reasonText ? reasonId : undefined}
       className={`border-s-2 ${LEVEL_STYLE[result.level].surface} ${selected ? 'ring-2 ring-inset ring-primary-500' : ''}`}
     >
