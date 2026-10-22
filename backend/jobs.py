@@ -36,6 +36,7 @@ from backend.core.models import (
     ReviewEdit,
 )
 from backend.core.pipeline.orchestrator import SseEvent
+from backend.core.pipeline.outcome import PageOutcome
 from backend.core.pipeline.s0_intake import UploadedBlob
 from backend.core.pipeline.s11_finalize import PurgeSchedule, purge_schedule
 from backend.core.ports.clock import ClockPort
@@ -57,6 +58,7 @@ class JobEntry:
     uploads: list[UploadedBlob] | None
     consent: bool = False
     derived_from: str | None = None
+    outcomes: list[PageOutcome] = field(default_factory=list)  # what each page produced
     all_known_samples: bool = False  # every page matched the sample hashes (PLAN ?8.5)
     page_images: dict[str, ImageRef] = field(default_factory=dict)  # corrected page, per page id
     raw_images: dict[str, ImageRef] = field(default_factory=dict)  # as scanned, per page id
@@ -253,6 +255,7 @@ class JobStore:
         entry.audit.clear()
         entry.undo.clear()
         entry.page_images.clear()
+        entry.outcomes.clear()
         entry.raw_images.clear()
         entry.finished = True
         entry.wake()

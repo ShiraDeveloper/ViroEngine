@@ -64,6 +64,21 @@ def load_pipeline_config(
     return PipelineConfig.from_mapping(data)
 
 
+DEFAULT_SEED_PATH = Path(__file__).resolve().parents[1] / "config" / "learning_seed.json"
+
+
+def load_learning_seed(path: Path | None = None) -> dict[str, Any]:
+    """The committed PII-free layout seed (PLAN ?7.4), or an empty seed when there is none or it
+    cannot be read. It only ever fills an empty learning store."""
+    import json
+
+    try:
+        data = json.loads((path or DEFAULT_SEED_PATH).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def build_container(settings: Settings, *, use_fakes: bool = False) -> Container:
     """Construct and return a Container.
 
@@ -130,6 +145,8 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     from backend.adapters.storage.tempdir import TmpdirStorage  # T9
 
     storage = TmpdirStorage(settings=settings)
+    learning = SqliteLearningStore(settings=settings)
+    learning.import_seed(load_learning_seed())
     vision: VisionLLMPort | None = None
     if not settings.local_only:
         from backend.adapters.vision.chain import VisionChainAdapter  # T18
@@ -146,7 +163,7 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
         storage=storage,
         documents=DocumentReader(settings=settings),
         imaging=CvImaging(settings=settings),
-        learning=SqliteLearningStore(settings=settings),
+        learning=learning,
         clock=SystemClock(),
         exporters={
             "json": JsonExporter(),

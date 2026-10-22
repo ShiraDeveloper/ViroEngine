@@ -15,7 +15,7 @@ import structlog
 
 from backend.api.schemas import SseDoneData, SseDoneEvent, SseErrorData, SseErrorEvent
 from backend.core.errors import JobNotFound, SafeLineError
-from backend.core.models import JobStatus, PageRaw
+from backend.core.models import JobStatus, PageRaw, RunMetric
 from backend.core.pipeline.orchestrator import PipelineServices, SseEvent, run_job
 from backend.core.pipeline.outcome import PageOutcome
 from backend.jobs import JobEntry, JobStore
@@ -43,6 +43,7 @@ def _remember_pages(
 ) -> None:
     """Keep the image references the crop and image routes need, per page id."""
     entry.raw_images = {r.page_id: r.image for r in raws}
+    entry.outcomes = list(outcomes)
     entry.all_known_samples = bool(raws) and all(r.known_sample for r in raws)
     entry.page_images = {o.page_id: o.color_image for o in outcomes if o.color_image is not None}
 
@@ -86,10 +87,34 @@ def make_pipeline(
             return
         current.record = result
         store.record_finished(current)
+        _record_run(current, services)
         current.finished = True
         current.wake()
 
     return run
+
+
+def _record_run(entry: JobEntry, services: PipelineServices) -> None:
+    """Append the finished job's counters to the learning curve. Counters only; a failure to
+    record never fails the job."""
+    report = entry.record.report
+    if report is None:
+        return
+    try:
+        services.learning.record_run(
+            RunMetric(
+                at=services.clock.now(),
+                fields_total=report.fields_total,
+                fields_closed_local=report.fields_closed_local,
+                fields_escalated=report.fields_escalated,
+                fields_flagged=report.fields_flagged,
+                local_close_rate=report.local_close_rate,
+                provider_calls=report.cost.provider_calls,
+                engine_version=report.engine_version,
+            )
+        )
+    except Exception as exc:  # the curve is a convenience; the job is done
+        log.warning("run_metric_failed", exc_type=type(exc).__name__)
 
 
 def _on_event(entry: JobEntry, event: SseEvent) -> None:

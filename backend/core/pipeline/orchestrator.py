@@ -40,6 +40,7 @@ from backend.api.schemas import (
 )
 from backend.core.errors import SafeLineError
 from backend.core.geometry import page_size
+from backend.core.learning import with_learned
 from backend.core.models import (
     Box,
     Candidate,
@@ -56,6 +57,7 @@ from backend.core.models import (
     PatternHint,
     ReaderName,
     ReadingTrailStep,
+    RunMetric,
     SenderSpec,
     SourceKind,
     Strict,
@@ -202,6 +204,13 @@ class _NoLearning:
     def pattern_hints(self, sender: str, field: str) -> list[PatternHint]:
         """No hints."""
         return []
+
+    def label_synonyms(self, sender: str, field: str) -> list[str]:
+        """No synonyms."""
+        return []
+
+    def record_run(self, metric: RunMetric) -> None:
+        """Discard the metric."""
 
 
 @dataclass
@@ -412,6 +421,8 @@ def process_page(
         config=cfg.classify,
     )
     spec = services.senders.get(cls.sender) if cls.sender is not None else None
+    # What was learned for this sender widens the labels searched and the shapes that score well.
+    spec = with_learned(spec, learning)
     if spec is not None:
         # The sender is known only after S5 and decides which commitment labels and learned
         # hints apply, so the regions are found again with it.

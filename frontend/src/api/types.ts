@@ -131,13 +131,16 @@ export interface LayoutHint {
   confidence: number;
 }
 
-/** Locations and abstracted shapes only; values are rejected by _assert_pii_free. */
+/** Locations and abstracted shapes only. Deliberately has NO value field: adding one must break `core.learning.assert_pii_free` and the reflection test that guards it (PLAN ?7.1). */
 export interface LayoutObservation {
   sender: string;
   field: FieldKey;
   region_kind: RegionKind | null;
   box: Box;
   source: SourceKind;
+  page_role?: string;
+  label_text?: string | null;
+  shape?: string | null;
 }
 
 export interface NormalizedPage {
@@ -247,6 +250,18 @@ export interface ReviewEdit {
   actor: string;
   action: "edit" | "pick_candidate" | "clear" | "confirm" | "undo";
   at: string;
+}
+
+/** Counters of one finished job for the learning curve (PLAN ?7.2 `run_metric`). No values. */
+export interface RunMetric {
+  at: string;
+  fields_total: number;
+  fields_closed_local: number;
+  fields_escalated: number;
+  fields_flagged: number;
+  local_close_rate: number;
+  provider_calls: number;
+  engine_version: string;
 }
 
 /** run_report.json - counters only, no values, no PII. */

@@ -24,6 +24,7 @@ from backend.api.errors import (
 from backend.api.schemas import FieldEditRequest, JobView
 from backend.container import Container
 from backend.core.errors import EditConflict
+from backend.core.learning import assert_pii_free, observations_from_row
 from backend.core.models import (
     CommitmentRow,
     ConfidenceLevel,
@@ -150,6 +151,15 @@ async def confirm_job(
     entry = _editable(store, job_id)
     if entry.record.status not in (JobStatus.needs_review, JobStatus.confirmed):
         raise JobNotReady("the job has not finished")
+    # What the confirmed rows teach the learning layer: locations and shapes, never values. Every
+    # observation is checked BEFORE the first write, so a leak stops the confirmation entirely.
+    observations = [
+        obs for row in entry.record.rows for obs in observations_from_row(row, entry.outcomes)
+    ]
+    for obs in observations:
+        assert_pii_free(obs)
+    for obs in observations:
+        container.learning.record_confirmation(obs)
     now = container.clock.now()
     rows = []
     for row in entry.record.rows:

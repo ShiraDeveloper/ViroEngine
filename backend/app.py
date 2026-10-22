@@ -172,6 +172,7 @@ def create_app(*, use_fakes: bool = False) -> FastAPI:
     from backend.api.documents import router as documents_router
     from backend.api.export import router as export_router
     from backend.api.jobs import router as jobs_router
+    from backend.api.learning import router as learning_router
     from backend.api.meta import router as meta_router
     from backend.api.review import router as review_router
     from backend.api.senders import router as senders_router
@@ -181,6 +182,7 @@ def create_app(*, use_fakes: bool = False) -> FastAPI:
     app.include_router(documents_router, prefix="/v1")
     app.include_router(jobs_router, prefix="/v1")
     app.include_router(review_router, prefix="/v1")
+    app.include_router(learning_router, prefix="/v1")
     app.include_router(export_router, prefix="/v1")
     app.include_router(stress_router, prefix="/v1")
     app.include_router(senders_router, prefix="/v1")

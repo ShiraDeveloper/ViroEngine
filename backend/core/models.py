@@ -411,13 +411,30 @@ class ProviderHealth(Strict):
 
 
 class LayoutObservation(Strict):
-    """Locations and abstracted shapes only; values are rejected by _assert_pii_free."""
+    """Locations and abstracted shapes only. Deliberately has NO value field: adding one must
+    break `core.learning.assert_pii_free` and the reflection test that guards it (PLAN ?7.1)."""
 
     sender: str
     field: FieldKey
     region_kind: RegionKind | None
     box: Box
     source: SourceKind
+    page_role: str = "primary_form"
+    label_text: str | None = None  # static printed label text, never a form value
+    shape: str | None = None  # '#######' / 'A######' from abstract_shape(), never the value
+
+
+class RunMetric(Strict):
+    """Counters of one finished job for the learning curve (PLAN ?7.2 `run_metric`). No values."""
+
+    at: datetime
+    fields_total: int
+    fields_closed_local: int
+    fields_escalated: int
+    fields_flagged: int
+    local_close_rate: float
+    provider_calls: int
+    engine_version: str
 
 
 class LayoutHint(Strict):
