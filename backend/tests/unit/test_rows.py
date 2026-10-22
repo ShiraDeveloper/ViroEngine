@@ -251,6 +251,37 @@ def test_row_count_equals_commitments_summed_over_groups() -> None:
     assert len(rows) == 3 + 1 + 1
 
 
+def with_commitment_noise(base: PageOutcome, values: Sequence[str]) -> PageOutcome:
+    """`base` with rejected one-off commitment readings added beside its own candidates."""
+    from backend.tests.fixtures.rows import noise
+
+    key = FieldKey.commitment_number
+    cands = list(base.evaluations[key].result.candidates)
+    for i, value in enumerate(values):
+        cands += noise(value, (0.80, 0.10 + 0.1 * i, 0.82, 0.15 + 0.1 * i))
+    evaluations = {**base.evaluations, key: evaluation(key, cands)}
+    return base.model_copy(update={"evaluations": evaluations})
+
+
+def test_rejected_commitment_candidates_open_no_row() -> None:
+    base = page("p1", centrals=["937309"], date=DATE, commitments=["4521"])
+    pages = [with_commitment_noise(base, ["31/05/26", "המרכז", "2344936"])]
+
+    rows = rows_of(pages)
+
+    assert [commitment(r) for r in rows] == ["4521"]
+
+
+def test_only_rejected_commitment_candidates_yield_one_flagged_row() -> None:
+    base = page("p1", centrals=["937309"], date=DATE, commitments=[])
+    pages = [with_commitment_noise(base, ["31/05/26", "עבור", "2344936"])]
+
+    rows = rows_of(pages)
+
+    assert len(rows) == 1
+    assert rows[0].fields[FieldKey.commitment_number].level is ConfidenceLevel.D
+
+
 @pytest.mark.parametrize("iou", [0.0, 1.0])
 def test_location_threshold_is_configurable(iou: float) -> None:
     from backend.tests.fixtures.rows import box_at

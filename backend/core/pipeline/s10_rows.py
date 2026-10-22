@@ -365,16 +365,21 @@ class _Cluster:
     trail_from: FieldResult | None = None
 
 
-def _commitment_clusters(pages: Sequence[PageOutcome], config: RowsConfig) -> list[_Cluster]:
+def _commitment_clusters(
+    pages: Sequence[PageOutcome], config: RowsConfig, ev: _Evidence
+) -> list[_Cluster]:
+    """Clusters of the commitment candidates whose value survives alone (level A-C). A candidate
+    S8 rejected - a nearby word, a date beside the label - never opens a row of its own."""
     key = FieldKey.commitment_number
     items: list[tuple[int, Candidate, FieldResult, str]] = []
     for index, page in enumerate(pages):
         result = page.results.get(key)
         if result is None:
             continue
+        surviving = ev.survivors(page, key)
         for cand in result.candidates:
             norm = _norm(key, cand.value)
-            if norm is not None:
+            if norm is not None and norm in surviving:
                 items.append((index, cand, result, norm))
     parent = list(range(len(items)))
 
@@ -407,12 +412,13 @@ def _commitment_clusters(pages: Sequence[PageOutcome], config: RowsConfig) -> li
 
 
 def _commitment_results(
-    pages: Sequence[PageOutcome], spec: SenderSpec | None, ctx: RowContext
+    pages: Sequence[PageOutcome], spec: SenderSpec | None, ctx: RowContext, ev: _Evidence
 ) -> list[FieldResult]:
-    """One result per distinct commitment, in page then top-to-bottom order; a single flagged
-    result when the form has none. A lone commitment keeps its page-level S8 result unchanged."""
+    """One result per distinct surviving commitment, in page then top-to-bottom order; a single
+    result when the form has at most one, which keeps its page-level S8 result unchanged (flagged,
+    with its own reason, when nothing survived)."""
     key = FieldKey.commitment_number
-    clusters = _commitment_clusters(pages, ctx.config)
+    clusters = _commitment_clusters(pages, ctx.config, ev)
     page_results = [p.results[key] for p in pages if key in p.results]
     if len(clusters) <= 1:
         if page_results:
@@ -473,7 +479,7 @@ def rows_from_group(
     if central is not None:
         shared[FieldKey.central_number] = central
     rows: list[CommitmentRow] = []
-    for number, commitment in enumerate(_commitment_results(members, spec, ctx), start=1):
+    for number, commitment in enumerate(_commitment_results(members, spec, ctx, ev), start=1):
         fields = {k: v.model_copy(deep=True) for k, v in shared.items()}
         fields[FieldKey.commitment_number] = commitment
         rows.append(

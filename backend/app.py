@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+import os
 from typing import Any
 import uuid
 
@@ -208,4 +209,4 @@ def create_app(*, use_fakes: bool = False) -> FastAPI:
 # Module-level app — skeleton uses fakes; update to use_fakes=False
 # once all real adapters are implemented (T9, T11, T13, T18, T19, T24).
 # ---------------------------------------------------------------------------
-app = create_app(use_fakes=True)
+app = create_app(use_fakes=os.environ.get("SAFELINE_USE_FAKES", "0") == "1")

@@ -99,6 +99,29 @@ STAMP_PSM: Final = 11
 # Stamp words closer than this many proximity radii belong to one stamp.
 _STAMP_CLUSTER_RADII: Final = 2.0
 
+# The words of the patient block's printed labels, one token each (S4's PATIENT_LABELS and
+# S6's ID and name labels, split into words). They anchor the re-read and are the only words
+# it keeps: the values beside them are the page pass's and S7's to read, and a second,
+# different reading of a handwritten value at the same place would split it in S6.
+PATIENT_WORDS: Final = (
+    "ת.ז",
+    "מ.ז",
+    "זהות",
+    "שם",
+    "משפחה",
+    "פרטי",
+    "המבוטח",
+    "המבוטחת",
+    "המטופל",
+    "כתובת",
+)
+# Sparse text, Hebrew only, on the colour page: on A1 this is the one setting that read all of
+# "פרטי", "המבוטח/ת", 'ת"ז' and "שם" in the block's crop; heb+eng read "שם" as Latin noise.
+PATIENT_PSM: Final = 11
+PATIENT_LANGS: Final = "heb"
+# Patient-label words closer than this many proximity radii belong to one block.
+_PATIENT_CLUSTER_RADII: Final = 2.0
+
 
 def read_page(
     page: NormalizedPage,
@@ -122,7 +145,7 @@ def read_page(
     radius_px = settings.proximity_radius * diagonal(size)
     words = list(raw.words)
     binarized = storage.get(page.gray_bin)
-    colour = storage.get(page.color) if hits else b""
+    colour = storage.get(page.color)
     for hit in hits:
         for extra in _caption_words(
             page, hit, binarized, radius_px, size, settings, ocr, imaging, storage
@@ -133,6 +156,9 @@ def read_page(
             if not _already_read(extra, words):
                 words.append(extra)
     for extra in _stamp_words(page, words, binarized, size, settings, ocr, imaging, storage):
+        if not _already_read(extra, words):
+            words.append(extra)
+    for extra in _patient_label_words(page, words, colour, size, settings, ocr, imaging, storage):
         if not _already_read(extra, words):
             words.append(extra)
 
@@ -291,7 +317,41 @@ def stamp_areas(words: Sequence[OcrWord], size: Size, settings: Settings) -> lis
         if (score := best_similarity(w.text, STAMP_WORDS)) >= settings.receipt_stamp_fuzz
         and score > similarity(w.text, _CENTRAL_CAPTION)
     ]
-    gap_px = _STAMP_CLUSTER_RADII * settings.proximity_radius * diagonal(size)
+    return _reread_areas(
+        _group(anchors, _STAMP_CLUSTER_RADII * settings.proximity_radius * diagonal(size), size),
+        reach=settings.stamp_reread_reach,
+        limit=settings.stamp_reread_max,
+        size=size,
+    )
+
+
+def patient_areas(words: Sequence[OcrWord], size: Size, settings: Settings) -> list[Box]:
+    """Areas to re-read for the patient block: each group of patient-label words grown by the
+    patient reach on every side, at most ``patient_reread_max`` of them. A group holding more
+    different label words goes first, so the block ("שם", "כתובת", 'ת"ז' together) is read
+    before a lone "שם" in a provider box. Never a value: anchors are printed label words."""
+    anchors = [w for w in words if _is_patient_word(w.text, settings)]
+    groups = _group(
+        anchors, _PATIENT_CLUSTER_RADII * settings.proximity_radius * diagonal(size), size
+    )
+    groups.sort(key=lambda g: len({_patient_word_of(w.text) for w in g}), reverse=True)
+    return _reread_areas(
+        groups, reach=settings.patient_reread_reach, limit=settings.patient_reread_max, size=size
+    )
+
+
+def _patient_word_of(text: str) -> str:
+    """The vocabulary word `text` is closest to."""
+    return max(PATIENT_WORDS, key=lambda p: similarity(text, p))
+
+
+def _is_patient_word(text: str, settings: Settings) -> bool:
+    return best_similarity(text, PATIENT_WORDS) >= settings.label_fuzz
+
+
+def _group(anchors: Sequence[OcrWord], gap_px: float, size: Size) -> list[list[OcrWord]]:
+    """Anchors chained into groups: a word joins every group with a member within `gap_px`.
+    Largest group first."""
     groups: list[list[OcrWord]] = []
     for word in anchors:
         joined = [
@@ -302,16 +362,24 @@ def stamp_areas(words: Sequence[OcrWord], size: Size, settings: Settings) -> lis
         merged = [word] + [w for g in joined for w in g]
         groups = [g for g in groups if g not in joined] + [merged]
     groups.sort(key=len, reverse=True)
-    reach_px = settings.stamp_reread_reach * diagonal(size)
+    return groups
+
+
+def _reread_areas(
+    groups: Sequence[Sequence[OcrWord]], *, reach: float, limit: int, size: Size
+) -> list[Box]:
+    """Each group's box grown by `reach` (share of the diagonal), in order, at most `limit`.
+    An area inside one already chosen is not read twice."""
+    reach_px = reach * diagonal(size)
     dy, dx = reach_px / size[1], reach_px / size[0]
     areas: list[Box] = []
     for group in groups:
+        if len(areas) >= limit:
+            break
         area = grow(union(w.box for w in group), top=dy, left=dx, bottom=dy, right=dx)
         if any(contains(a, area) for a in areas):
             continue
         areas.append(area)
-        if len(areas) >= settings.stamp_reread_max:
-            break
     return areas
 
 
@@ -338,6 +406,33 @@ def _stamp_words(
         ref = storage.put_page_image(page.raw.image.job_id, page.raw.page_id, crop.data, "crop")
         for word in ocr.read_crop(ref, psm=STAMP_PSM, langs=settings.ocr_langs).words:
             found.append(word.model_copy(update={"box": from_crop(word.box, area)}))
+    return found
+
+
+def _patient_label_words(
+    page: NormalizedPage,
+    words: Sequence[OcrWord],
+    colour: bytes,
+    size: Size,
+    settings: Settings,
+    ocr: OcrPort,
+    imaging: ImagingPort,
+    storage: StoragePort,
+) -> list[OcrWord]:
+    """Patient-label words read again around the label words the page pass found, placed back
+    on the page frame. Only label words are kept (see PATIENT_WORDS). Never raises."""
+    if not colour:
+        return []
+    found: list[OcrWord] = []
+    for area in patient_areas(words, size, settings):
+        try:
+            crop = imaging.crop(colour, area)
+        except RenderFailed:
+            continue
+        ref = storage.put_page_image(page.raw.image.job_id, page.raw.page_id, crop.data, "crop")
+        for word in ocr.read_crop(ref, psm=PATIENT_PSM, langs=PATIENT_LANGS).words:
+            if _is_patient_word(word.text, settings):
+                found.append(word.model_copy(update={"box": from_crop(word.box, area)}))
     return found
 
 
