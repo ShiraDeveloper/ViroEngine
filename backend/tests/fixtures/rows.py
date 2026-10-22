@@ -45,6 +45,7 @@ def _cand(
     note: bool = False,
     conf: float = 0.9,
     label_distance: float | None = 0.05,
+    kind: RegionKind = RegionKind.patient_box,
 ) -> Candidate:
     return Candidate(
         value=value,
@@ -53,24 +54,32 @@ def _cand(
         box=box,
         reader_confidence=conf,
         label_distance=label_distance,
-        region=RegionKind.patient_box,
+        region=kind,
         notes=[SECOND_READ_NOTE] if note else [],
     )
 
 
-def agreed(value: str, box: Box, *, source: SourceKind = SourceKind.printed) -> list[Candidate]:
+def agreed(
+    value: str,
+    box: Box,
+    *,
+    source: SourceKind = SourceKind.printed,
+    kind: RegionKind = RegionKind.patient_box,
+) -> list[Candidate]:
     """One value read twice by independent readers at one place: closes at level B (or better)."""
     return [
-        _cand(value, ReaderName.tesseract, source, box),
-        _cand(value, ReaderName.tesseract, source, box, note=True),
+        _cand(value, ReaderName.tesseract, source, box, kind=kind),
+        _cand(value, ReaderName.tesseract, source, box, note=True, kind=kind),
     ]
 
 
 def barcoded(value: str, box: Box) -> list[Candidate]:
     """A barcode and its printed digits agreeing."""
     return [
-        _cand(value, ReaderName.zxing, SourceKind.barcode, box),
-        _cand(value, ReaderName.tesseract, SourceKind.printed, box),
+        _cand(value, ReaderName.zxing, SourceKind.barcode, box, kind=RegionKind.central_sticker),
+        _cand(
+            value, ReaderName.tesseract, SourceKind.printed, box, kind=RegionKind.central_sticker
+        ),
     ]
 
 
@@ -118,7 +127,9 @@ def page(
             date, (0.05, 0.60, 0.09, 0.90), source=SourceKind.stamp
         )
     for i, value in enumerate(commitments):
-        cands[FieldKey.commitment_number] += agreed(value, box_at(i))
+        cands[FieldKey.commitment_number] += agreed(
+            value, box_at(i), kind=RegionKind.commitment_label
+        )
     if first_name is not None:
         cands[FieldKey.first_name] = agreed(first_name, (0.30, 0.50, 0.33, 0.80))
     if last_name is not None:

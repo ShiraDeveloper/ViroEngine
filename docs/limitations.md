@@ -123,6 +123,21 @@ and KGI.
 - **Planning cost only.** `estimated_usd` uses Gemini Flash list prices (an assumption, PLAN §6.5);
   free-tier fallbacks are counted as zero.
 
+## Learning layer (T24)
+
+- **Learns only from human confirmations, and needs three of them** before a location or shape is
+  used. The first batch from a new institution gets no benefit. Every behaviour change is traceable
+  to confirmations and reversible by deleting a row.
+- **The effect on real forms is unmeasured.** The only measured improvement is on a synthetic page
+  (T24 test). Whether the local close rate rises on the 48 samples awaits the gold set, a person
+  confirming rows and the augmented set.
+- **A hint needs a known sender.** A page with no resolved institution (most real pages at the
+  moment, see T20) cannot be keyed, so it neither teaches nor benefits.
+- **Label synonyms and sender proposals have no producer yet.** The store and the approval API
+  work; S6 does not report the governing label and S5 does not read approved proposals.
+- **A typed value teaches nothing,** because its place on the page is unknown; picked candidates
+  and untouched fields teach their location.
+
 ## Reported results versus targets
 
 _Filled in Task 30 from the held-out run. Where a target was missed, the real value appears here

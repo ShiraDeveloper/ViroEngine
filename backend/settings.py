@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # stream never outlives the ceiling, whatever the job does.
     sse_ping_seconds: int = Field(default=15, ge=1, le=120)
     sse_max_seconds: int = Field(default=600, ge=1, le=3600)
+    # Learning layer (PLAN §7.3): a location or shape is used once confirmed this many times. One
+    # correction is an anecdote, three is a pattern.
+    learning_promotion_hits: int = Field(default=3, ge=1, le=100)
     # Stress Mode (PLAN §10.3): the seed that makes a degradation reproducible across machines.
     stress_seed: int = 20261018
     purged_visible_minutes: int = Field(default=10, ge=0, le=1440)

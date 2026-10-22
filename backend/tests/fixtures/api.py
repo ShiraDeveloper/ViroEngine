@@ -24,6 +24,7 @@ from backend.adapters.storage.tempdir import TmpdirStorage
 import backend.app as app_module
 from backend.container import Container, build_container
 from backend.core.models import CommitmentRow, JobStatus, RunReport
+from backend.core.pipeline.outcome import PageOutcome
 from backend.core.pipeline.s10_rows import assemble_rows
 from backend.core.pipeline.s11_finalize import build_report
 from backend.jobs import JobEntry, JobStore
@@ -82,7 +83,7 @@ def running_app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, **env: str) -> 
         )
 
 
-def sample_rows() -> tuple[list[CommitmentRow], RunReport]:
+def sample_rows() -> tuple[list[CommitmentRow], RunReport, list[PageOutcome]]:
     """Two rows: one with every critical field closed, one missing its stamp date (flagged)."""
     pages = [
         page(
@@ -107,7 +108,7 @@ def sample_rows() -> tuple[list[CommitmentRow], RunReport]:
         intake_ms=1,
         prompt_version="v1",
     )
-    return rows, report
+    return rows, report, pages
 
 
 def seed_job(
@@ -120,9 +121,10 @@ def seed_job(
     key: str | None = None,
 ) -> JobEntry:
     """A finished (or, with `status`, running) job registered as if the pipeline had made it."""
-    seeded_rows, report = sample_rows()
+    seeded_rows, report, outcomes = sample_rows()
     entry = h.store.create([], idempotency_key=key, consent=False)
     entry.uploads = None
+    entry.outcomes = outcomes
     entry.record = entry.record.model_copy(
         update={
             "status": status,

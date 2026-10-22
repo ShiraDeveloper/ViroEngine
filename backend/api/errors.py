@@ -79,3 +79,10 @@ class StressUnavailable(SafeLineError):
 
     code = "STRESS_UNAVAILABLE"
     http_status = 501
+
+
+class ProposalNotFound(SafeLineError):
+    """There is no such label synonym or proposed institution to approve."""
+
+    code = "PROPOSAL_NOT_FOUND"
+    http_status = 404

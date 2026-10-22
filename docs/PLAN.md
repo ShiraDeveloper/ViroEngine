@@ -2024,7 +2024,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 21 ✅ | Screens: login, upload, processing, export | Shira | P5 | D6–7 | 3h | 4 · **22 at runtime only** |
 | 22 ◐ | Full API: SSE, edits, audit, TTL | Ahuba | P5 | D7–8 | **6h** | 3,20 |
 | 23 | Review workspace with Evidence Lens | Shira | P5 | D7 | 5h | 4 · **22 at runtime only** |
-| 24 | Learning layer | Ahuba | P6 | D8 | 2h | 20,22 |
+| 24 ◐ | Learning layer | Ahuba | P6 | D8 | 2h | 20,22 |
 | 25 | Augmentation and Stress Mode | Shira | P6 | D8 | 1h | 15,22 |
 | 26 | Metrics dashboard and ablation UI | Shira | P6 | D8 | 2h | 15,25 · **24 at runtime only** |
 | 27 | Security hardening and test suite | Ahuba | P7 | D8 | 2h ⚠ | 18,22,24 |
@@ -3672,6 +3672,15 @@ python -m tools.demo rows --pdf reference/samples_part2.pdf --pages B20,B19,A9,A
 > ambiguous page (the `SameFormResolver` hook exists, nothing is wired: an ambiguous page stays an
 > orphan, never guessed); `tools.demo rows`. A page whose commitments the S6 candidates already
 > merged into one reading cannot be split by S10.
+> **Measured on the 48 real pages, 2026-10-22 (local engine, `LOCAL_ONLY`, Tesseract 5.4 with
+> `tessdata_fast` Hebrew, not a held-out split, no gold yet):** 8 groups · 40 orphan pages · 14 rows ·
+> 24 of 336 fields closed locally (7.1%). S10 is not the bottleneck: S5 classified **36 of the 48
+> pages `unknown`**, 8 `primary_form`, 3 `lab_report`, 1 `sap_screen`, because S4 finds no
+> `patient_box` or `commitment_label` region on them, and only primary forms open a group. M4 is
+> **not** declared and the "row structure matches gold" criterion is **not met**. Next step is
+> region detection and role classification on real pages (T11 regions: Ahuba; S5: Shira), not S10.
+> (This Windows machine's Tesseract shipped without `heb`; without it every page reads as empty.
+> Install `tessdata` Hebrew and set `TESSDATA_PREFIX` before measuring.)
 
 ---
 
@@ -3989,6 +3998,37 @@ curl -s -H "X-API-Key: $API_KEY" localhost:8000/v1/metrics/learning
 ```
 Reference: `samples_part2.pdf` p.12–13 — two Wolfson forms with the same layout, the pair that
 makes layout memory visibly pay off.
+
+> **◐ Implemented — 2026-10-22 (D5). The real-data measurement is NOT done, so there is no claim
+> that the local close rate rises on the sample forms.**
+> Built: `core/learning.py` (`observations_from_row`, `abstract_shape`, `shape_to_regex`,
+> `assert_pii_free` raising `PiiLeak`, `with_learned`), `adapters/learning/{sqlite_store.py,
+> schema.sql}` (WAL, idempotent schema, upserts that average the box, promotion at
+> `LEARNING_PROMOTION_HITS` = 3, approval flags, `run_metric`, seed export/import, a full-table
+> dump for audits), `api/learning.py` (`/v1/metrics/learning`, `/v1/learning/seed`,
+> `/v1/learning/proposals`, approve), the `/confirm` hook (observations built and all checked
+> before the first write; a leak stops the confirmation), `run_metric` recorded per finished job,
+> and the feedback into S4 (learned regions, `detector="learned"`, capped by
+> `learned_region_score`) and S6/S8 (`with_learned` widens the commitment labels with approved
+> synonyms and the pattern hints with promoted shapes). `LayoutObservation` gained `page_role`,
+> `label_text`, `shape`; new `RunMetric`; `LearningStorePort` gained `label_synonyms` and
+> `record_run`; `learning.db` lives under `DATA_DIR` and survives a purge and a restart. Schema
+> differences from §7.2 (both so a UNIQUE key works): `label_text` is `NOT NULL DEFAULT ''` and
+> `layout_hint` has `region_kind`.
+> Verified: 52 new tests (learning 25, store/privacy 27), 912 pass / 0 fail in `backend/tests`;
+> mypy, layering, docs checks clean; the real container (Sqlite store, provider chain, Tesseract)
+> builds. **`test_local_close_rate_improves_on_second_run` passes on a synthetic page** whose
+> sticker the detector misses: cold the central number is level D, after three confirmations the
+> learned region closes it from the barcode and the printed digits, so warm closes strictly more
+> fields locally. A raw search of `learning.db` (and its WAL) finds none of the planted values.
+> **Not verified:** the plan's cold → confirm → augmented-set run on the real pages (needs the gold
+> set, a person confirming rows and T25's augmentation), so the real effect is unknown and may be
+> small: the engine currently reads most real pages as role `unknown` (see T20), where there is no
+> sender to key a hint on. **Not built:** label text is not captured (S6 candidates carry no
+> governing label, Shira's identity finders would have to surface it), so layer 2 label synonyms
+> exist in the store and the approval API but nothing fills them yet; sender proposals likewise
+> have no producer and S5/the closed list do not read `approved_senders()` yet; a typed value has
+> no known place, so only untouched and picked-candidate fields teach a location.
 
 ---
 

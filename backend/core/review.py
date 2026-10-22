@@ -12,7 +12,7 @@ Pure functions; the clock and the sender list arrive through ports.
 
 from __future__ import annotations
 
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from backend.core.models import (
     REASON_TEXT,
@@ -130,8 +130,13 @@ def resolve_edit(
         duration_ms=0,
         cloud=False,
     )
+    located: dict[str, Any] = {}
+    if pick_index is not None:  # a picked candidate brings its own location and source
+        picked = current.candidates[pick_index]
+        located = {"box": picked.box, "source": picked.source}
     edited = current.model_copy(
         update={
+            **located,
             "value": canonical,
             "display_value": canonical,
             "level": ConfidenceLevel.B,

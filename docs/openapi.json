@@ -708,6 +708,138 @@
         }
       }
     },
+    "/v1/metrics/learning": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Metrics Learning",
+        "description": "The learning curve: one point per finished job, oldest first (`at`, `local_close_rate` and\nthe counters behind it). Empty when nothing has run or the store keeps no history.",
+        "operationId": "metrics_learning_v1_metrics_learning_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Metrics Learning V1 Metrics Learning Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/learning/seed": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Learning Seed",
+        "description": "The store exported as `learning_seed.json`: promoted boxes and shapes only, so a developer\ncan commit it (PLAN §7.4).",
+        "operationId": "learning_seed_v1_learning_seed_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Learning Seed V1 Learning Seed Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/learning/proposals": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Learning Proposals",
+        "description": "Label synonyms and proposed institutions, with their hit counts and approval state.",
+        "operationId": "learning_proposals_v1_learning_proposals_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Learning Proposals V1 Learning Proposals Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/learning/proposals/{kind}/{proposal_id}/approve": {
+      "post": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Approve Proposal",
+        "description": "Approve one proposal. Raises ProposalNotFound (404) when there is none.",
+        "operationId": "approve_proposal_v1_learning_proposals__kind___proposal_id__approve_post",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "label",
+                "sender"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proposal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Approve Proposal V1 Learning Proposals  Kind   Proposal Id  Approve Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/jobs/{job_id}/export": {
       "get": {
         "tags": [

@@ -51,6 +51,8 @@ DOCUMENTED = {
     ("get", "/v1/senders"),
     ("get", "/v1/metrics"),
     ("get", "/v1/metrics/eval"),
+    ("get", "/v1/metrics/learning"),
+    ("get", "/v1/learning/seed"),
     ("get", "/v1/health"),
 }
 
