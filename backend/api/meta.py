@@ -51,7 +51,10 @@ async def health(
         "ocr_missing": ocr.missing,
         "models": {
             "trocr": "loaded" if container.ocr_digits is not None else "not_loaded",
-            "yolo": "not_loaded",  # loaded in T16 when the experiment runs
+            # "selected" = configured; the model loads lazily and falls back if it is missing.
+            "yolo": "selected"
+            if container.settings.region_detector == "yolo_onnx"
+            else "not_loaded",
         },
         "providers": providers,
         "local_only": settings.local_only,

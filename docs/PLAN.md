@@ -2016,7 +2016,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 13 ✅ | S6–S7 central number, receipt date, TrOCR | Ahuba | P3 | D4 | 4h | 8,11 |
 | 14 ✅ | S8 scoring, ladder, calibration | Shira | P3 | D4 | 3h | 8 · **12,13 at runtime only** |
 | 15 ✅ | Orchestrator and evaluation runner — **M3** | Shira | P3 | D4–5 | 3h | 9–14 |
-| 16 | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
+| 16 ◐ | YOLOv8n region-detector experiment | Ahuba | P3 | D5 | 3h | 7,11 |
 | 17 | Reader bake-off and decision record | Both | P3 | D5 | 2h+2h | 13,15,16 |
 | 18 ◐ | S9 provider layer with failover | Ahuba | P4 | D5–6 | 4h | 14,15,17 |
 | 19 ✅ | Export adapters: Excel, CSV, JSON | Shira | P4 | D5–6 | **4h** | 2 · **15 at runtime only** |
@@ -3358,6 +3358,24 @@ python -m tools.demo regions A14 --detector yolo_onnx --compare rule_based
 # -> yolo_onnx  : central_sticker IoU 0.83 | stamp IoU 0.76 | +180ms +64MB
 # -> verdict written to docs/decisions/ADR-016-region-detector.md
 ```
+
+> **◐ Prepared — 2026-10-22 (D5). The experiment has NOT been run: no model, no held-out numbers, no
+> decision.** Owner: Ahuba.
+> Built and unit-tested (fake ONNX session, synthetic images): `eval/build_yolo_dataset.py` (page-level
+> split, held-out excluded, refuses to run without `held_out.txt`); `eval/make_gold.py --propose` now also
+> writes `gold_boxes.csv` (**draft** boxes from the highlighter, patient block merged: a human must review
+> them); `backend/adapters/regions/yolo_onnx.py` (`YoloRegionDetector`: onnxruntime only, lazy, 15 MB
+> budget, boxes normalised, never raises; `YoloPreferred`: per-class replacement, falls back to
+> rule-based when the model is missing); `REGION_DETECTOR` / `YOLO_*` settings and container selection;
+> `docs/decisions/ADR-016-region-detector.md` (status **open**), AGPL note in `docs/limitations.md`,
+> `models/README.md` marked not trained. `config/models.yaml` keeps `rule_based`.
+> Tests: `backend/tests/unit/test_yolo_adapter.py` has the 7 named tests plus 20 more; the named
+> `test_onnx_model_under_size_budget` skips until a model is installed.
+> **Not done, needs others:** the reviewed gold boxes and `held_out.txt` (T7 labelling, both developers),
+> the Colab/Kaggle training run, and the IoU/latency/memory comparison on held-out. The Step-5 commands in
+> the skill (`tools.demo regions`, `run_eval --detector`) are **not built**. Dataset caveat: boxes are in
+> the raw render's frame, and some SAP pages are sideways there.
+> **For Shira:** nothing to do for T16; `s4_regions` already takes whatever the container injects.
 
 ---
 

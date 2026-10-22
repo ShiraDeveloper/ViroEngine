@@ -53,7 +53,7 @@ layers:
 readers:
   primary_ocr: tesseract             # "tesseract" | "surya" — bake-off decides (T17)
   digit_ocr: trocr                   # "trocr" | "tesseract" — bake-off decides (T17)
-  region_detector: rule-based        # "rule-based" | "yolov8n-onnx" — ADR-016 decides (T16)
+  region_detector: rule_based        # "rule_based" | "yolo_onnx" — ADR-016 decides (T16); read from REGION_DETECTOR
 
 # --- TrOCR (handwritten digits, T13) --------------------------------------
 # Read at runtime from Settings (TROCR_* in .env); mirrored here for calibrate.py.
@@ -68,10 +68,15 @@ trocr:
   max_model_mb: 80        # larger file sets are refused at load
 
 # --- YOLOv8n region detector (experimental, T16) --------------------------
+# Read at runtime from Settings (YOLO_* in .env); mirrored here for eval tooling. Not trained
+# yet: no model file exists and region_detector stays rule_based (docs/decisions/ADR-016).
 yolo:
-  model_path: models/yolov8n-regions.onnx      # git-ignored; see models/README.md
-  confidence_threshold: 0.60
+  model_path: models/yolov8n_regions_int8.onnx   # git-ignored; see models/README.md
+  confidence_threshold: 0.35
   iou_threshold: 0.45
+  image_size: 1024
+  max_model_mb: 15
+  classes: [central_sticker, receipt_stamp, patient_box, commitment_label]
 
 # --- Cloud providers (T18) ---------------------------------------------------
 # Read by backend/adapters/vision/config.py; ProvidersConfig defaults must equal these (a test

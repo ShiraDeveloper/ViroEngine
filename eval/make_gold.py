@@ -97,6 +97,21 @@ DRAFT_COLUMNS: Final = (
 # `confirmed_value` with the empty token turned into "" (calibrate's "absent on the page").
 GOLD_COLUMNS: Final = ("page_label", "field", "confirmed_value", "page_id", "value")
 UNASSIGNED_COLUMNS: Final = ("page_label", "crop_path")
+# gold_boxes.csv (T16): DRAFT region boxes taken from the highlights, one row per box, for the
+# YOLO dataset. A human reviews them before training; the highlighter is only a proposal.
+BOXES_COLUMNS: Final = ("page_label", "kind", "y_min", "x_min", "y_max", "x_max", "source")
+BOXES_SOURCE: Final = "highlight"
+# Field -> the region class its highlight proposes. The sender and the two name fields differ:
+# the patient block is one region, so all of a page's patient-field highlights are merged.
+FIELD_REGION_KIND: Final[dict[FieldKey, str]] = {
+    FieldKey.central_number: "central_sticker",
+    FieldKey.receipt_date: "receipt_stamp",
+    FieldKey.first_name: "patient_box",
+    FieldKey.last_name: "patient_box",
+    FieldKey.national_id: "patient_box",
+    FieldKey.commitment_number: "commitment_label",
+}
+MERGED_KINDS: Final = frozenset({"patient_box"})
 UNASSIGNED_NOTE: Final = "page has unassigned highlight(s): see unassigned_highlights.csv"
 
 # PLAN §10.2: held-out size and seed; the seed is shared so both developers get the same set.
@@ -221,7 +236,8 @@ def propose_labels(
 ) -> Path:
     """Render every page, find its highlights and write `<out_dir>/gold_draft.csv` plus crops
     under `crops/`, page images under `pages/` and any highlight no field claimed in
-    `unassigned_highlights.csv`. All 7 fields of every page get a row (336 for 48 pages), not
+    `unassigned_highlights.csv`, and the draft region boxes for the YOLO dataset in
+    `gold_boxes.csv` (T16; only highlights a field claimed). All 7 fields of every page get a row (336 for 48 pages), not
     only highlighted ones; `proposed_value` stays empty (nothing is guessed). With a `locator`
     each field also gets a crop of its engine-found box. Returns the draft path.
     Raises EvalInputError for a missing PDF or one whose name gives no page label."""
@@ -231,6 +247,7 @@ def propose_labels(
         dpi = dpi if dpi is not None else settings.render_dpi
     rows: list[dict[str, str]] = []
     unassigned: list[dict[str, str]] = []
+    boxes: list[dict[str, str]] = []
     pages = highlights_total = 0
     for pdf in pdfs:
         if not pdf.is_file():
@@ -244,7 +261,7 @@ def propose_labels(
             image = decode_bgr(encoded.data)
             _write(out_dir / "pages" / f"{label}.png", encoded.data)
             page_rows, page_unassigned, found = _propose_page(
-                label, image, encoded.data, out_dir, locator
+                label, image, encoded.data, out_dir, locator, boxes
             )
             rows += page_rows
             unassigned += page_unassigned
@@ -254,6 +271,7 @@ def propose_labels(
     draft = out_dir / "gold_draft.csv"
     _write_csv(draft, DRAFT_COLUMNS, rows)
     _write_csv(out_dir / "unassigned_highlights.csv", UNASSIGNED_COLUMNS, unassigned)
+    _write_csv(out_dir / "gold_boxes.csv", BOXES_COLUMNS, boxes)
     log.info(
         "gold_draft_written",
         stage="T7",
@@ -265,16 +283,68 @@ def propose_labels(
     return draft
 
 
+def draft_region_boxes(label: str, placed: Sequence[tuple[FieldKey, Box]]) -> list[dict[str, str]]:
+    """Draft `gold_boxes.csv` rows for one page from (field, highlight box) pairs: one row per
+    highlight, except the patient block, whose highlights merge into one box. Fields with no
+    region class (the sender) give no row."""
+    rows: list[dict[str, str]] = []
+    merged: dict[str, list[Box]] = {}
+    for key, box in placed:
+        kind = FIELD_REGION_KIND.get(key)
+        if kind is None:
+            continue
+        if kind in MERGED_KINDS:
+            merged.setdefault(kind, []).append(box)
+        else:
+            rows.append(_box_row(label, kind, box))
+    for kind, parts in merged.items():
+        rows.append(
+            _box_row(
+                label,
+                kind,
+                (
+                    min(b[0] for b in parts),
+                    min(b[1] for b in parts),
+                    max(b[2] for b in parts),
+                    max(b[3] for b in parts),
+                ),
+            )
+        )
+    return rows
+
+
+def _box_row(label: str, kind: str, box: Box) -> dict[str, str]:
+    y_min, x_min, y_max, x_max = box
+    return {
+        "page_label": label,
+        "kind": kind,
+        "y_min": f"{y_min:.6f}",
+        "x_min": f"{x_min:.6f}",
+        "y_max": f"{y_max:.6f}",
+        "x_max": f"{x_max:.6f}",
+        "source": BOXES_SOURCE,
+    }
+
+
 def _propose_page(
-    label: str, image: Pixels, png: bytes, out_dir: Path, locator: Locator | None
+    label: str,
+    image: Pixels,
+    png: bytes,
+    out_dir: Path,
+    locator: Locator | None,
+    boxes: list[dict[str, str]] | None = None,
 ) -> tuple[list[dict[str, str]], list[dict[str, str]], int]:
-    """Draft rows for one page, its unassigned highlights and its highlight count."""
+    """Draft rows for one page, its unassigned highlights and its highlight count. When `boxes`
+    is given, the page's draft region boxes are appended to it."""
     field_boxes: Mapping[FieldKey, Box] = locator(label, png) if locator is not None else {}
     attached: dict[FieldKey, list[str]] = {}
     unassigned: list[dict[str, str]] = []
+    placed: list[tuple[FieldKey, Box]] = []
     found = find_highlights(image)
     for n, hl in enumerate(found, start=1):
         key = attach_field(hl.box, field_boxes)
+        if key is not None:
+            placed.append((key, hl.box))
         name = f"{label}_{key.value}_hl{n}" if key is not None else f"{label}_hl{n}"
         rel = f"crops/{name}.png"
         _write(out_dir / rel, _crop_png(image, hl.box))
@@ -282,6 +352,8 @@ def _propose_page(
             unassigned.append({"page_label": label, "crop_path": rel})
         else:
             attached.setdefault(key, []).append(rel)
+    if boxes is not None:
+        boxes += draft_region_boxes(label, placed)
     rows: list[dict[str, str]] = []
     for key in FieldKey:
         crops = attached.get(key, [])

@@ -9,6 +9,8 @@ fails startup loudly rather than silently using a wrong default.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -168,6 +170,19 @@ class Settings(BaseSettings):
     # The pair must fit beside OpenCV and Tesseract on a 512 MB host; larger is refused.
     trocr_max_model_mb: float = Field(default=80.0, gt=0.0, le=1000.0)
 
+    # --- S4 region detector (T16) -------------------------------------------
+    # "rule_based" is the default and the baseline; "yolo_onnx" is the experiment, switched on
+    # only if ADR-016's pre-declared rule holds. A missing model file falls back to rule_based.
+    region_detector: Literal["rule_based", "yolo_onnx"] = "rule_based"
+    yolo_model_file: str = "yolov8n_regions_int8.onnx"  # inside models_dir
+    yolo_conf: float = Field(default=0.35, ge=0.0, le=1.0)  # detections below are dropped
+    yolo_iou: float = Field(default=0.45, ge=0.0, le=1.0)  # NMS overlap that merges two boxes
+    yolo_imgsz: int = Field(default=1024, ge=64, le=4096)  # square input side, pixels
+    yolo_max_model_mb: float = Field(default=15.0, gt=0.0, le=1000.0)  # larger is refused
+    # Classes whose YOLO detections replace the rule-based regions of that kind (per-class
+    # choice: YOLO may win on receipt_stamp alone). Comma-separated RegionKind values.
+    yolo_kinds: str = "central_sticker,receipt_stamp,patient_box,commitment_label"
+
     # --- Paths ------------------------------------------------------------
     tesseract_cmd: str = "/usr/bin/tesseract"
     models_dir: str = "./models"
@@ -182,6 +197,11 @@ class Settings(BaseSettings):
     def gemini_keys_list(self) -> list[str]:
         """Split comma-separated Gemini API keys. Empty string → empty list."""
         return [k.strip() for k in self.gemini_api_keys.split(",") if k.strip()]
+
+    @property
+    def yolo_kinds_list(self) -> list[str]:
+        """Split the comma-separated YOLO class list. Empty string → empty list."""
+        return [k.strip() for k in self.yolo_kinds.split(",") if k.strip()]
 
     @property
     def origins_list(self) -> list[str]:
