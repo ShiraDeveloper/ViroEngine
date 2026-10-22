@@ -107,6 +107,26 @@ def from_crop(box: Box, crop: Box) -> Box:
     )
 
 
+def readable_line_box(box: Box, orientation_deg: int, *, reach: float, margin: float) -> Box:
+    """Where a barcode's human-readable number is printed: the band just below the bars once
+    the code is upright, on the page frame.
+
+    `orientation_deg` is the clockwise turn that makes the code upright (BarcodeHit). The band
+    runs `reach` bar-heights past the bars, overlaps them by `margin` bar-heights (a decoder's
+    box is often a little short of the real bars) and is `margin` bar-lengths longer at each
+    end. Limited to the page.
+    """
+    y0, x0, y1, x1 = box
+    h, w = y1 - y0, x1 - x0
+    if orientation_deg == 180:  # upside down: "below" is above on the page
+        return clamp((y0 - reach * h, x0 - margin * w, y0 + margin * h, x1 + margin * w))
+    if orientation_deg == 90:  # turning the page 90 clockwise maps page-right to down
+        return clamp((y0 - margin * h, x1 - margin * w, y1 + margin * h, x1 + reach * w))
+    if orientation_deg == 270:  # turning it 90 counter-clockwise maps page-left to down
+        return clamp((y0 - margin * h, x0 - reach * w, y1 + margin * h, x0 + margin * w))
+    return clamp((y1 - margin * h, x0 - margin * w, y1 + reach * h, x1 + margin * w))
+
+
 def distance_to_box(point: tuple[float, float], box: Box, size: Size) -> float:
     """Pixel distance from a (y, x) point to a box; 0 when the point lies inside it."""
     dy = max(box[0] - point[0], 0.0, point[0] - box[2]) * size[1]

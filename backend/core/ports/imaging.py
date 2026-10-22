@@ -6,6 +6,7 @@ thresholds; this port only computes numbers and performs the named operations.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final, Protocol, runtime_checkable
 
@@ -99,4 +100,12 @@ class ImagingPort(Protocol):
 
         Raises RenderFailed when the image cannot be decoded or the box holds no pixels, and
         ValueError for any other angle."""
+        ...
+
+    def fill_boxes(self, image: bytes, boxes: Sequence[Box], *, gray_level: int) -> EncodedImage:
+        """Paint each normalized box solid grey (`gray_level`, 0-255) at full resolution, size
+        unchanged. Used to redact a page BEFORE it is downscaled, so no glyph survives the
+        resample. A box with no pixels is ignored.
+
+        Raises RenderFailed when the image cannot be decoded."""
         ...

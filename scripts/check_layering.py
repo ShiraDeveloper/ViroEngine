@@ -26,6 +26,8 @@ FORBIDDEN: frozenset[str] = frozenset(
         "cv2",
         "openpyxl",
         "backend.adapters",
+        # Evaluation-only code (the yellow-highlighter mask lives there, project rule §4).
+        "eval",
     }
 )
 
@@ -37,7 +39,7 @@ def find_violations(
     """Return (file, line, import_string) for every forbidden import in core_dir.
 
     forbidden = {"fastapi","pytesseract","google","httpx","sqlite3","cv2",
-                 "openpyxl","backend.adapters"}
+                 "openpyxl","backend.adapters","eval"}
     Never raises; an unreadable or unparseable file is skipped with a warning.
     """
     violations: list[tuple[Path, int, str]] = []

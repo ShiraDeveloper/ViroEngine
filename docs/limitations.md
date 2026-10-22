@@ -28,7 +28,18 @@ escalating. _Outcome: to be filled._
 
 The rule-based detector finds regions by reading the labels around them. If the label itself is
 unreadable, or the layout is unfamiliar, it has nothing to work from. The YOLOv8n experiment
-(Task 16) addresses this, under a decision rule declared in advance. _Outcome: to be filled._
+(Task 16) addresses this, under a decision rule declared in advance. _Outcome (2026-10-22): the
+experiment has **not been run** - the code and the dataset builder exist, but there is no
+trained model, because training needs the reviewed gold boxes (T7) and a GPU session. The
+rule-based detector stays the only active detector; see ADR-016. No claim about YOLO is made._
+
+**Licence note (AGPL-3.0).** `ultralytics`, the library that trains and exports YOLOv8, is
+AGPL-3.0. It is used only offline, on a training machine, and is not a dependency of this
+repository (a test asserts that nothing under `backend/` imports it and that it is in neither
+`requirements.txt` nor `pyproject.toml`). The runtime reads the exported ONNX file with
+`onnxruntime` (MIT). Whether the *weights* trained with an AGPL tool carry the licence is a
+question we did not resolve; if the system is ever deployed closed-source, take legal advice or
+retrain with a permissively licensed detector first.
 
 Measured by Task 11 on the 48 sample pages (ground truth counted by eye; dev data, not held-out):
 
@@ -104,6 +115,72 @@ and KGI.
 | FastAPI, Pydantic, openpyxl, rapidfuzz, structlog | MIT / Apache-2.0 | |
 | React, Vite, Tailwind, Radix, TanStack | MIT | |
 | Our own code | MIT | See [`LICENSE`](../LICENSE) |
+
+## Cloud provider layer (T18)
+
+- **Not exercised against a live provider.** The Gemini, OpenRouter and Groq request shapes are
+  written from the providers' public REST documentation and tested against a fake transport only.
+  Gemini's `responseJsonSchema` field and `thinkingBudget: 0` have not been confirmed live; a
+  provider that rejects either answers 4xx, which the chain treats as `rejected` and skips. Run the
+  48 sample pages once with a real key before relying on the escalation numbers.
+- **No OpenRouter or Groq model is pinned.** The free model lists change weekly. Set
+  `OPENROUTER_VISION_MODEL` (and `GROQ_VISION_MODEL` if Groq lists a vision model that day) or the
+  provider is reported unavailable and skipped.
+- **S5's letterhead question is a second request.** When text and logo matching both fail, S5 asks
+  the model to choose the sender from the closed list (a letterhead crop only). It is a separate
+  request from S9's field request, so a page can make two provider calls; both are cached.
+- **The cached answer is patient data.** It holds values read from crops, never an image. It expires
+  after `JOB_TTL_MINUTES` unless `VISION_CACHE_TTL_MINUTES` is set deliberately.
+- **Planning cost only.** `estimated_usd` uses Gemini Flash list prices (an assumption, PLAN §6.5);
+  free-tier fallbacks are counted as zero.
+
+## Deployment (T28)
+
+- **Not deployed.** There is no public URL, no measured production latency and no idle-hour check; the
+  configuration (`render.yaml`, `vercel.json`, the Space README, the runbook) is written but
+  untested against a real host, and the Docker image has not been built on the development machine.
+- **Speed.** Measured locally: 12.2 s per page, Python process peak 220 MB (Tesseract children not
+  counted). The target of 30 forms in under 4 minutes is missed on that machine, and Render's free plan
+  (0.1 CPU) is slower still; see ADR-014 for the recommended host.
+- **TrOCR is not in the image** (64 MB, git-ignored, measured to close no local fields); the handwritten
+  digit reader is simply absent in production.
+- **A free host sleeps.** The monitor keeps only the primary warm; the standby is warmed by hand.
+- **Readiness depends on the OCR packs.** Without the Hebrew pack the service reports `unready` (503)
+  and refuses uploads rather than returning empty results.
+
+## Security hardening (T27)
+
+- **Rate limiting keys on the socket peer.** Behind a reverse proxy every request would share one
+  address unless the server runs with proxy headers enabled and a trusted forwarder list; the
+  deployment (T28) must set that. Counters live in memory, so they reset on restart and are not
+  shared between processes.
+- **Open API without `API_KEY`.** An empty key means no authentication (development). The
+  application logs `auth_disabled` at start-up; a deployment must set it.
+- **The upload is held in memory** (bounded by `MAX_UPLOAD_MB`) until the pipeline takes it,
+  instead of being streamed to disk.
+- **Dependencies move.** The pins were bumped to clear `pip-audit` on 2026-10-22; new advisories
+  appear continuously, so the CI `pip-audit --strict` job can go red later with no code change.
+- **`gitleaks` is not run locally.** CI runs it over the full history; locally the history was
+  searched for key-shaped strings and private keys with `git log -G`.
+- **Sample hashes depend on the renderer.** `config/sample_hashes.json` is the SHA-256 of pages as
+  this build's PDF renderer draws them; a different renderer version changes the hashes and the
+  sample forms are then treated as unknown (processed locally, safe but less accurate).
+  Regenerate with `python -m tools.make_sample_hashes` on the deployment's renderer.
+
+## Learning layer (T24)
+
+- **Learns only from human confirmations, and needs three of them** before a location or shape is
+  used. The first batch from a new institution gets no benefit. Every behaviour change is traceable
+  to confirmations and reversible by deleting a row.
+- **The effect on real forms is unmeasured.** The only measured improvement is on a synthetic page
+  (T24 test). Whether the local close rate rises on the 48 samples awaits the gold set, a person
+  confirming rows and the augmented set.
+- **A hint needs a known sender.** A page with no resolved institution (most real pages at the
+  moment, see T20) cannot be keyed, so it neither teaches nor benefits.
+- **Label synonyms and sender proposals have no producer yet.** The store and the approval API
+  work; S6 does not report the governing label and S5 does not read approved proposals.
+- **A typed value teaches nothing,** because its place on the page is unknown; picked candidates
+  and untouched fields teach their location.
 
 ## Reported results versus targets
 

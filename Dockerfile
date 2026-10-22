@@ -17,7 +17,7 @@ LABEL org.opencontainers.image.title="Safe Line" \
       org.opencontainers.image.version="0.1.0"
 
 # --- System dependencies ---------------------------------------------------
-# tesseract-ocr-heb: Hebrew language pack — required, startup fails without it
+# tesseract-ocr-heb: Hebrew language pack - required; without it /v1/health answers 503 and uploads are refused
 # libgl1 libglib2.0-0: OpenCV headless runtime
 # libzbar0: barcode decoding runtime (zxing-cpp may need it on some platforms)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -63,12 +63,14 @@ ENV LOG_LEVEL=INFO
 # Render free tier keeps the container alive; the health check path is also
 # used by UptimeRobot and by the deploy smoke test.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')" \
+    CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:%s/v1/health' % os.environ.get('PORT', '8000'))" \
     || exit 1
 
 # --- Expose and start ------------------------------------------------------
 EXPOSE 8000
 
-# Single worker: concurrency comes from the async job queue (MAX_CONCURRENCY),
+# Render injects PORT; locally it is 8000. --proxy-headers makes the client address seen by the
+# rate limiter the real one behind Render's proxy (trust is set by FORWARDED_ALLOW_IPS, see
+# render.yaml). Single worker: concurrency comes from the async job queue (MAX_CONCURRENCY),
 # not from multiple uvicorn processes.
-CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["sh", "-c", "exec uvicorn backend.app:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --proxy-headers"]

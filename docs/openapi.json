@@ -35,7 +35,7 @@
           "meta"
         ],
         "summary": "Metrics",
-        "description": "Process-level aggregated counters — no PII.\n\nFull metrics are populated in T22/T24. Skeleton returns zeros.",
+        "description": "Process-level aggregated counters since start-up. Counters only: no value, no PII.",
         "operationId": "metrics_v1_metrics_get",
         "responses": {
           "200": {
@@ -52,23 +52,64 @@
         }
       }
     },
+    "/v1/metrics/eval": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Metrics Eval",
+        "description": "The latest evaluation report (`eval/results/latest.json`), or `{\"available\": false}` when\nno run has produced one. The report holds counts and rates, never a field value.",
+        "operationId": "metrics_eval_v1_metrics_eval_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Metrics Eval V1 Metrics Eval Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/documents": {
       "post": {
         "tags": [
           "documents"
         ],
-        "summary": "Upload Document",
-        "description": "Accept a single document and create an extraction job.\n\nReturns job_id and initial status immediately; extraction runs async.\n\nRaises:\n    UnsupportedMedia (415): content type is not supported.\n    TooLarge (413): file size exceeds MAX_UPLOAD_MB.\n    HTTPException 429: job queue is at capacity (Retry-After: 30).",
-        "operationId": "upload_document_v1_documents_post",
+        "summary": "Create Document",
+        "description": "One document. 201 with the job, or 200 with `idempotent_replay` for a repeated key.\n\nRaises UnsupportedMedia (415), TooLarge (413); answers 429 + Retry-After when the queue is\nfull. `cloud_consent` is the per-job consent of PLAN §8.5 (default: no).",
+        "operationId": "create_document_v1_documents_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_document_v1_documents_post"
+                "$ref": "#/components/schemas/Body_create_document_v1_documents_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -76,8 +117,821 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/batches": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Create Batch",
+        "description": "Many documents (repeated `files` parts) or a ZIP, as one job. Same statuses as\n`/documents`; the total size is bounded by `MAX_UPLOAD_MB`.",
+        "operationId": "create_batch_v1_batches_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_batch_v1_batches_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Job",
+        "description": "The job as the UI sees it. A purged job answers with status `purged` for a while, then 404.",
+        "operationId": "get_job_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Delete Job",
+        "description": "Purge the job's artefacts and data now. The job then answers `purged` for a while.",
+        "operationId": "delete_job_v1_jobs__job_id__delete",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/results": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Results",
+        "description": "The rows only: the integration payload.",
+        "operationId": "get_results_v1_jobs__job_id__results_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CommitmentRow"
+                  },
+                  "title": "Response Get Results V1 Jobs  Job Id  Results Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/events": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Job Events",
+        "description": "Server-sent progress: every event so far, then live ones, ending after `done`, on\ndisconnect or after the configured ceiling. A `: ping` comment keeps proxies from closing it.",
+        "operationId": "job_events_v1_jobs__job_id__events_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/pages/{page_id}/image": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Image",
+        "description": "The corrected page (`color`) or its thumbnail, as PNG. Never cached.",
+        "operationId": "get_image_v1_jobs__job_id__pages__page_id__image_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Page Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "color",
+                "thumb"
+              ],
+              "type": "string",
+              "default": "color",
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/pages/{page_id}/crop": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Crop",
+        "description": "PNG of the region `box` (`y0,x0,y1,x1`, fractions of the page) plus `pad`, rendered on\ndemand from the corrected page. The long edge is capped at 1200 px.",
+        "operationId": "get_crop_v1_jobs__job_id__pages__page_id__crop_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Page Id"
+            }
+          },
+          {
+            "name": "box",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^(?:0(?:\\.\\d+)?|1(?:\\.0+)?|\\.\\d+),(?:0(?:\\.\\d+)?|1(?:\\.0+)?|\\.\\d+),(?:0(?:\\.\\d+)?|1(?:\\.0+)?|\\.\\d+),(?:0(?:\\.\\d+)?|1(?:\\.0+)?|\\.\\d+)$",
+              "title": "Box"
+            }
+          },
+          {
+            "name": "pad",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 0.2,
+              "minimum": 0.0,
+              "default": 0.02,
+              "title": "Pad"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/rows/{row_id}/fields/{field}": {
+      "patch": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Edit Field",
+        "description": "Set a field to a typed value (`null` clears it) or to one of its candidates, recompute the\nrow level and append the change to the audit log. 422 for a value that breaks a hard rule,\n404 for an unknown row or field, 409 on a confirmed or purged job.",
+        "operationId": "edit_field_v1_jobs__job_id__rows__row_id__fields__field__patch",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Row Id"
+            }
+          },
+          {
+            "name": "field",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/FieldKey"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldEditRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitmentRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/rows/{row_id}/undo": {
+      "post": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Undo Edit",
+        "description": "Revert the last edit of the row. The log stays append-only: the undo is an entry too.",
+        "operationId": "undo_edit_v1_jobs__job_id__rows__row_id__undo_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Row Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitmentRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/confirm": {
+      "post": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Confirm Job",
+        "description": "Mark the job reviewed. Rows keep `edited` where a person changed them and become\n`confirmed` otherwise; a field accepted while still flagged is recorded in the audit log.\n409 while the job is still running, and once it is confirmed.",
+        "operationId": "confirm_job_v1_jobs__job_id__confirm_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/audit": {
+      "get": {
+        "tags": [
+          "review"
+        ],
+        "summary": "Get Audit",
+        "description": "Every review action on the job, oldest first.",
+        "operationId": "get_audit_v1_jobs__job_id__audit_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewEdit"
+                  },
+                  "title": "Response Get Audit V1 Jobs  Job Id  Audit Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/metrics/learning": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Metrics Learning",
+        "description": "The learning curve: one point per finished job, oldest first (`at`, `local_close_rate` and\nthe counters behind it). Empty when nothing has run or the store keeps no history.",
+        "operationId": "metrics_learning_v1_metrics_learning_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Metrics Learning V1 Metrics Learning Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/learning/seed": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Learning Seed",
+        "description": "The store exported as `learning_seed.json`: promoted boxes and shapes only, so a developer\ncan commit it (PLAN §7.4).",
+        "operationId": "learning_seed_v1_learning_seed_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
                   "type": "object",
-                  "title": "Response Upload Document V1 Documents Post"
+                  "title": "Response Learning Seed V1 Learning Seed Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/learning/proposals": {
+      "get": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Learning Proposals",
+        "description": "Label synonyms and proposed institutions, with their hit counts and approval state.",
+        "operationId": "learning_proposals_v1_learning_proposals_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Learning Proposals V1 Learning Proposals Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/learning/proposals/{kind}/{proposal_id}/approve": {
+      "post": {
+        "tags": [
+          "learning"
+        ],
+        "summary": "Approve Proposal",
+        "description": "Approve one proposal. Raises ProposalNotFound (404) when there is none.",
+        "operationId": "approve_proposal_v1_learning_proposals__kind___proposal_id__approve_post",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "label",
+                "sender"
+              ],
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "proposal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Proposal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Approve Proposal V1 Learning Proposals  Kind   Proposal Id  Approve Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/export": {
+      "get": {
+        "tags": [
+          "export"
+        ],
+        "summary": "Export Job",
+        "description": "The rows (and the run counters) as a file. 409 until the job has a report.",
+        "operationId": "export_job_v1_jobs__job_id__export_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "xlsx",
+                "csv",
+                "json"
+              ],
+              "type": "string",
+              "default": "xlsx",
+              "title": "Format"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/stress": {
+      "post": {
+        "tags": [
+          "stress"
+        ],
+        "summary": "Stress Job",
+        "description": "A new job over the source job's original pages, each degraded by each requested op.\n422 for an unknown op, 501 when no augmenter is installed.",
+        "operationId": "stress_job_v1_jobs__job_id__stress_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StressRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
                 }
               }
             }
@@ -122,19 +976,413 @@
   },
   "components": {
     "schemas": {
-      "Body_upload_document_v1_documents_post": {
+      "Body_create_batch_v1_batches_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "cloud_consent": {
+            "type": "boolean",
+            "title": "Cloud Consent",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_create_batch_v1_batches_post"
+      },
+      "Body_create_document_v1_documents_post": {
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
+          },
+          "cloud_consent": {
+            "type": "boolean",
+            "title": "Cloud Consent",
+            "default": false
           }
         },
         "type": "object",
         "required": [
           "file"
         ],
-        "title": "Body_upload_document_v1_documents_post"
+        "title": "Body_create_document_v1_documents_post"
+      },
+      "Candidate": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "reader": {
+            "$ref": "#/components/schemas/ReaderName"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "box": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Box"
+          },
+          "reader_confidence": {
+            "type": "number",
+            "title": "Reader Confidence"
+          },
+          "label_distance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Distance"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegionKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value",
+          "reader",
+          "source",
+          "box",
+          "reader_confidence",
+          "label_distance",
+          "region"
+        ],
+        "title": "Candidate"
+      },
+      "CommitmentRow": {
+        "properties": {
+          "row_id": {
+            "type": "string",
+            "title": "Row Id"
+          },
+          "group_id": {
+            "type": "string",
+            "title": "Group Id"
+          },
+          "page_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Page Ids"
+          },
+          "fields": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldResult"
+            },
+            "type": "object",
+            "title": "Fields",
+            "x-key-type": "FieldKey"
+          },
+          "central_numbers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Central Numbers"
+          },
+          "row_level": {
+            "$ref": "#/components/schemas/ConfidenceLevel"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "confirmed",
+              "edited"
+            ],
+            "title": "Status"
+          },
+          "merge_suggestion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merge Suggestion"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "row_id",
+          "group_id",
+          "page_ids",
+          "fields",
+          "central_numbers",
+          "row_level",
+          "status"
+        ],
+        "title": "CommitmentRow"
+      },
+      "ConfidenceLevel": {
+        "type": "string",
+        "enum": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "title": "ConfidenceLevel"
+      },
+      "CostCounters": {
+        "properties": {
+          "provider_calls": {
+            "type": "integer",
+            "title": "Provider Calls"
+          },
+          "cache_hits": {
+            "type": "integer",
+            "title": "Cache Hits"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "estimated_usd": {
+            "type": "number",
+            "title": "Estimated Usd"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider_calls",
+          "cache_hits",
+          "input_tokens",
+          "output_tokens",
+          "estimated_usd"
+        ],
+        "title": "CostCounters",
+        "description": "Counters only. The PLAN names this type but does not define it (see T2 notes)."
+      },
+      "FieldEditRequest": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "pick_candidate_index": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pick Candidate Index"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": "technician"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FieldEditRequest",
+        "description": "Exactly one of `value` (None clears the field) or `pick_candidate_index`."
+      },
+      "FieldKey": {
+        "type": "string",
+        "enum": [
+          "first_name",
+          "last_name",
+          "national_id",
+          "central_number",
+          "receipt_date",
+          "sender",
+          "commitment_number"
+        ],
+        "title": "FieldKey"
+      },
+      "FieldResult": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/FieldKey"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "display_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Value"
+          },
+          "level": {
+            "$ref": "#/components/schemas/ConfidenceLevel"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceKind"
+          },
+          "box": {
+            "anyOf": [
+              {
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array",
+                "maxItems": 4,
+                "minItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Box"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "validations": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationOutcome"
+            },
+            "type": "array",
+            "title": "Validations"
+          },
+          "trail": {
+            "items": {
+              "$ref": "#/components/schemas/ReadingTrailStep"
+            },
+            "type": "array",
+            "title": "Trail"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "escalated": {
+            "type": "boolean",
+            "title": "Escalated"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field",
+          "value",
+          "display_value",
+          "level",
+          "score",
+          "source",
+          "box",
+          "candidates",
+          "validations",
+          "trail",
+          "reason",
+          "escalated"
+        ],
+        "title": "FieldResult"
       },
       "HTTPValidationError": {
         "properties": {
@@ -148,6 +1396,454 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "JobStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "needs_review",
+          "confirmed",
+          "failed",
+          "purged"
+        ],
+        "title": "JobStatus"
+      },
+      "JobView": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "page_count": {
+            "type": "integer",
+            "title": "Page Count"
+          },
+          "pages_done": {
+            "type": "integer",
+            "title": "Pages Done"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CommitmentRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "orphan_page_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Orphan Page Ids"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job_id",
+          "status",
+          "expires_at",
+          "page_count",
+          "pages_done",
+          "rows",
+          "orphan_page_ids",
+          "report"
+        ],
+        "title": "JobView",
+        "description": "The job as the UI sees it: no file paths, no internal refs."
+      },
+      "ReaderName": {
+        "type": "string",
+        "enum": [
+          "zxing",
+          "tesseract",
+          "trocr",
+          "gemini",
+          "openrouter",
+          "groq",
+          "human"
+        ],
+        "title": "ReaderName"
+      },
+      "ReadingTrailStep": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "reader": {
+            "$ref": "#/components/schemas/ReaderName"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "value",
+              "no_value",
+              "rejected",
+              "skipped"
+            ],
+            "title": "Outcome"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reader_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reader Confidence"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          },
+          "cloud": {
+            "type": "boolean",
+            "title": "Cloud"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "page_sent": {
+            "type": "boolean",
+            "title": "Page Sent",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "stage",
+          "reader",
+          "outcome",
+          "value",
+          "reader_confidence",
+          "duration_ms",
+          "cloud"
+        ],
+        "title": "ReadingTrailStep"
+      },
+      "RegionKind": {
+        "type": "string",
+        "enum": [
+          "central_sticker",
+          "receipt_stamp",
+          "patient_box",
+          "commitment_label",
+          "table",
+          "letterhead",
+          "clinical"
+        ],
+        "title": "RegionKind"
+      },
+      "ReviewEdit": {
+        "properties": {
+          "edit_id": {
+            "type": "string",
+            "title": "Edit Id"
+          },
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "row_id": {
+            "type": "string",
+            "title": "Row Id"
+          },
+          "field": {
+            "$ref": "#/components/schemas/FieldKey"
+          },
+          "old_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Value"
+          },
+          "new_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Value"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "edit",
+              "pick_candidate",
+              "clear",
+              "confirm",
+              "undo"
+            ],
+            "title": "Action"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "edit_id",
+          "job_id",
+          "row_id",
+          "field",
+          "old_value",
+          "new_value",
+          "actor",
+          "action",
+          "at"
+        ],
+        "title": "ReviewEdit"
+      },
+      "RunReport": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "page_count": {
+            "type": "integer",
+            "title": "Page Count"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "fields_total": {
+            "type": "integer",
+            "title": "Fields Total"
+          },
+          "fields_closed_local": {
+            "type": "integer",
+            "title": "Fields Closed Local"
+          },
+          "fields_escalated": {
+            "type": "integer",
+            "title": "Fields Escalated"
+          },
+          "fields_flagged": {
+            "type": "integer",
+            "title": "Fields Flagged"
+          },
+          "tier1_calls": {
+            "type": "integer",
+            "title": "Tier1 Calls"
+          },
+          "tier2_calls": {
+            "type": "integer",
+            "title": "Tier2 Calls"
+          },
+          "local_close_rate": {
+            "type": "number",
+            "title": "Local Close Rate"
+          },
+          "level_histogram": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Level Histogram"
+          },
+          "stage_durations_ms": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Stage Durations Ms"
+          },
+          "corrections_histogram": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Corrections Histogram"
+          },
+          "cost": {
+            "$ref": "#/components/schemas/CostCounters"
+          },
+          "provider_failovers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Provider Failovers"
+          },
+          "engine_version": {
+            "type": "string",
+            "title": "Engine Version"
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "cloud_consent": {
+            "type": "boolean",
+            "title": "Cloud Consent",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job_id",
+          "started_at",
+          "finished_at",
+          "page_count",
+          "row_count",
+          "fields_total",
+          "fields_closed_local",
+          "fields_escalated",
+          "fields_flagged",
+          "tier1_calls",
+          "tier2_calls",
+          "local_close_rate",
+          "level_histogram",
+          "stage_durations_ms",
+          "corrections_histogram",
+          "cost",
+          "provider_failovers",
+          "engine_version",
+          "prompt_version"
+        ],
+        "title": "RunReport",
+        "description": "run_report.json - counters only, no values, no PII."
+      },
+      "SourceKind": {
+        "type": "string",
+        "enum": [
+          "barcode",
+          "printed",
+          "handwritten",
+          "stamp",
+          "screen",
+          "unknown"
+        ],
+        "title": "SourceKind"
+      },
+      "StressRequest": {
+        "properties": {
+          "ops": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Ops"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ops"
+        ],
+        "title": "StressRequest",
+        "description": "`POST /v1/jobs/{id}/stress`: which degradations to apply (PLAN §10.3)."
+      },
+      "UploadResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "page_count": {
+            "type": "integer",
+            "title": "Page Count"
+          },
+          "idempotent_replay": {
+            "type": "boolean",
+            "title": "Idempotent Replay",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job_id",
+          "status",
+          "page_count"
+        ],
+        "title": "UploadResponse"
       },
       "ValidationError": {
         "properties": {
@@ -172,6 +1868,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -181,6 +1884,56 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ValidationOutcome": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "hard",
+              "soft"
+            ],
+            "title": "Kind"
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "repaired_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repaired From"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "passed"
+        ],
+        "title": "ValidationOutcome"
       }
     }
   }

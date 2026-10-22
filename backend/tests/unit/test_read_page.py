@@ -15,7 +15,17 @@ from backend.adapters.ocr.tesseract import parse_tsv
 from backend.adapters.storage.tempdir import TmpdirStorage
 from backend.core.geometry import contains, grow, unrotate_box
 from backend.core.models import BarcodeHit, Box, NormalizedPage, OcrWord
-from backend.core.pipeline.s3_read_page import SIDEWAYS_PSM, caption_strips, nearby_text, read_page
+from backend.core.pipeline.s3_read_page import (
+    READABLE_LINE_LANGS,
+    READABLE_LINE_PSM,
+    SIDEWAYS_PSM,
+    STAMP_PSM,
+    caption_strips,
+    nearby_text,
+    read_page,
+    readable_line_area,
+    stamp_areas,
+)
 from backend.core.reading_order import group_lines
 from backend.settings import Settings
 from backend.tests.fixtures.synthetic import pages
@@ -248,8 +258,9 @@ def test_sideways_caption_is_read_and_placed_on_the_page(
     assert caption[0].box == pytest.approx(caption_box, abs=1e-3)
     assert {w.text for w in result.words} == {"מרכזי"}  # type: ignore[attr-defined]
     assert "מרכזי" in hits[0].nearby_text
-    assert len(ocr.crop_calls) == 2  # one strip beyond each end of the bars
-    assert all(c["psm"] == SIDEWAYS_PSM and c["langs"] == "heb" for c in ocr.crop_calls)
+    caption_calls = [c for c in ocr.crop_calls if c["langs"] == "heb"]
+    assert len(caption_calls) == 2  # one strip beyond each end of the bars
+    assert all(c["psm"] == SIDEWAYS_PSM for c in caption_calls)
 
 
 def test_sideways_caption_of_a_sticker_applied_upside_down(
@@ -295,3 +306,98 @@ def test_unrotate_box_inverts_a_turn(turn: int) -> None:
     h, w = rotated.shape
     box: Box = (ys.min() / h, xs.min() / w, (ys.max() + 1) / h, (xs.max() + 1) / w)
     assert unrotate_box(box, turn) == pytest.approx((40 / 200, 10 / 100, 80 / 200, 30 / 100))
+
+
+# ---------------------------------------------------------------- receipt-stamp re-read (T13)
+
+
+def test_stamp_area_is_read_again_and_its_words_placed_on_the_page(
+    make_normalized: MakeNormalized, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    """A1: the page pass reads only the stamp's lab-name line; the area around it is read
+    again as sparse text, and the gapped date found there lands on the page frame."""
+    page = make_normalized(pages.clean_page())
+    lab_line = [
+        _word("המעבדה", (0.718, 0.300, 0.727, 0.360)),
+        _word("המרכזית", (0.718, 0.222, 0.727, 0.298)),
+    ]
+    (area,) = stamp_areas(lab_line, SIZE, settings)
+    assert area[0] < 0.718 and area[2] > 0.727  # grown on every side
+    date_box: Box = (0.684, 0.214, 0.699, 0.324)
+    in_crop: Box = (
+        (date_box[0] - area[0]) / (area[2] - area[0]),
+        (date_box[1] - area[1]) / (area[3] - area[1]),
+        (date_box[2] - area[0]) / (area[2] - area[0]),
+        (date_box[3] - area[1]) / (area[3] - area[1]),
+    )
+    ocr = ScriptedOcr(words=lab_line, crop_script=[[_word("18-06-2026", in_crop)]])
+    result, _ = _read(page, settings, storage, imaging, ocr=ocr, barcode=FakeBarcode())
+    dates = [w for w in result.words if w.text == "18-06-2026"]  # type: ignore[attr-defined]
+    assert len(dates) == 1 and dates[0].box == pytest.approx(date_box, abs=1e-6)
+    assert ocr.crop_calls == [{"psm": STAMP_PSM, "langs": settings.ocr_langs}]
+
+
+def test_sticker_caption_does_not_trigger_a_stamp_reread(
+    make_normalized: MakeNormalized, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    """'מרכזי' is a near match for the stamp's 'המרכזית' but is the sticker caption."""
+    page = make_normalized(pages.clean_page())
+    ocr = ScriptedOcr(words=[_word("מרכזי", (0.036, 0.330, 0.068, 0.342))])
+    _read(page, settings, storage, imaging, ocr=ocr, barcode=FakeBarcode())
+    assert ocr.crop_calls == []
+
+
+def test_stamp_rereads_capped_per_page(settings: Settings) -> None:
+    """Lab-name lines also appear in address lines; at most ``stamp_reread_max`` are read."""
+    groups = [_word("לנגיפים", (y, 0.40, y + 0.01, 0.48)) for y in (0.10, 0.40, 0.70, 0.90)]
+    assert len(stamp_areas(groups, SIZE, settings)) == settings.stamp_reread_max
+
+
+# ---------------------------------------------------------------- readable line under bars (T13)
+
+
+@pytest.mark.parametrize("orientation", [0, 90, 180, 270])
+def test_readable_line_lies_below_the_bars_once_upright(
+    orientation: int, settings: Settings
+) -> None:
+    """The band sits on the side of the bars that is 'below' after turning the code upright."""
+    bars: Box = (0.40, 0.40, 0.45, 0.50)
+    area = readable_line_area(_hit_at(bars, orientation), settings)
+    below, above, right, left = (
+        area[2] > bars[2],
+        area[0] < bars[0],
+        area[3] > bars[3],
+        area[1] < bars[1],
+    )
+    expected = {0: below, 180: above, 90: right, 270: left}[orientation]
+    assert expected
+
+
+def _hit_at(box: Box, orientation: int) -> BarcodeHit:
+    return BarcodeHit(
+        payload="939376", symbology="Code128", box=box, orientation_deg=orientation, nearby_text=[]
+    )
+
+
+def test_readable_line_is_read_and_placed_on_the_page(
+    make_normalized: MakeNormalized, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    """A1: the decoder found 939376; the printed line under the bars is read on its own band
+    (digits whitelist, single line) and lands on the page under the bars."""
+    page = make_normalized(pages.clean_page())
+    bars: Box = (0.032, 0.232, 0.056, 0.312)
+    area = readable_line_area(_hit_at(bars, 0), settings)
+    ocr = ScriptedOcr(
+        crop_script=[
+            [],
+            [],
+            [_word("939376", (0.2, 0.1, 0.8, 0.9)), _word("|", (0.0, 0.0, 0.1, 0.1))],
+        ]
+    )
+    result, _ = _read(
+        page, settings, storage, imaging, ocr=ocr, barcode=ScriptedBarcode([_hit_at(bars, 0)])
+    )
+    printed = [w for w in result.words if w.text == "939376"]  # type: ignore[attr-defined]
+    assert len(printed) == 1 and contains(area, printed[0].box)
+    assert "|" not in {w.text for w in result.words}  # type: ignore[attr-defined]
+    assert {"psm": READABLE_LINE_PSM, "langs": READABLE_LINE_LANGS} in ocr.crop_calls

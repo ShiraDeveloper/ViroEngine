@@ -1,90 +1,178 @@
-"""Document upload endpoints — POST /v1/documents and POST /v1/batches.
+"""Uploads: `POST /v1/documents` (one file) and `POST /v1/batches` (many files or a ZIP).
 
-This is a skeleton stub. Full intake (S0-S2) is implemented in Task 9.
-The stub validates content type and size, creates a job record in memory,
-and enqueues a no-op pipeline call so the queue back-pressure test can work.
-
-In-memory job store here is replaced by the real StoragePort in Task 22.
+An upload is validated for content type and size, registered as a job and queued; the extraction
+runs asynchronously and is followed through the job routes. `Idempotency-Key` makes a repeat
+return the existing job (`200`, `idempotent_replay: true`) instead of creating a second one.
+The bytes are held in memory until the pipeline takes them (never written outside the job's
+storage) and the full magic-byte inspection happens in S0.
 """
 
 from __future__ import annotations
 
 import asyncio
-from typing import Any
-import uuid
+from typing import Annotated, Final
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
 import structlog
 
-from backend.api.deps import get_container, get_queue
+from backend.api.deps import (
+    get_container,
+    get_queue,
+    get_store,
+    require_access_code,
+    require_api_key,
+)
+from backend.api.schemas import UploadResponse
 from backend.container import Container
-from backend.core.errors import TooLarge, UnsupportedMedia
+from backend.core.errors import OcrUnavailable, TooLarge, UnsupportedMedia
+from backend.core.pipeline.s0_intake import UploadedBlob
+from backend.jobs import JobEntry, JobStore
 from backend.queue import JobQueue
+from backend.readiness import ocr_readiness
+from backend.security import limit_uploads
 
 log = structlog.get_logger()
 
-router = APIRouter(tags=["documents"])
+router = APIRouter(tags=["documents"], dependencies=[Depends(require_api_key)])
 
-# Accepted MIME types — also checked by magic bytes in S0 (T9)
-_ACCEPTED_TYPES: frozenset[str] = frozenset(
-    {"application/pdf", "image/png", "image/jpeg", "application/zip"}
-)
-
-# Skeleton: in-memory job store (T22 replaces with StoragePort-backed persistence)
-_jobs: dict[str, dict[str, Any]] = {}
-
-
-@router.post("/documents", status_code=201)
-async def upload_document(
-    request: Request,
-    file: UploadFile = File(...),
-    container: Container = Depends(get_container),
-    queue: JobQueue = Depends(get_queue),
-) -> dict[str, Any]:
-    """Accept a single document and create an extraction job.
-
-    Returns job_id and initial status immediately; extraction runs async.
-
-    Raises:
-        UnsupportedMedia (415): content type is not supported.
-        TooLarge (413): file size exceeds MAX_UPLOAD_MB.
-        HTTPException 429: job queue is at capacity (Retry-After: 30).
-    """
-    # --- Content-type validation (magic bytes check added in T9) ---
-    if file.content_type not in _ACCEPTED_TYPES:
-        raise UnsupportedMedia(
-            f"Content type {file.content_type!r} is not supported. "
-            f"Accepted: {sorted(_ACCEPTED_TYPES)}"
-        )
-
-    # --- Size validation ---
-    data = await file.read()
-    max_bytes = container.settings.max_upload_mb * 1024 * 1024
-    if len(data) > max_bytes:
-        raise TooLarge(
-            f"File size {len(data)} bytes exceeds the {container.settings.max_upload_mb} MB limit"
-        )
-
-    # --- Create job ---
-    job_id = str(uuid.uuid4())
-    _jobs[job_id] = {
-        "job_id": job_id,
-        "status": "queued",
-        "filename": file.filename or "upload",
-        "size_bytes": len(data),
+# Structural: accepted by content type here; the content itself is checked by magic bytes in S0.
+ACCEPTED_TYPES: Final = frozenset(
+    {
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "application/zip",
+        "application/x-zip-compressed",
     }
+)
+# Structural: bytes read per chunk while enforcing the size limit.
+_CHUNK: Final = 1024 * 1024
+_RETRY_AFTER: Final = "30"
+_BYTES_PER_MB: Final = 1024 * 1024
 
-    # --- Enqueue ---
+
+async def read_limited(upload: UploadFile, remaining: int, limit_mb: int) -> bytes:
+    """The upload's bytes, refusing as soon as more than `remaining` have arrived. Raises
+    UnsupportedMedia (415) for a content type outside ACCEPTED_TYPES and TooLarge (413)."""
+    if upload.content_type not in ACCEPTED_TYPES:
+        raise UnsupportedMedia(f"content type {upload.content_type!r} is not supported")
+    data = bytearray()
+    while chunk := await upload.read(_CHUNK):
+        data.extend(chunk)
+        if len(data) > remaining:
+            raise TooLarge(f"the upload exceeds the {limit_mb} MB limit")
+    return bytes(data)
+
+
+async def _enqueue(entry: JobEntry, store: JobStore, queue: JobQueue) -> None:
+    """Queue the job, or forget it and answer 429 + Retry-After when the queue is full."""
     try:
-        await queue.enqueue(job_id)
+        await queue.enqueue(entry.job_id)
     except asyncio.QueueFull:
-        del _jobs[job_id]
-        log.warning("queue_full", job_id=job_id)
+        store.discard(entry.job_id)
+        log.warning("queue_full", job_id=entry.job_id)
         raise HTTPException(
             status_code=429,
-            headers={"Retry-After": "30"},
+            headers={"Retry-After": _RETRY_AFTER},
             detail={"error": "QUEUE_FULL", "recoverable": True},
         ) from None
 
-    log.info("document_accepted", job_id=job_id, filename=file.filename)
-    return {"job_id": job_id, "status": "queued"}
+
+def _response(entry: JobEntry, *, replay: bool) -> JSONResponse:
+    body = UploadResponse(
+        job_id=entry.job_id,
+        status=entry.record.status,
+        page_count=entry.record.page_count,
+        idempotent_replay=replay,
+    )
+    return JSONResponse(body.model_dump(mode="json"), status_code=200 if replay else 201)
+
+
+def require_ocr_ready(container: Container = Depends(get_container)) -> None:
+    """Refuse an upload (503) while the engine cannot read: accepting it would only waste it."""
+    ocr = ocr_readiness(container)
+    if not ocr.ready:
+        raise OcrUnavailable("the OCR engine is not ready: " + ", ".join(ocr.missing))
+
+
+async def _accept(
+    uploads: list[UploadFile],
+    *,
+    idempotency_key: str | None,
+    consent: bool,
+    container: Container,
+    store: JobStore,
+    queue: JobQueue,
+) -> JSONResponse:
+    if idempotency_key:
+        existing = store.find_by_key(idempotency_key)
+        if existing is not None:
+            return _response(existing, replay=True)
+    limit_mb = container.settings.max_upload_mb
+    remaining = limit_mb * _BYTES_PER_MB
+    blobs: list[UploadedBlob] = []
+    for upload in uploads:
+        data = await read_limited(upload, remaining, limit_mb)
+        remaining -= len(data)
+        blobs.append(UploadedBlob(filename=upload.filename or "upload", data=data))
+    entry = store.create(blobs, idempotency_key=idempotency_key, consent=consent)
+    await _enqueue(entry, store, queue)
+    log.info("document_accepted", job_id=entry.job_id, files=len(blobs), consent=consent)
+    return _response(entry, replay=False)
+
+
+@router.post(
+    "/documents",
+    status_code=201,
+    response_model=UploadResponse,
+    dependencies=[Depends(limit_uploads), Depends(require_ocr_ready)],
+)
+async def create_document(
+    file: Annotated[UploadFile, File()],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    cloud_consent: Annotated[bool, Form()] = False,
+    _: None = Depends(require_access_code),
+    container: Container = Depends(get_container),
+    store: JobStore = Depends(get_store),
+    queue: JobQueue = Depends(get_queue),
+) -> JSONResponse:
+    """One document. 201 with the job, or 200 with `idempotent_replay` for a repeated key.
+
+    Raises UnsupportedMedia (415), TooLarge (413); answers 429 + Retry-After when the queue is
+    full. `cloud_consent` is the per-job consent of PLAN §8.5 (default: no)."""
+    return await _accept(
+        [file],
+        idempotency_key=idempotency_key,
+        consent=cloud_consent,
+        container=container,
+        store=store,
+        queue=queue,
+    )
+
+
+@router.post(
+    "/batches",
+    status_code=201,
+    response_model=UploadResponse,
+    dependencies=[Depends(limit_uploads), Depends(require_ocr_ready)],
+)
+async def create_batch(
+    files: Annotated[list[UploadFile], File()],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    cloud_consent: Annotated[bool, Form()] = False,
+    _: None = Depends(require_access_code),
+    container: Container = Depends(get_container),
+    store: JobStore = Depends(get_store),
+    queue: JobQueue = Depends(get_queue),
+) -> JSONResponse:
+    """Many documents (repeated `files` parts) or a ZIP, as one job. Same statuses as
+    `/documents`; the total size is bounded by `MAX_UPLOAD_MB`."""
+    return await _accept(
+        files,
+        idempotency_key=idempotency_key,
+        consent=cloud_consent,
+        container=container,
+        store=store,
+        queue=queue,
+    )

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import hashlib
 import struct
-from typing import Literal
+from typing import Any, Literal
 import zlib
 
 from backend.core.models import (
@@ -31,6 +31,7 @@ from backend.core.models import (
     ProviderHealth,
     ReaderName,
     Region,
+    RunMetric,
     RunReport,
     SenderSpec,
     VisionRequest,
@@ -72,6 +73,10 @@ class FakeOcr:
     def detect_orientation(self, image: ImageRef) -> int | None:
         """Always abstains: a fake cannot tell which way a page faces."""
         return None
+
+    def languages(self) -> list[str] | None:
+        """A fake always has the packs the product needs."""
+        return ["eng", "heb", "osd"]
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +198,10 @@ class FakeImaging:
         """Returns the input unchanged."""
         return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
 
+    def fill_boxes(self, image: bytes, boxes: Sequence[Box], *, gray_level: int) -> EncodedImage:
+        """Returns the input unchanged (the fake raster has nothing to redact)."""
+        return EncodedImage(data=image, width=_FAKE_PAGE.width, height=_FAKE_PAGE.height)
+
 
 # ---------------------------------------------------------------------------
 # VisionLLMPort fake
@@ -287,6 +296,29 @@ class FakeLearningStore:
     def pattern_hints(self, sender: str, field: str) -> list[PatternHint]:
         """Always returns an empty list."""
         return []
+
+    def label_synonyms(self, sender: str, field: str) -> list[str]:
+        """Always returns an empty list."""
+        return []
+
+    def record_run(self, metric: RunMetric) -> None:
+        """Accept and discard the metric."""
+
+    def run_metrics(self, limit: int = 200) -> list[dict[str, Any]]:
+        """No runs are kept."""
+        return []
+
+    def proposals(self) -> dict[str, list[dict[str, Any]]]:
+        """No proposals are kept."""
+        return {"labels": [], "senders": []}
+
+    def approve(self, kind: Literal["label", "sender"], proposal_id: int) -> bool:
+        """There is nothing to approve."""
+        return False
+
+    def seed(self) -> dict[str, list[dict[str, Any]]]:
+        """Nothing was learned."""
+        return {"layout_hints": [], "pattern_hints": []}
 
 
 # ---------------------------------------------------------------------------

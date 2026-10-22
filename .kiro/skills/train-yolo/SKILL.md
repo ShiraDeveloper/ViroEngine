@@ -30,9 +30,18 @@ consistent visual shape — use it for that class alone. This is the most probab
 
 ## Step 1 — Build the dataset locally
 
+`eval/gold.csv` holds values only, not boxes. Boxes come from `eval/results/gold_boxes.csv`, which
+`python -m eval.make_gold --propose` writes next to the draft (one box per highlight, the patient
+block merged). **It is a draft: review every box by hand before training** - the highlighter is
+inconsistent and is only a proposal.
+
 ```bash
-python -m eval.build_yolo_dataset --gold eval/gold.csv --out eval/results/yolo
+python -m eval.build_yolo_dataset --boxes eval/results/gold_boxes.csv --out eval/results/yolo
 ```
+
+It refuses to run without `eval/held_out.txt`. It builds one image per page (no augmented
+variants; ultralytics augments during training). Pages are the raw renders in
+`eval/results/pages/`; some SAP pages are sideways there, so prefer normalised pages if you have them.
 
 Four classes: `central_sticker`, `receipt_stamp`, `patient_box`, `commitment_label`.
 
@@ -112,15 +121,15 @@ Record in `models/README.md`: the source model, the dataset commit, the training
 validation mAP50, the file size and the checksum. Weights are git-ignored, so provenance must live
 in the repository.
 
-Enable in `config/models.yaml`:
-```yaml
-region_detector: yolo_onnx        # or: rule_based
-yolo:
-  path: models/yolov8n_regions_int8.onnx
-  conf: 0.35
-  iou: 0.45
-  classes: [central_sticker, receipt_stamp, patient_box, commitment_label]
+Enable in `.env` (the runtime reads `Settings`; `config/models.yaml` mirrors the values):
 ```
+REGION_DETECTOR=yolo_onnx        # or: rule_based (default)
+YOLO_MODEL_FILE=yolov8n_regions_int8.onnx
+YOLO_CONF=0.35
+YOLO_IOU=0.45
+YOLO_KINDS=receipt_stamp         # classes where YOLO replaces the rule-based regions
+```
+A missing or oversize model file falls back to `rule_based`.
 
 ## Step 5 — Compare and decide
 
@@ -138,25 +147,24 @@ either way, then set `config/models.yaml` accordingly.
 
 ## Appendix — Exporting TrOCR-small to ONNX (Task 13)
 
-Same notebook pattern, no training — export only.
+No training — export only, with the repository's own script so the file names, the graph inputs
+and the vocabulary file match what `adapters/ocr/trocr_digits.py` loads. Any machine whose
+network reaches the Hugging Face file CDN works (the development network blocks it: `418 Blocked
+by NetFree`). On Colab/Kaggle, upload or clone the repository, then:
 
 ```python
-!pip -q install transformers optimum[onnxruntime]
-
-from optimum.onnxruntime import ORTModelForVision2Seq
-m = ORTModelForVision2Seq.from_pretrained("microsoft/trocr-small-handwritten", export=True)
-m.save_pretrained("trocr_small_onnx")
+!pip -q install torch transformers sentencepiece protobuf onnx==1.17.0 onnxruntime==1.20.1
+!python -m tools.export_trocr --out models --revision b4648cfa171985a6745f37ddd637e98c0da958ac
 ```
 
-```python
-from onnxruntime.quantization import quantize_dynamic, QuantType
-# quantize the decoder, which dominates the size
-quantize_dynamic("trocr_small_onnx/decoder_model.onnx",
-                 "trocr_small_decoder_int8.onnx", weight_type=QuantType.QUInt8)
-```
+It exports the encoder and the decoder (opset 17, decoder without a key/value cache — a digit
+field is a dozen tokens), int8-quantizes both, writes `trocr_small_vocab.json`, and prints each
+file's size and SHA-256. **It fails when the set reaches 80 MB**, the budget that fits the 512 MB
+host alongside OpenCV and Tesseract (the adapter refuses a larger set at load, too).
 
-**Target: the whole model under 80 MB** so it fits the 512 MB host budget alongside OpenCV and
-Tesseract. Record the checksum in `models/README.md`.
+Download the three files into `models/` and record the date, sizes and checksums in
+`models/README.md`. `pytest backend/tests/unit/test_trocr.py::test_model_size_under_budget`
+then runs instead of skipping.
 
 **ASSUMPTION to test, not to trust.** TrOCR-small-handwritten is trained on Latin handwriting.
 Digit glyphs are largely shared with Hebrew handwriting, so it should transfer for **numbers** and

@@ -7,7 +7,7 @@ and each carries its justification.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 import math
 from typing import Final
 
@@ -161,6 +161,20 @@ class CvImaging:
         piece = pixels[y0:y1, x0:x1]
         code = _CROP_ROTATIONS[rotate_deg]
         return encode_png(piece if code is None else _u8(cv2.rotate(piece, code)))
+
+    def fill_boxes(self, image: bytes, boxes: Sequence[Box], *, gray_level: int) -> EncodedImage:
+        """Paint each normalized box solid grey at full resolution; the size is unchanged.
+        Pixel bounds round outward (floor, ceil) so a box is always covered completely."""
+        if not 0 <= gray_level <= 255:
+            raise ValueError(f"gray_level must be 0-255, got {gray_level}")
+        pixels = decode_bgr(image)
+        height, width = pixels.shape[:2]
+        for box in boxes:
+            y0, x0 = max(math.floor(box[0] * height), 0), max(math.floor(box[1] * width), 0)
+            y1, x1 = min(math.ceil(box[2] * height), height), min(math.ceil(box[3] * width), width)
+            if y1 > y0 and x1 > x0:
+                pixels[y0:y1, x0:x1] = gray_level
+        return encode_png(pixels)
 
     # ------------------------------------------------------------------ operations
 
