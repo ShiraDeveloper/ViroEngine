@@ -125,4 +125,11 @@ export const mockClient: ApiClient = {
     ),
 
   exportUrl: (jobId, fmt) => `mock://export/${jobId}.${fmt}`,
+
+  // Demo mode has no evaluation run: it reports "no data" rather than invent numbers.
+  getEvalMetrics: () => Promise.resolve({ available: false }),
+
+  // The derived job is the same fixture: enough to exercise the screen without a backend.
+  stress: () =>
+    Promise.resolve({ job_id: `${fixture.job_id}-stress`, status: 'needs_review', page_count: fixture.page_count }),
 };
