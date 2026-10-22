@@ -348,8 +348,11 @@ class VisionRequest(Strict):
 
     job_id: str
     page_id: str
-    task: Literal["fields", "sender"] = "fields"
+    # `page` (vision-first engine) sends whole pages in `page_images` and asks for every field;
+    # `verify` sends zoomed crops with no candidates, for a blind second read.
+    task: Literal["fields", "sender", "page", "verify"] = "fields"
     page_thumb: bytes | None = None
+    page_images: list[bytes] = Field(default_factory=list)
     crops: list[CropPayload]
     sender: str | None = None
     sender_options: list[str] = Field(default_factory=list)
@@ -380,6 +383,20 @@ class VisionAnswer(Strict):
         return self
 
 
+class PageAnswer(Strict):
+    """The validated whole-page reading of one page of a `page` request. `page_role` is checked
+    against the pipeline's PageRole by the core; a value outside it is treated as a form."""
+
+    page: int = Field(ge=1)
+    page_role: str
+    # The patient's address line as printed, used only to reject a "name" read from it (ADR-017).
+    address: str = Field(default="", max_length=VISION_TEXT_MAX)
+    answers: dict[FieldKey, VisionAnswer] = Field(
+        default_factory=dict, json_schema_extra={"x-key-type": "FieldKey"}
+    )
+    ambiguities: list[str] = Field(default_factory=list, max_length=10)
+
+
 class VisionResponse(Strict):
     """Schema-validated provider response. The model never assigns its own confidence.
 
@@ -401,6 +418,10 @@ class VisionResponse(Strict):
     output_tokens: int = 0
     cache_hit: bool = False
     failovers: list[str] = Field(default_factory=list)
+    # `page` task: one answer per page sent, in request order. `verify` task: the values seen in
+    # each crop, in request order (an empty list when the crop was illegible).
+    pages: list[PageAnswer] = Field(default_factory=list)
+    crop_values: list[list[str]] = Field(default_factory=list)
 
 
 class ProviderHealth(Strict):

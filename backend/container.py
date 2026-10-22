@@ -45,6 +45,8 @@ class Container:
     senders: SenderIndexPort  # the closed list of sending institutions (T6)
     logo: LogoMatcherPort | None  # ORB letterhead fallback; None when unavailable
     pipeline: PipelineConfig  # thresholds and layer switches from config/models.yaml
+    # The blind second reader of the vision-first engine (ADR-017); None when LOCAL_ONLY=true.
+    vision_verify: VisionLLMPort | None = None
 
 
 DEFAULT_MODELS_PATH = Path(__file__).resolve().parents[1] / "config" / "models.yaml"
@@ -125,6 +127,7 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
             senders=FakeSenders(),
             logo=None,
             pipeline=load_pipeline_config(),
+            vision_verify=None if settings.local_only else FakeVision(),
         )
 
     # --- Real adapters — created in later tasks (T9, T11, T13, T18, T19, T24) ---
@@ -148,10 +151,18 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     learning = SqliteLearningStore(settings=settings)
     learning.import_seed(load_learning_seed())
     vision: VisionLLMPort | None = None
+    vision_verify: VisionLLMPort | None = None
     if not settings.local_only:
         from backend.adapters.vision.chain import VisionChainAdapter  # T18
 
-        vision = VisionChainAdapter(settings=settings)
+        # Two chains over the same keys: the page reader and the blind verifier try their models
+        # in different orders, so the two readings of a value come from different models.
+        vision = VisionChainAdapter(
+            settings=settings, gemini_models=settings.gemini_page_models_list or None
+        )
+        vision_verify = VisionChainAdapter(
+            settings=settings, gemini_models=settings.gemini_verify_models_list or None
+        )
 
     regions: RegionDetectorPort = RuleBasedDetector(settings=settings, storage=storage)
     if settings.region_detector == "yolo_onnx":
@@ -183,4 +194,5 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
         senders=SenderIndex.load(),
         logo=OrbLogoMatcher(storage),
         pipeline=load_pipeline_config(),
+        vision_verify=vision_verify,
     )

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Iterator, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 import gc
 import time
@@ -87,6 +88,7 @@ from backend.core.pipeline.s11_finalize import (
     final_status,
     flagged_field_count,
 )
+from backend.core.pipeline.vision_first import VisionServices, read_batch_vision
 from backend.core.ports.barcode import BarcodePort
 from backend.core.ports.clock import ClockPort
 from backend.core.ports.document import DocumentPort
@@ -112,6 +114,10 @@ SseEvent = SsePageEvent | SseCountersEvent | SseRowEvent | SseDoneEvent | SseErr
 
 # Structural: the stages `process_page` runs, in order. S0 is the batch-level intake.
 PAGE_STAGES: Final = ("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9")
+
+# Structural: the job error that tells the UI the AI reader was unavailable (quota or outage) for
+# some pages, which were then read locally - the reason so many fields are orange.
+AI_UNAVAILABLE: Final = "AI_UNAVAILABLE"
 
 # Structural: S5 reports how it found the sender; the model path is the only cloud one.
 _SENDER_READER: Final = {"text": ReaderName.tesseract, "logo": ReaderName.tesseract}
@@ -354,6 +360,40 @@ def _decide_fields(
     return evaluations
 
 
+def cloud_allowed_for(raw: PageRaw, settings: Settings, cloud_consent: bool) -> bool:
+    """PLAN §8.5 gate. With CLOUD_REQUIRES_CONSENT on, only a known sample page or a job with
+    explicit consent may reach a provider; off (the default), every page may. LOCAL_ONLY is
+    checked separately and always wins."""
+    return raw.known_sample or cloud_consent or not settings.cloud_requires_consent
+
+
+def _vision_services(services: PipelineServices) -> VisionServices | None:
+    """The ports of the vision-first engine (ADR-017), or None when no provider is wired."""
+    vision = services.vision
+    if vision is None:
+        return None
+    cfg = services.pipeline
+    verify: VisionLLMPort = getattr(services, "vision_verify", None) or vision
+    return VisionServices(
+        settings=services.settings,
+        vision=vision,
+        verify=verify,
+        barcode=services.barcode,
+        imaging=services.imaging,
+        storage=services.storage,
+        senders=services.senders,
+        clock=services.clock,
+        weights=cfg.weights,
+        scoring=cfg.scoring,
+        prompt_version=cfg.classify.prompt_version,
+        ocr=services.ocr_printed,
+        usd_per_million=(
+            cfg.escalation.usd_per_million_input_tokens,
+            cfg.escalation.usd_per_million_output_tokens,
+        ),
+    )
+
+
 def process_page(
     raw: PageRaw,
     *,
@@ -361,18 +401,17 @@ def process_page(
     progress: Callable[[str], None] | None = None,
     cloud_consent: bool = False,
 ) -> PageOutcome:
-    """S1-S9 for one page. `progress` is told the name of each stage as it starts.
-    `cloud_consent` is the per-job consent of PLAN §8.5: a page that is not a known sample is
-    processed locally unless it is True. May raise: `iter_outcomes` is what isolates a failing
-    page from its batch."""
+    """S1-S9 of the local cascade for one page (the vision-first engine reads pages in batches in
+    `iter_outcomes` and falls back to this for any page it could not read). `progress` is told
+    the name of each stage as it starts. `cloud_consent` is the per-job consent of PLAN §8.5.
+    May raise: `iter_outcomes` isolates a failing page from its batch."""
     cfg = services.pipeline
     settings = services.settings
+    # LOCAL_ONLY is enforced here as well as in the container: a vision port that slipped through
+    # must still never be called (project rule §5). So is the §8.5 gate.
+    cloud_allowed = cloud_allowed_for(raw, settings, cloud_consent)
     timer = _Timer(progress)
     learning: LearningStorePort = services.learning if cfg.layers.learning else _NoLearning()
-    # LOCAL_ONLY is enforced here as well as in the container: a vision port that slipped through
-    # must still never be called (project rule §5). So is the §8.5 gate: an unknown document
-    # without consent never reaches a provider, S5's letterhead question included.
-    cloud_allowed = raw.known_sample or cloud_consent
     vision = None if settings.local_only or not cloud_allowed else services.vision
     logo = services.logo if cfg.layers.logo else None
 
@@ -511,30 +550,79 @@ def iter_outcomes(
     ever held. A page that raises becomes a `failed` outcome carrying a stable code (the
     exception's own for a SafeLineError, `INTERNAL` otherwise) and the batch continues.
     `cloud_consent` is the job's per-job consent to send crops of unknown documents (§8.5)."""
-    interval = services.settings.gc_interval_pages
-    for n, raw in enumerate(raws, start=1):
+    settings = services.settings
+    interval = settings.gc_interval_pages
 
-        def announce(stage: str, page: PageRaw = raw) -> None:
+    def announce_for(raw: PageRaw) -> Callable[[str], None]:
+        def announce(stage: str) -> None:
             if progress is not None:
-                progress(page, stage)
+                progress(raw, stage)
 
+        return announce
+
+    def failed(raw: PageRaw, exc: Exception) -> PageOutcome:
+        code = exc.code if isinstance(exc, SafeLineError) else "INTERNAL"
+        log.warning(
+            "page_failed",
+            page_id=raw.page_id,
+            stage="pipeline",
+            code=code,
+            exc_type=type(exc).__name__,
+        )
+        return _failed(raw, code)
+
+    def one(raw: PageRaw) -> PageOutcome:
         try:
-            outcome = process_page(
-                raw, services=services, progress=announce, cloud_consent=cloud_consent
+            return process_page(
+                raw, services=services, progress=announce_for(raw), cloud_consent=cloud_consent
             )
         except Exception as exc:
-            code = exc.code if isinstance(exc, SafeLineError) else "INTERNAL"
-            log.warning(
-                "page_failed",
-                page_id=raw.page_id,
-                stage="pipeline",
-                code=code,
-                exc_type=type(exc).__name__,
-            )
-            outcome = _failed(raw, code)
-        yield outcome
-        if n % interval == 0:
-            gc.collect()
+            return failed(raw, exc)
+
+    vision = _vision_services(services)
+    use_vision = (
+        settings.engine_mode == "vision_first" and not settings.local_only and vision is not None
+    )
+    if not use_vision or vision is None:
+        for n, raw in enumerate(raws, start=1):
+            yield one(raw)
+            if n % interval == 0:
+                gc.collect()
+        return
+
+    def batch(chunk: Sequence[PageRaw]) -> list[PageOutcome]:
+        allowed = [r for r in chunk if cloud_allowed_for(r, settings, cloud_consent)]
+        read: dict[str, PageOutcome | None] = {}
+        if allowed:
+            try:
+                outcomes = read_batch_vision(allowed, services=vision, progress=progress)
+                read = {r.page_id: o for r, o in zip(allowed, outcomes, strict=True)}
+            except Exception as exc:  # one bad image must not cost the batch its cloud read
+                log.warning("vision_batch_failed", exc_type=type(exc).__name__, pages=len(chunk))
+        # A page the cloud could not read, or may not see, goes through the local cascade. A page
+        # the cloud MAY see but no model answered is marked, so the job can say why it is orange.
+        out: list[PageOutcome] = []
+        for r in chunk:
+            found = read.get(r.page_id)
+            if found is not None:
+                out.append(found)
+                continue
+            fallback = one(r)
+            if r in allowed:
+                stats = fallback.escalation.model_copy(update={"exhausted": True})
+                fallback = fallback.model_copy(update={"escalation": stats})
+            out.append(fallback)
+        return out
+
+    size = settings.vision_batch_pages
+    chunks = [raws[i : i + size] for i in range(0, len(raws), size)]
+    # The engine waits on the network, not the CPU: batches are read side by side and the pages
+    # still come out in upload order. The provider chain paces the requests itself.
+    with ThreadPoolExecutor(
+        max_workers=settings.vision_concurrency, thread_name_prefix="batch"
+    ) as pool:
+        for outcomes in pool.map(batch, chunks):
+            yield from outcomes
 
 
 Assembler = Callable[[Sequence[PageOutcome]], Assembly]
@@ -591,11 +679,14 @@ async def run_job(
     emit: Callable[[SseEvent], None] = on_event or (lambda event: None)
     started = time.perf_counter()
     started_at = c.clock.now()
+    intake_settings = c.settings
+    if c.settings.engine_mode == "vision_first" and not c.settings.local_only:
+        intake_settings = c.settings.model_copy(update={"render_dpi": c.settings.vision_render_dpi})
     try:
         intaken = await asyncio.to_thread(
             intake,
             uploads,
-            settings=c.settings,
+            settings=intake_settings,
             documents=c.documents,
             storage=c.storage,
             job_id=job.job_id,
@@ -664,6 +755,8 @@ async def run_job(
         )
         emit(SseCountersEvent(event="counters", data=counters))
 
+    if any(o.escalation.exhausted for o in outcomes):
+        errors.append(AI_UNAVAILABLE)
     row_ctx = RowContext(
         clock=c.clock,
         senders=c.senders,

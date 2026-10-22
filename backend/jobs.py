@@ -102,7 +102,12 @@ class JobEntry:
             rows=r.rows,
             orphan_page_ids=r.orphan_page_ids,
             report=r.report,
+            notices=[e for e in r.errors if e in _UI_NOTICES],
         )
+
+
+# Job error codes the UI explains to the technician (the rest stay in logs and the report).
+_UI_NOTICES: Final = frozenset({"AI_UNAVAILABLE"})
 
 
 @dataclass

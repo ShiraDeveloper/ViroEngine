@@ -13,12 +13,13 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 import os
+from pathlib import Path
 from typing import Any
 import uuid
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 import structlog
 
 from backend.container import build_container
@@ -201,8 +202,29 @@ def create_app(*, use_fakes: bool = False) -> FastAPI:
     app.include_router(export_router, prefix="/v1")
     app.include_router(stress_router, prefix="/v1")
     app.include_router(senders_router, prefix="/v1")
+    _serve_frontend(app, Path(settings.static_dir))
 
     return app
+
+
+def _serve_frontend(app: FastAPI, root: Path) -> None:
+    """Serve the built single-page app from `root` at `/` when it exists (one-container deploy).
+    A path that is not a file returns `index.html` so client-side routes survive a reload; /v1
+    stays the API's, and nothing outside `root` can be reached."""
+    index = root / "index.html"
+    if not index.is_file():
+        return
+    base = root.resolve()
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def _app_file(path: str) -> FileResponse:
+        if path.startswith("v1/") or path == "v1":
+            raise HTTPException(status_code=404)
+        target = (base / path).resolve()
+        if path and target.is_file() and target.is_relative_to(base):
+            cache = "public, max-age=31536000, immutable" if path.startswith("assets/") else "no-cache"
+            return FileResponse(target, headers={"Cache-Control": cache})
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 
 # ---------------------------------------------------------------------------

@@ -63,9 +63,14 @@ export function ReviewTable({ rows, filter, selected, onSelectCell }: ReviewTabl
       <TBody>
         {shown.map((row) => (
           <Tr key={row.row_id} data-row-level={row.row_level}>
-            <Th scope="row" className="relative ps-4 font-normal">
+            <Th scope="row" className="relative ps-5 align-middle font-mono text-ink-base">
               <ConfidenceRibbon level={row.row_level} flaggedCount={flaggedFields(row).length} />
-              {ltr(row.row_id)}
+              <span className="flex flex-col leading-tight">
+                <span className="font-bold text-ink-strong">{ltr(String(rows.indexOf(row) + 1))}</span>
+                <span className="whitespace-nowrap text-[11px] text-ink-muted">
+                  {review.pageOf(row.page_ids.map((id) => id.split('#').pop() ?? id).join(', '))}
+                </span>
+              </span>
             </Th>
             {COLUMNS.map((column) => (
               <FieldCell

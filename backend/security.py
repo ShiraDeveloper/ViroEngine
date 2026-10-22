@@ -40,6 +40,15 @@ STATIC_HEADERS: Final = {
 # Structural: the interactive API docs load their UI from a CDN, so they get a CSP that allows it.
 # Everything else, which never serves HTML, keeps `default-src 'self'`.
 _DOCS_PATHS: Final = ("/v1/docs", "/v1/redoc")
+# Structural: everything outside /v1 is the single-page app when the image serves it (ADR-017).
+# Its evidence crops are blob: images, and a Hugging Face Space shows the app inside its own page,
+# so it may be framed by that page only - the API keeps `DENY`.
+_API_PREFIX: Final = "/v1"
+_APP_CSP: Final = (
+    "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; "
+    "font-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'self'; "
+    "frame-ancestors 'self' https://huggingface.co"
+)
 _DOCS_CSP: Final = (
     "default-src 'self'; img-src 'self' data: https://fastapi.tiangolo.com; "
     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
@@ -72,7 +81,9 @@ class SecurityHeadersMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        docs = scope.get("path", "").startswith(_DOCS_PATHS)
+        path = scope.get("path", "")
+        docs = path.startswith(_DOCS_PATHS)
+        spa = not path.startswith(_API_PREFIX)
         tls = _is_tls(scope)
 
         async def send_with_headers(message: Message) -> None:
@@ -81,6 +92,9 @@ class SecurityHeadersMiddleware:
                 added = dict(STATIC_HEADERS)
                 if docs:
                     added["content-security-policy"] = _DOCS_CSP
+                elif spa:
+                    added["content-security-policy"] = _APP_CSP
+                    del added["x-frame-options"]
                 if tls:
                     added["strict-transport-security"] = _HSTS
                 for name, value in added.items():

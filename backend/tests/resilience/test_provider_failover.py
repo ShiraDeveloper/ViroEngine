@@ -197,14 +197,16 @@ def test_backoff_delay_is_capped(tmp_path: Path) -> None:
     assert chain._backoff(10) == pytest.approx(8.0)
 
 
-def test_timeout_is_retried_like_a_server_error(tmp_path: Path) -> None:
-    transport = FakeTransport({GEMINI_HOST: [timeout_error(), gemini_reply()]})
+def test_timeout_moves_on_to_the_next_provider_without_waiting(tmp_path: Path) -> None:
+    # A model that hung once usually hangs again under load: retrying it cost 3 x timeout.
+    transport = FakeTransport({GEMINI_HOST: [timeout_error()], OPENROUTER_HOST: [chat_reply()]})
     chain, clock = make_chain(tmp_path, transport)
 
     response = chain.extract(fields_request(FieldKey.first_name))
 
-    assert response.provider is ReaderName.gemini
-    assert len(clock.slept) == 1
+    assert response.provider is ReaderName.openrouter
+    assert "gemini:timed_out" in response.failovers
+    assert clock.slept == []
 
 
 # --- cache and batching ---------------------------------------------------------------------

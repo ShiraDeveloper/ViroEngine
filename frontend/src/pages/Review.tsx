@@ -1,3 +1,4 @@
+import { CloudOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -10,7 +11,9 @@ import { ReadingTrail } from '@/components/ReadingTrail';
 import { ReviewTable, visibleRows } from '@/components/ReviewTable';
 import type { RowFilter, SelectedCell } from '@/components/ReviewTable';
 import { common, dialogs, review } from '@/copy/he';
+import type { ConfidenceLevel } from '@/api/types';
 import { Badge } from '@/design/Badge';
+import { ConfidenceRibbon } from '@/design/ConfidenceRibbon';
 import { Button } from '@/design/Button';
 import { Dialog } from '@/design/Dialog';
 import { EmptyState } from '@/design/EmptyState';
@@ -33,6 +36,14 @@ import { useNow } from '@/lib/useNow';
 import { useReviewMutations } from '@/lib/useReviewMutations';
 
 type Tab = 'rows' | 'orphans';
+
+const SEGMENTS = 'flex gap-1 rounded-pill bg-surface-sunken p-1';
+
+function segment(active: boolean): string {
+  return `min-h-8 rounded-pill px-4 text-sm font-medium transition-colors duration-fast ${
+    active ? 'bg-surface-raised text-primary-900 shadow-card' : 'text-ink-muted hover:text-ink-strong'
+  }`;
+}
 
 export type ReviewPageClient = Pick<
   ApiClient,
@@ -144,6 +155,21 @@ export function Review({ client = api, clock = systemClock }: ReviewProps = {}) 
   const isolate = selected ? isIsolatedField(selected.field) : false;
   const pageId = pageIdFor(selectedRow);
 
+  const levelCounts: Record<ConfidenceLevel, number> = { A: 0, B: 0, C: 0, D: 0 };
+  for (const row of job.rows) {
+    for (const result of Object.values(row.fields)) {
+      if (result) levelCounts[result.level] += 1;
+    }
+  }
+
+  const totalFields = levelCounts.A + levelCounts.B + levelCounts.C + levelCounts.D;
+  const readiness =
+    totalFields === 0 ? 0 : Math.round(((totalFields - levelCounts.D) / totalFields) * 100);
+  const foundBeside = selectedResult?.candidates
+    .flatMap((c) => c.notes ?? [])
+    .find((n) => n.startsWith('label:'))
+    ?.slice('label:'.length);
+
   async function onConfirm(): Promise<void> {
     if (await actions.confirm()) navigate(`/jobs/${encodeURIComponent(jobId)}/export`);
   }
@@ -168,47 +194,94 @@ export function Review({ client = api, clock = systemClock }: ReviewProps = {}) 
         </p>
       ) : null}
 
-      <p aria-live="polite" className="mt-2 text-sm text-ink-muted">
-        {flagged.length === 0 ? review.noFlaggedLeft : review.flaggedSummary(flagged.length)}
-      </p>
+      {(job.notices ?? []).includes('AI_UNAVAILABLE') ? (
+        <div
+          role="alert"
+          className="mt-4 flex items-start gap-3 rounded-xl border border-state-review-border bg-state-review-bg p-4 text-state-review-fg"
+        >
+          <CloudOff aria-hidden="true" className="mt-1 size-5 shrink-0" />
+          <div className="flex flex-col gap-1">
+            <p className="font-semibold">{review.aiUnavailableTitle}</p>
+            <p className="text-sm">{review.aiUnavailableBody}</p>
+          </div>
+        </div>
+      ) : null}
+
+      <section
+        aria-label={review.summaryLabel}
+        className="mt-4 grid gap-4 rounded-xl border border-surface-border bg-surface-raised p-4 shadow-card lg:grid-cols-[220px_1fr]"
+      >
+        <div className="flex items-center gap-4 rounded-lg bg-gradient-to-bl from-brand-from via-brand-via to-brand-to p-4 text-ink-inverse">
+          <div
+            role="img"
+            aria-label={review.readinessLabel(readiness)}
+            className="grid size-20 shrink-0 place-items-center rounded-full"
+            style={{
+              background: `conic-gradient(var(--ring-fill) ${readiness * 3.6}deg, var(--ring-track) 0deg)`,
+            }}
+          >
+            <span className="grid size-16 place-items-center rounded-full bg-primary-900 text-lg font-bold">
+              {`${readiness}%`}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold">{review.readinessTitle}</span>
+
+          </div>
+        </div>
+        <div className="flex flex-col gap-3">
+        <dl className="grid grid-cols-3 gap-3">
+          {[
+            { label: review.statRows, value: job.rows.length, tone: 'text-primary-900' },
+            {
+              label: review.statVerified,
+              value: levelCounts.A + levelCounts.B + levelCounts.C,
+              tone: 'text-state-verified-fg',
+            },
+            { label: review.statFlagged, value: levelCounts.D, tone: 'text-state-review-fg' },
+          ].map((stat) => (
+            <div key={stat.label} className="flex flex-col rounded-lg bg-surface-base px-4 py-3">
+              <dt className="order-2 text-xs text-ink-muted">{stat.label}</dt>
+              <dd className={`order-1 text-2xl font-bold ${stat.tone}`}>{stat.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <ConfidenceRibbon level="A" flaggedCount={levelCounts.D} aggregate={levelCounts} />
+        <p aria-live="polite" className="sr-only">
+          {flagged.length === 0 ? review.noFlaggedLeft : review.flaggedSummary(flagged.length)}
+        </p>
+        </div>
+      </section>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <div role="group" aria-label={review.rowsTab} className="flex gap-2">
-          <Button
-            variant={tab === 'rows' ? 'primary' : 'secondary'}
-            size="sm"
-            aria-pressed={tab === 'rows'}
-            onClick={() => setTab('rows')}
-          >
-            {review.rowsTab}
-          </Button>
-          <Button
-            variant={tab === 'orphans' ? 'primary' : 'secondary'}
-            size="sm"
-            aria-pressed={tab === 'orphans'}
-            onClick={() => setTab('orphans')}
-          >
-            {review.orphansTab}
-          </Button>
-        </div>
+        {job.orphan_page_ids.length > 0 || tab === 'orphans' ? (
+          <div role="group" aria-label={review.rowsTab} className={SEGMENTS}>
+            {(['rows', 'orphans'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={tab === value}
+                onClick={() => setTab(value)}
+                className={segment(tab === value)}
+              >
+                {value === 'rows' ? review.rowsTab : review.orphansTab}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {tab === 'rows' ? (
-          <div role="group" aria-label={review.filterLabel} data-filter-group="" className="flex gap-2">
-            <Button
-              variant={filter === 'all' ? 'primary' : 'secondary'}
-              size="sm"
-              aria-pressed={filter === 'all'}
-              onClick={() => setFilter('all')}
-            >
-              {review.filterAll}
-            </Button>
-            <Button
-              variant={filter === 'review' ? 'primary' : 'secondary'}
-              size="sm"
-              aria-pressed={filter === 'review'}
-              onClick={() => setFilter('review')}
-            >
-              {review.filterReview}
-            </Button>
+          <div role="group" aria-label={review.filterLabel} data-filter-group="" className={SEGMENTS}>
+            {(['all', 'review'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={filter === value}
+                onClick={() => setFilter(value)}
+                className={segment(filter === value)}
+              >
+                {value === 'all' ? review.filterAll : review.filterReview}
+              </button>
+            ))}
           </div>
         ) : null}
       </div>
@@ -231,7 +304,7 @@ export function Review({ client = api, clock = systemClock }: ReviewProps = {}) 
           )}
         </section>
       ) : (
-        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,3fr)_minmax(340px,1fr)]">
           <ReviewTable rows={job.rows} filter={filter} selected={selected} onSelectCell={setSelected} />
           <aside
             aria-labelledby="evidence-title"
@@ -248,6 +321,12 @@ export function Review({ client = api, clock = systemClock }: ReviewProps = {}) 
                     {selectedText === null ? common.notAvailable : isolate ? ltr(selectedText) : selectedText}
                   </p>
                   <Badge level={selectedResult.level} />
+                  {foundBeside ? (
+                    <p className="text-sm text-ink-base">
+                      <span className="text-ink-muted">{review.foundBeside}</span>{' '}
+                      <span className="font-semibold">{foundBeside}</span>
+                    </p>
+                  ) : null}
                   {selectedResult.reason ? (
                     <p className="text-sm text-ink-base">{selectedResult.reason}</p>
                   ) : selectedText === null ? (
@@ -290,7 +369,6 @@ export function Review({ client = api, clock = systemClock }: ReviewProps = {}) 
           </aside>
         </div>
       )}
-      <p className="mt-5 text-sm text-ink-muted">{review.shortcuts}</p>
 
       <Dialog open={helpOpen} onOpenChange={setHelpOpen} title={dialogs.shortcutsTitle}>
         <dl className="flex flex-col gap-2">

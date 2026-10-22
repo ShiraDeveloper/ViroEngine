@@ -26,7 +26,7 @@ from backend.adapters.vision.base import Provider, ProviderReply
 from backend.adapters.vision.cache import CACHE_DIRNAME, ResponseCache, cache_key
 from backend.adapters.vision.circuit import CircuitBreaker
 from backend.adapters.vision.config import ProvidersConfig, load_providers_config
-from backend.adapters.vision.errors import ProviderRejected, ProviderUnavailable
+from backend.adapters.vision.errors import ProviderRejected, ProviderTimedOut, ProviderUnavailable
 from backend.adapters.vision.gemini import GeminiProvider
 from backend.adapters.vision.groq import GroqProvider
 from backend.adapters.vision.openrouter import OpenRouterProvider
@@ -42,14 +42,23 @@ from backend.core.errors import (
 from backend.core.models import ProviderHealth, VisionRequest, VisionResponse
 from backend.core.vision_schema import (
     ExtractionPayload,
+    PagePayload,
     SenderPayload,
+    VerifyPayload,
+    crop_values,
+    page_answers,
     parse_extraction,
+    parse_page,
     parse_sender,
+    parse_verify,
     to_answers,
 )
 from backend.settings import Settings
 
 log = structlog.get_logger()
+
+# Every validated answer shape the chain can produce, one per request task.
+Payload = ExtractionPayload | SenderPayload | PagePayload | VerifyPayload
 
 # Structural: milliseconds per second, for the duration the response reports.
 _MS: Final = 1000.0
@@ -68,22 +77,33 @@ class _Slot:
     provider: Provider
     breaker: CircuitBreaker
     caller: HttpCaller
+    with_model: bool = False  # several slots share this provider: name the model too
 
     @property
     def name(self) -> str:
-        return self.provider.name.value
+        """The provider (`gemini`), or provider and model (`gemini/gemini-2.5-flash`) when several
+        models of one provider are chained, so a failover between them reads in the report."""
+        base = self.provider.name.value
+        return f"{base}/{self.provider.model_id}" if self.with_model else base
 
 
 def _default_providers(
-    settings: Settings, config: ProvidersConfig, clock: Callable[[], float]
+    settings: Settings,
+    config: ProvidersConfig,
+    clock: Callable[[], float],
+    gemini_models: Sequence[str] | None = None,
 ) -> list[Provider]:
-    """The providers named in `config.order`, with ids from the environment first, then the file."""
+    """The providers named in `config.order`, with ids from the environment first, then the file.
+    `gemini_models` puts several Gemini models in the primary slot, in order: each has its own
+    free daily quota, so a spent model hands over to the next before any other provider."""
     explicit = settings.model_fields_set
     gemini_model = settings.gemini_model if "gemini_model" in explicit else config.gemini.model
-    built: dict[str, Provider] = {
-        "gemini": GeminiProvider(
-            keys=settings.gemini_keys_list, model=gemini_model, config=config, clock=clock
-        ),
+    models = list(gemini_models or [gemini_model])
+    built: dict[str, Provider | list[Provider]] = {
+        "gemini": [
+            GeminiProvider(keys=settings.gemini_keys_list, model=m, config=config, clock=clock)
+            for m in models
+        ],
         "openrouter": OpenRouterProvider(
             keys=[settings.openrouter_api_key] if settings.openrouter_api_key else [],
             model=settings.openrouter_vision_model or config.openrouter.model,
@@ -97,7 +117,13 @@ def _default_providers(
             clock=clock,
         ),
     }
-    return [built[name] for name in config.order if name in built]
+    chosen: list[Provider] = []
+    for name in config.order:
+        entry = built.get(name)
+        if entry is None:
+            continue
+        chosen.extend(entry if isinstance(entry, list) else [entry])
+    return chosen
 
 
 class VisionChainAdapter:
@@ -117,6 +143,7 @@ class VisionChainAdapter:
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
         rand: Callable[[], float] = random.random,
+        gemini_models: Sequence[str] | None = None,
     ) -> None:
         self._settings = settings
         self._config = config or load_providers_config()
@@ -126,7 +153,7 @@ class VisionChainAdapter:
         chosen = (
             list(providers)
             if providers is not None
-            else _default_providers(settings, self._config, clock)
+            else _default_providers(settings, self._config, clock, gemini_models)
         )
         self._slots = [
             _Slot(
@@ -149,6 +176,9 @@ class VisionChainAdapter:
             )
             for p in chosen
         ]
+        names = [slot.provider.name for slot in self._slots]
+        for slot in self._slots:
+            slot.with_model = names.count(slot.provider.name) > 1
         ttl_minutes = settings.vision_cache_ttl_minutes or settings.job_ttl_minutes
         self._cache = cache or ResponseCache(
             Path(settings.data_dir) / CACHE_DIRNAME, ttl_seconds=ttl_minutes * 60.0
@@ -219,9 +249,7 @@ class VisionChainAdapter:
         base = min(retry.max_delay_seconds, retry.base_delay_seconds * 2.0**attempt)
         return base * (1.0 + retry.jitter_factor * (2.0 * self._rand() - 1.0))
 
-    def _ask(
-        self, slot: _Slot, request: VisionRequest
-    ) -> tuple[ProviderReply, ExtractionPayload | SenderPayload]:
+    def _ask(self, slot: _Slot, request: VisionRequest) -> tuple[ProviderReply, Payload]:
         """One provider, with its retries. Returns the reply and its validated payload.
         Raises _ProviderFailed."""
         transient = 0
@@ -235,6 +263,8 @@ class VisionChainAdapter:
                 if reminder:
                     raise _ProviderFailed("bad_response") from None
                 reminder = True  # one retry, with the schema reminder
+            except ProviderTimedOut:
+                raise _ProviderFailed("timed_out") from None
             except ProviderUnavailable:
                 transient += 1
                 if transient >= self._config.retry.max_attempts:
@@ -252,13 +282,15 @@ class VisionChainAdapter:
         slot: _Slot,
         request: VisionRequest,
         reply: ProviderReply,
-        parsed: ExtractionPayload | SenderPayload,
+        parsed: Payload,
         failovers: list[str],
         started: float,
     ) -> VisionResponse:
         """The response for a validated payload. The raw text of a field extraction is not kept:
         its values are in `answers`, and fewer copies of patient data is better."""
         sender = parsed.sender if isinstance(parsed, SenderPayload) else None
+        answers = to_answers(parsed) if isinstance(parsed, ExtractionPayload) else {}
+        ambiguities = parsed.ambiguities if isinstance(parsed, ExtractionPayload) else []
         return VisionResponse(
             raw_text=sender or "",
             candidates=[sender] if sender else [],
@@ -266,14 +298,26 @@ class VisionChainAdapter:
             model_id=slot.provider.model_id,
             prompt_version=request.prompt_version,
             duration_ms=int((time.perf_counter() - started) * _MS),
-            answers=to_answers(parsed) if isinstance(parsed, ExtractionPayload) else {},
-            ambiguities=parsed.ambiguities if isinstance(parsed, ExtractionPayload) else [],
+            answers=answers,
+            ambiguities=[a[:200] for a in ambiguities[:10]],
+            pages=page_answers(parsed, len(request.page_images))
+            if isinstance(parsed, PagePayload)
+            else [],
+            crop_values=crop_values(parsed, len(request.crops))
+            if isinstance(parsed, VerifyPayload)
+            else [],
             input_tokens=reply.input_tokens,
             output_tokens=reply.output_tokens,
             failovers=list(failovers),
         )
 
 
-def _validate(request: VisionRequest, text: str) -> ExtractionPayload | SenderPayload:
+def _validate(request: VisionRequest, text: str) -> Payload:
     """The validated payload of `text` for this request's task. Raises ProviderBadResponse."""
-    return parse_sender(text) if request.task == "sender" else parse_extraction(text)
+    if request.task == "sender":
+        return parse_sender(text)
+    if request.task == "page":
+        return parse_page(text)
+    if request.task == "verify":
+        return parse_verify(text)
+    return parse_extraction(text)

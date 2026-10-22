@@ -10,7 +10,7 @@ unresolved crops go to a free cloud model. An empty flagged field beats a guess.
 | Challenge | מטפסי התחייבות לאקסל — Central Virology Laboratory, MoH |
 | Team | Ahuba, Shira — 51 h capacity each (8 days × 6 h + Fri 3 h). Committed task hours: Ahuba 44.5 h, Shira 47 h; ~4 h reviews each on top (§13 Totals) |
 | Days | 8.5 working days: D1 = Sun 18.10 … D9 = Tue 27.10. No work Shabbat 24.10. Final night 28.10 |
-| Plan version | 2.3 · 2026-10-19 |
+| Plan version | **3.0 · 2026-10-22** — engine replaced, see "Amendment v3.0" below (2.3 · 2026-10-19 underneath) |
 | Cost target | $0 — free tiers only |
 
 **In five lines.** The system takes one form or a pile, reads every page on the local machine
@@ -20,6 +20,39 @@ authority: **deterministic code → local OCR → cloud → human**, and a field
 is left empty and flagged with a reason rather than guessed. The product is an API; the Excel file
 is one export adapter for the demo. **Start at Tasks 1–4, all four on Day 1, both developers
 together** — they freeze the data contracts that let the two of you work in parallel afterwards.
+
+> ### Amendment v3.0 (2026-10-22) — the engine is vision-first; everything else stands
+>
+> Running the plan as built showed it **cannot** produce the target scenario: every handwritten
+> name was orange by construction (a lone cloud read of a `handwritten` source is level D in
+> §5.2), any form outside the 48 samples was read by Tesseract alone (§8.5 gate, and the web app
+> never sent consent), fields the local layer could not locate were never sent at all, a page took
+> ~20 s, and the free tier turned out to be **20 requests per model per day**. Full measurements:
+> [ADR-017](decisions/ADR-017-vision-first.md).
+>
+> **What changes.** §4 S1–S9 and §6.4 are no longer the default path. Per page: barcode sweep
+> (local) → one page read by Gemini 3 Flash with a strict schema and the closed sender list as an
+> enumeration → one **blind** re-read of zoomed crops per three-page batch → **S8 unchanged** (§5:
+> check digit and calendar are hard gates; barcode + reading = A, two agreeing readers = B, else D
+> with a reason) → S10/S11 unchanged. New rule: a number claimed by two of ID / central /
+> commitment flags both. Model failover: Gemini 3 Flash → 2.5 Flash (Flash-Lite is not a page
+> reader: it mixes fields up); a page no strong model reads falls back to the §4 cascade.
+>
+> **What stays.** §1 requirements and metrics, §2 domain knowledge (now in the prompt,
+> `config/prompts/page_v1.txt`), §3 architecture and ports, §5 scoring and hard rules, §7
+> learning, §8 security (with §8.5 now opt-in: `CLOUD_REQUIRES_CONSENT`), §9 design (re-themed:
+> navy + virology teal), §10 evaluation — which must now be run **with this engine** before any
+> number is published.
+>
+> **Deployment (replaces §11).** One Docker image serves the API (`/v1`) and the web app (`/`);
+> primary host a free Hugging Face Docker Space (2 vCPU, 16 GB). Step by step:
+> [docs/DEPLOY.md](DEPLOY.md).
+>
+> **Remaining tasks.** (1) Run `eval/run_eval.py` on the held-out pages with the new engine and
+> fill the README results table honestly. (2) Secure quota for the final: one free key per team
+> member's own account, or one key with billing enabled (≈ $0.002 a page; Google's trial credit
+> covers it). (3) Deploy with `scripts/deploy_hf.ps1` and rehearse `docs/demo_script.md` against
+> the public URL, warm-up run included.
 
 **Contents:** [0 How to use](#0-how-to-use) · [1 Product](#1-product) · [2 Domain](#2-domain-knowledge) ·
 [3 Architecture](#3-architecture) · [4 Pipeline](#4-pipeline-s0s11) · [5 Scoring](#5-scoring) ·

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+import threading
 import time
 from typing import Literal
 
@@ -28,8 +29,8 @@ class Credential:
 
 
 class CredentialRing:
-    """An ordered set of credentials for one provider. Thread-safe enough for the one worker
-    thread that calls it; the clock (monotonic seconds) is injected."""
+    """An ordered set of credentials for one provider. Safe for the concurrent page workers of
+    the vision-first engine (one lock); the clock (monotonic seconds) is injected."""
 
     def __init__(
         self,
@@ -43,29 +44,34 @@ class CredentialRing:
         self._cooldown = cooldown_seconds
         self._clock = clock
         self._creds = [Credential(label=f"k{i}", key=k) for i, k in enumerate(keys, start=1)]
+        self._lock = threading.Lock()
 
     def next(self) -> Credential | None:
         """The first credential that is usable now: `ok`, or `cooling` whose cooldown has ended.
         None when every credential is cooling or dead."""
-        now = self._clock()
-        for cred in self._creds:
-            if cred.state == "cooling" and cred.cooldown_until <= now:
-                cred.state = "ok"
-            if cred.state == "ok":
-                return cred
-        return None
+        with self._lock:
+            now = self._clock()
+            for cred in self._creds:
+                if cred.state == "cooling" and cred.cooldown_until <= now:
+                    cred.state = "ok"
+                if cred.state == "ok":
+                    return cred
+            return None
 
-    def cool(self, cred: Credential) -> None:
-        """Rate limited (429): rest this credential for the cooldown, then it is usable again."""
-        cred.state = "cooling"
-        cred.cooldown_until = self._clock() + self._cooldown
+    def cool(self, cred: Credential, seconds: float | None = None) -> None:
+        """Rate limited (429): rest this credential for the cooldown (or `seconds`), then it is
+        usable again."""
+        with self._lock:
+            cred.state = "cooling"
+            cred.cooldown_until = self._clock() + (self._cooldown if seconds is None else seconds)
         log.info("credential_rate_limited", provider=self._provider, label=cred.label)
 
     def kill(self, cred: Credential) -> None:
         """Rejected (401/403): dead for the life of the process. Logged once, by label."""
-        if cred.state == "dead":
-            return
-        cred.state = "dead"
+        with self._lock:
+            if cred.state == "dead":
+                return
+            cred.state = "dead"
         log.warning("credential_dead", provider=self._provider, label=cred.label)
 
     @property

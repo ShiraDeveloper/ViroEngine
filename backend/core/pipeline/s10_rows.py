@@ -41,6 +41,7 @@ from backend.core.ports.clock import ClockPort
 from backend.core.ports.senders import SenderIndexPort
 from backend.core.scoring import (
     CRITICAL_FIELDS,
+    CROSS_FIELD_NOTE,
     DEFAULT_WEIGHTS,
     ScoringConfig,
     ScoringWeights,
@@ -155,6 +156,8 @@ class _Evidence:
                 if norm == decided:
                     found[norm] = base
                     continue
+                if any(CROSS_FIELD_NOTE in c.notes for c in cands):
+                    continue  # a number two fields claimed never stands on its own (ADR-017)
                 alone = evaluate_field(
                     key,
                     cands,
@@ -232,6 +235,15 @@ def _group_id(first: PageOutcome) -> str:
     return f"grp-{first.page_id}"
 
 
+def _has_values(page: PageOutcome) -> bool:
+    """True when the page closed (level A-C) a central or commitment number: it is a sample."""
+    return any(
+        r.value and r.level is not ConfidenceLevel.D
+        for k, r in page.results.items()
+        if k in (FieldKey.central_number, FieldKey.commitment_number)
+    )
+
+
 def _walk(
     pages: Sequence[PageOutcome], ctx: RowContext, ev: _Evidence
 ) -> tuple[list[_Open], list[str]]:
@@ -240,11 +252,15 @@ def _walk(
     current: _Open | None = None
     for page in pages:
         role = page.page_role
-        if page.status != "done" or role is None or role == "unknown":
+        if page.status != "done" or role is None:
             orphans.append(page.page_id)
-        elif role == "primary_form":
+        elif role == "primary_form" or (role == "unknown" and _has_values(page)):
+            # A page whose role could not be told but that carries values is a form of its own:
+            # dropping it to the orphans tab would lose a whole row from the spreadsheet.
             current = _open_group(page, ev)
             groups.append(current)
+        elif role == "unknown":
+            orphans.append(page.page_id)
         elif current is None:
             orphans.append(page.page_id)
         elif role == "blank":

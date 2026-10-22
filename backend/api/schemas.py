@@ -57,6 +57,8 @@ class JobView(Strict):
     rows: list[CommitmentRow]
     orphan_page_ids: list[str]
     report: RunReport | None
+    # Job-level conditions the UI explains, by stable code (e.g. AI_UNAVAILABLE). Never a value.
+    notices: list[str] = Field(default_factory=list)
 
 
 class ProviderStatus(Strict):

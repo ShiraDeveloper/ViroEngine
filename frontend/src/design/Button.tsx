@@ -5,13 +5,15 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const BASE =
-  'inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors ' +
-  'duration-fast ease-token disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex items-center justify-center gap-2 rounded-md font-medium transition-all ' +
+  'duration-fast ease-token active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60';
 
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: 'bg-primary-700 text-ink-inverse hover:bg-primary-900 active:bg-primary-900',
+  primary:
+    'bg-gradient-to-l from-primary-700 to-primary-500 text-ink-inverse shadow-card ' +
+    'hover:from-primary-900 hover:to-primary-700 hover:shadow-raised',
   secondary:
-    'border border-primary-500 bg-surface-raised text-primary-700 hover:bg-primary-100 active:bg-primary-100',
+    'border border-primary-300 bg-surface-raised text-primary-700 shadow-card hover:border-primary-500 hover:bg-primary-100',
   ghost: 'bg-transparent text-primary-700 hover:bg-primary-100 active:bg-primary-100',
   danger: 'bg-accent-700 text-ink-inverse hover:bg-accent-500 active:bg-accent-500',
 };

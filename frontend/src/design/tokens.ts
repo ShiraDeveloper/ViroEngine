@@ -4,18 +4,22 @@
  */
 export const tokens = {
   colors: {
-    primary: { 900: '#1C1B4D', 700: '#2B2A6B', 500: '#454399', 300: '#8785C6', 100: '#E7E6F7' },
+    // "Clinical Clarity": laboratory navy with a virology teal. Deep tones carry the brand, the
+    // calm surfaces leave the confidence colours (green / amber / orange) as the loudest thing.
+    primary: { 900: '#0A1F3D', 700: '#123C73', 500: '#1E63B5', 300: '#8FB6E6', 100: '#E7F0FC' },
+    teal: { 700: '#0B6E6C', 500: '#12A19E', 300: '#7FD6D3', 100: '#DDF5F4' },
     accent: { 700: '#9E1049', 500: '#C2185B', 100: '#FBE4EE' },
-    surface: { base: '#F6F7FB', raised: '#FFFFFF', sunken: '#EEF0F7', border: '#E2E4EE' },
-    ink: { strong: '#1A1C2A', base: '#3A3D52', muted: '#6B6F85', inverse: '#FFFFFF' },
+    brand: { from: '#071733', via: '#123C73', to: '#0B6E6C', glow: '#5FE0D8' },
+    surface: { base: '#F3F6FB', raised: '#FFFFFF', sunken: '#EAF0F8', border: '#DCE4EF' },
+    ink: { strong: '#0E1A2E', base: '#33415A', muted: '#64718A', inverse: '#FFFFFF' },
     state: {
-      verified: { fg: '#1B5E20', bg: '#E8F5E9', border: '#2E7D32' }, // level A/B
-      single: { fg: '#7A4700', bg: '#FFF6E5', border: '#B26A00' }, // level C
+      verified: { fg: '#1B5E20', bg: '#F1FAF2', border: '#2E7D32' }, // level A/B
+      single: { fg: '#2F5D3A', bg: '#F6FBF4', border: '#7CB342' }, // level C
       review: { fg: '#B33F00', bg: '#FFE8D6', border: '#E65100' }, // level D
       neutral: { fg: '#3A3D52', bg: '#EEF0F7', border: '#C9CBD6' },
     },
-    cloud: '#C2185B', // anything that left the machine
-    local: '#2E7D32', // anything resolved on the machine
+    cloud: '#12A19E', // the AI read (teal)
+    local: '#1E63B5', // a stage that ran on the machine (blue)
   },
   fontFamily: {
     sans: ['Heebo', 'system-ui', 'sans-serif'],
@@ -29,6 +33,7 @@ export const tokens = {
     xl: '22px',
     '2xl': '28px',
     '3xl': '36px',
+    '4xl': '46px',
   },
   spacing: {
     1: '4px',
@@ -40,11 +45,12 @@ export const tokens = {
     7: '48px',
     8: '64px',
   },
-  borderRadius: { sm: '6px', md: '10px', lg: '14px', pill: '999px' },
+  borderRadius: { sm: '6px', md: '10px', lg: '16px', xl: '24px', pill: '999px' },
   boxShadow: {
-    card: '0 1px 2px rgba(26,28,42,.06), 0 2px 8px rgba(26,28,42,.04)',
-    raised: '0 4px 16px rgba(26,28,42,.10)',
-    focus: '0 0 0 3px rgba(69,67,153,.35)',
+    card: '0 1px 2px rgba(10,31,61,.06), 0 4px 14px rgba(10,31,61,.05)',
+    raised: '0 10px 30px rgba(10,31,61,.12)',
+    hero: '0 24px 60px rgba(7,23,51,.28)',
+    focus: '0 0 0 3px rgba(30,99,181,.35)',
   },
   motion: { fast: '120ms', base: '180ms', slow: '260ms', ease: 'cubic-bezier(.2,.8,.2,1)' },
 } as const;

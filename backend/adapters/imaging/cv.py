@@ -16,7 +16,7 @@ import numpy as np
 from numpy.typing import NDArray
 import structlog
 
-from backend.adapters.imaging.codec import Pixels, decode_bgr, encode_png
+from backend.adapters.imaging.codec import Pixels, decode_bgr, encode_jpeg, encode_png
 from backend.core.errors import RenderFailed
 from backend.core.models import Box
 from backend.core.ports.document import EncodedImage
@@ -141,10 +141,14 @@ class CvImaging:
         except cv2.error as exc:
             raise RenderFailed("binarization failed") from exc
 
-    def thumbnail(self, image: bytes, *, max_side: int) -> EncodedImage:
-        """Downscale to `max_side` on the longest side; smaller images are returned as is."""
+    def thumbnail(
+        self, image: bytes, *, max_side: int, jpeg_quality: int | None = None
+    ) -> EncodedImage:
+        """Downscale to `max_side` on the longest side; smaller images are returned as is.
+        PNG, or JPEG at `jpeg_quality` when it is given."""
         try:
-            return encode_png(_downscale(decode_bgr(image), max_side))
+            small = _downscale(decode_bgr(image), max_side)
+            return encode_png(small) if jpeg_quality is None else encode_jpeg(small, jpeg_quality)
         except cv2.error as exc:
             raise RenderFailed("thumbnail failed") from exc
 

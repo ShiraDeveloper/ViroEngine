@@ -51,4 +51,5 @@ and a negative result is recorded just as fully as a positive one.
 | 014 | Hosting: stay on Render or move to the Space | **pending** | Day-3 measurement |
 | 015 | Does the sticker barcode equal the printed digits? Decides whether level A exists | **pending** | T5 |
 | 016 | Region detector: rule-based or YOLO | **open** - experiment prepared, not run (no model, no held-out numbers) | T16 |
-| 017 | Final results | **pending** | T30 |
+| 017 | Vision-first engine: page read + blind crop re-read, decided in code ([ADR-017](ADR-017-vision-first.md)) | **accepted** - default engine; the cascade is the fallback | 2026-10-22 measurement |
+| 018 | Final results | **pending** | T30 |
