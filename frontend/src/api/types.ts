@@ -131,7 +131,7 @@ export interface LayoutHint {
   confidence: number;
 }
 
-/** Locations and abstracted shapes only. Deliberately has NO value field: adding one must break `core.learning.assert_pii_free` and the reflection test that guards it (PLAN ?7.1). */
+/** Locations and abstracted shapes only. Deliberately has NO value field: adding one must break `core.learning.assert_pii_free` and the reflection test that guards it (PLAN §7.1). */
 export interface LayoutObservation {
   sender: string;
   field: FieldKey;
@@ -252,7 +252,7 @@ export interface ReviewEdit {
   at: string;
 }
 
-/** Counters of one finished job for the learning curve (PLAN ?7.2 `run_metric`). No values. */
+/** Counters of one finished job for the learning curve (PLAN §7.2 `run_metric`). No values. */
 export interface RunMetric {
   at: string;
   fields_total: number;

@@ -123,6 +123,25 @@ and KGI.
 - **Planning cost only.** `estimated_usd` uses Gemini Flash list prices (an assumption, PLAN §6.5);
   free-tier fallbacks are counted as zero.
 
+## Security hardening (T27)
+
+- **Rate limiting keys on the socket peer.** Behind a reverse proxy every request would share one
+  address unless the server runs with proxy headers enabled and a trusted forwarder list; the
+  deployment (T28) must set that. Counters live in memory, so they reset on restart and are not
+  shared between processes.
+- **Open API without `API_KEY`.** An empty key means no authentication (development). The
+  application logs `auth_disabled` at start-up; a deployment must set it.
+- **The upload is held in memory** (bounded by `MAX_UPLOAD_MB`) until the pipeline takes it,
+  instead of being streamed to disk.
+- **Dependencies move.** The pins were bumped to clear `pip-audit` on 2026-10-22; new advisories
+  appear continuously, so the CI `pip-audit --strict` job can go red later with no code change.
+- **`gitleaks` is not run locally.** CI runs it over the full history; locally the history was
+  searched for key-shaped strings and private keys with `git log -G`.
+- **Sample hashes depend on the renderer.** `config/sample_hashes.json` is the SHA-256 of pages as
+  this build's PDF renderer draws them; a different renderer version changes the hashes and the
+  sample forms are then treated as unknown (processed locally, safe but less accurate).
+  Regenerate with `python -m tools.make_sample_hashes` on the deployment's renderer.
+
 ## Learning layer (T24)
 
 - **Learns only from human confirmations, and needs three of them** before a location or shape is

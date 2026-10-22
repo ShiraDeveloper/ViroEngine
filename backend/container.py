@@ -68,7 +68,7 @@ DEFAULT_SEED_PATH = Path(__file__).resolve().parents[1] / "config" / "learning_s
 
 
 def load_learning_seed(path: Path | None = None) -> dict[str, Any]:
-    """The committed PII-free layout seed (PLAN ?7.4), or an empty seed when there is none or it
+    """The committed PII-free layout seed (PLAN §7.4), or an empty seed when there is none or it
     cannot be read. It only ever fills an empty learning store."""
     import json
 

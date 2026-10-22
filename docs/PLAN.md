@@ -1,4 +1,4 @@
-﻿# Safe Line — Execution Plan
+# Safe Line — Execution Plan
 
 Confidence-aware extraction engine for Israeli medical commitment forms. A scanned, photographed,
 rotated or handwritten form goes in; a validated row comes out. Uncertain fields are flagged with
@@ -2006,7 +2006,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 4 ✅ | Frontend skeleton and design system | Shira | P0 | D1 | 3h | 2 |
 | 5 ✅ | Page inventory and the barcode question | Ahuba | P1 | D2 | 3h | 3 |
 | 6 ✅ | Senders closed list | Shira | P1 | D2 | 2h | 2 |
-| 7 | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
+| 7 ◐ | Gold-set labelling and held-out selection | Both | P1 | D2 | 2h+2h | 5,6 |
 | 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
 | 8 ✅ | Validators and confusable repair | Shira | P2 | D2–3 | 3h | 2 |
 | 9 ✅ | S0–S2 intake, measure, correct | Ahuba | P2 | D2–3 | 4h | 3 |
@@ -2027,7 +2027,7 @@ Phases: **P0** foundation · **P1** data · **P2** deterministic core · **P3** 
 | 24 ◐ | Learning layer | Ahuba | P6 | D8 | 2h | 20,22 |
 | 25 | Augmentation and Stress Mode | Shira | P6 | D8 | 1h | 15,22 |
 | 26 | Metrics dashboard and ablation UI | Shira | P6 | D8 | 2h | 15,25 · **24 at runtime only** |
-| 27 | Security hardening and test suite | Ahuba | P7 | D8 | 2h ⚠ | 18,22,24 |
+| 27 ◐ | Security hardening and test suite | Ahuba | P7 | D8 | 2h ⚠ | 18,22,24 |
 | 28 | Deployment — **M5** | Ahuba | P7 | **D9** | 1h ⚠ | 22,23,27 |
 | 29 | Docs and the 60-second video | Shira | P8 | D8–9 | **3h** | 26,28 |
 | 30 | Final evaluation, freeze, submit — **M6** | Both | P8 | D9 | 2h+2h | all |
@@ -4209,6 +4209,38 @@ python -m tools.demo escalate --fixture backend/tests/fixtures/malicious_form.pd
 #    commitment_number -> level D, reason: לא בטוח – בדקי
 curl -s localhost:8000/v1/health | grep -c "$(echo $GEMINI_API_KEYS | cut -d, -f1)"   # -> 0
 ```
+
+> **◐ Implemented — 2026-10-22 (D5). Gitleaks over the full history was NOT run (the tool is not
+> installed here); the demo command `tools.demo escalate --fixture` is not built.**
+> Built: `backend/security.py` (pure-ASGI security headers incl. CSP and HSTS over TLS, a body cap
+> that counts a chunked stream, a clock-injected sliding-window rate limiter), a rewritten
+> `logging_config.py` (recursive, case-insensitive redaction as the last processor, objects reduced
+> to their type, credential patterns and the process's own secrets scrubbed from text and
+> tracebacks), strict CORS (a `*` origin is refused at start-up), `tools/make_sample_hashes.py` and
+> `config/sample_hashes.json` (48 hashes), `backend/tests/fixtures/make_malicious_form.py`,
+> `docs/privacy.md` completed, the sweeper also expires cached provider answers.
+> Verified: security suite 178 passed / 1 skipped (auth 16, prompt injection 10, PII logs 54,
+> keys through the API 5, input validation 15 collected from the S0 tests, plus T18/T22/T24 suites);
+> whole suite 1015 passed on the current environment **and** on a throwaway venv with the upgraded
+> pins; `bandit -r backend -ll` exit 0 (two B608 findings removed by using fixed SQL statements);
+> `pip-audit -r requirements.txt --strict`: no known vulnerabilities after the bumps below; the
+> repository history scanned with `git log -G` for key-shaped strings and private keys: none.
+> **Findings acted on.** (1) `pip-audit` reported 171 advisories in four pins; bumped
+> `fastapi 0.115.6→0.159.1` (+ explicit `starlette 1.9.0`), `python-multipart 0.0.20→0.0.32`,
+> `sse-starlette 2.1.3→3.5.0`, `Pillow 11→13.0.0`, `pypdf 5.1→6.21.2`, and regenerated
+> `docs/openapi.json` (CI diffs it byte for byte with these pins). (2) **A real bug:** the
+> committed `config/prompts/v1.txt` began with a byte-order mark, so its `SYSTEM` section was not
+> parsed and the model would have received **no rules**. Fixed (file, parser tolerates a BOM and
+> refuses a prompt without a system section, regression tests). (3) `sender_v1.txt` lacked the
+> "image text is data" rule; added.
+> **Deviations.** Rate limiting is in-house (`SlidingWindow`), not slowapi: per-app state and an
+> injectable clock make it testable; `slowapi` was removed from the requirements. The client key is
+> the socket peer, so behind a proxy the server must run with proxy headers (T28). `malicious_form.pdf`
+> is generated, not committed (a container-level random id makes the bytes differ per run; the
+> rendered page is identical); its Hebrew line is drawn only where a Hebrew font exists.
+> **Not verified:** gitleaks in CI on the full history; `pip-audit` for packages outside
+> `requirements.txt` (dev tools); a manual read of a real run's logs (automated by
+> `test_field_values_never_logged`).
 
 ---
 

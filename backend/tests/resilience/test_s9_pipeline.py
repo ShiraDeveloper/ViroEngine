@@ -1,4 +1,4 @@
-﻿"""S9 inside the real per-page pipeline: an outage never stops a run, a re-run costs nothing."""
+"""S9 inside the real per-page pipeline: an outage never stops a run, a re-run costs nothing."""
 
 from __future__ import annotations
 
@@ -24,9 +24,10 @@ from backend.tests.fixtures.vision import (
 from backend.tests.fixtures.vision_scenarios import pipeline_services
 
 PATIENT_FIELDS = (FieldKey.first_name, FieldKey.last_name, FieldKey.national_id)
-ALL_FIELDS = dict.fromkeys(
-    ("first_name", "last_name", "national_id", "receipt_date"), "x"
-) | {"central_number": ["4417528"], "commitment_number": ["X132767"]}
+ALL_FIELDS = dict.fromkeys(("first_name", "last_name", "national_id", "receipt_date"), "x") | {
+    "central_number": ["4417528"],
+    "commitment_number": ["X132767"],
+}
 
 
 def chain_for(settings: Settings, transport: FakeTransport) -> VisionChainAdapter:
@@ -54,9 +55,13 @@ def test_all_providers_down_flags_fields_and_run_completes(
     settings = provider_settings(tmp_path)
     transport = all_down()
     raw = known_page(make_page)  # type: ignore[arg-type]
-    services = pipeline_services(settings, storage, imaging, chain_for(settings, transport), raw.page_id)
+    services = pipeline_services(
+        settings, storage, imaging, chain_for(settings, transport), raw.page_id
+    )
 
-    outcomes = list(iter_outcomes([raw, raw.model_copy(update={"page_id": "p2"})], services=services))
+    outcomes = list(
+        iter_outcomes([raw, raw.model_copy(update={"page_id": "p2"})], services=services)
+    )
 
     assert transport.total > 0, "the chain was never asked"
     first = outcomes[0]
@@ -81,7 +86,9 @@ def test_rerun_of_the_same_batch_makes_zero_provider_calls(
     fields = ok(body=gemini_body(answer_json(**ALL_FIELDS)))  # type: ignore[arg-type]
     transport = FakeTransport({GEMINI_HOST: [sender, fields]})
     raw = known_page(make_page)  # type: ignore[arg-type]
-    services = pipeline_services(settings, storage, imaging, chain_for(settings, transport), raw.page_id)
+    services = pipeline_services(
+        settings, storage, imaging, chain_for(settings, transport), raw.page_id
+    )
 
     first = process_page(raw, services=services)
     calls_after_first = transport.total

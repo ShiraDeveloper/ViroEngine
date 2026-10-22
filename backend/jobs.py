@@ -59,7 +59,7 @@ class JobEntry:
     consent: bool = False
     derived_from: str | None = None
     outcomes: list[PageOutcome] = field(default_factory=list)  # what each page produced
-    all_known_samples: bool = False  # every page matched the sample hashes (PLAN ?8.5)
+    all_known_samples: bool = False  # every page matched the sample hashes (PLAN §8.5)
     page_images: dict[str, ImageRef] = field(default_factory=dict)  # corrected page, per page id
     raw_images: dict[str, ImageRef] = field(default_factory=dict)  # as scanned, per page id
     events: list[SseEvent] = field(default_factory=list)

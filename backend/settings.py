@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     app_access_code: str = ""
     api_key: str = ""
     allowed_origins: str = "http://localhost:5173"
+    # PLAN §8 T-7: all requests per client per minute, and uploads on top of that.
+    rate_limit_per_minute: int = Field(default=60, ge=1, le=100_000)
+    upload_rate_limit_per_minute: int = Field(default=10, ge=1, le=10_000)
 
     # --- Gemini (primary crop reader) -------------------------------------
     gemini_api_keys: str = ""  # comma-separated; rotated on 429 / invalid key
@@ -184,6 +187,15 @@ class Settings(BaseSettings):
     def origins_list(self) -> list[str]:
         """Split comma-separated CORS origins."""
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    @field_validator("allowed_origins")
+    @classmethod
+    def _no_wildcard_origin(cls, v: str) -> str:
+        """A wildcard CORS origin is refused at start-up, development included (PLAN §8 T-8): a
+        development wildcard is the one that ships."""
+        if any(o.strip() == "*" for o in v.split(",")):
+            raise ValueError("ALLOWED_ORIGINS must list origins explicitly; '*' is not allowed")
+        return v
 
     @field_validator("sauvola_window")
     @classmethod
