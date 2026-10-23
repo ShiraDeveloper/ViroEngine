@@ -146,9 +146,23 @@ class TesseractAdapter:
         pixels = self._load(image)
         if pixels is None:
             return None
+        rotation = self._osd(cv2.cvtColor(pixels, cv2.COLOR_BGR2RGB))
+        if rotation is None:
+            # A blurred or washed-out scan: OSD often abstains on the page as it is but reads an
+            # adaptively binarized copy (strokes regain contrast). Sharpening was tried and
+            # rejected: on heavy blur it made OSD confidently wrong.
+            grey = cv2.cvtColor(pixels, cv2.COLOR_BGR2GRAY)
+            binary = cv2.adaptiveThreshold(
+                grey, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 41, 12
+            )
+            rotation = self._osd(binary)
+        return rotation
+
+    def _osd(self, pixels: Pixels) -> int | None:
+        """OSD's clockwise rotation for an RGB or grey image, or None when it is not sure."""
         try:
             osd = pytesseract.image_to_osd(
-                Image.fromarray(cv2.cvtColor(pixels, cv2.COLOR_BGR2RGB)),
+                Image.fromarray(pixels),
                 config="--psm 0",
                 output_type=Output.DICT,
                 timeout=self._settings.ocr_timeout_seconds,

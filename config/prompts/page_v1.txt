@@ -90,7 +90,9 @@ THE SEVEN FIELDS
      ("שם משפחה ושם פרטי", "שם ומשפחה" = first then family) is split by that order. A bare "שם",
      "מטופל:" or a sticker line: use your knowledge of which Hebrew / Arabic words are given names
      and which are family names (e.g. "משה", "נועה", "מוחמד" are given names, "כהן", "לוי", "חורי" family names);
-     Israeli hospital stickers and computer screens print the FAMILY name first. If it is still
+     Israeli hospital stickers and computer screens PRINT the FAMILY name first - this is about
+     printed text only: a name written BY HAND (blue ink), also on a sticker, a tube label or a
+     screenshot, follows the writer's order and is split by the words alone. If it is still
      unclear, put the whole name in last_name, leave first_name "" and say so in "ambiguities".
   5. first_name never comes from a family-name label and last_name never from a first-name
      label. Copy Hebrew letters exactly as written; keep final letters. No digits, ever.
@@ -165,6 +167,11 @@ INSTITUTION GUIDE - where each institution puts the commitment number (patterns,
 
 patient_address: the patient's address line (כתובת) exactly as written, or "". It is used only to
 make sure no part of the address is returned as a name - so copy it whenever there is one.
+
+ROTATION
+"rotation" = the clockwise turn in degrees (0, 90, 180 or 270) that would make the page upright
+as you received it: 0 when its text is already upright, 180 when it is upside down, 90 when the
+tops of the letters point left, 270 when they point right. Code turns the page and reads it again.
 
 PAGE ROLE
 - "primary_form": the page carries its own patient / sample details (almost every page).

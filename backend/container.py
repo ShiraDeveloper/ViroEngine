@@ -47,6 +47,9 @@ class Container:
     pipeline: PipelineConfig  # thresholds and layer switches from config/models.yaml
     # The blind second reader of the vision-first engine (ADR-017); None when LOCAL_ONLY=true.
     vision_verify: VisionLLMPort | None = None
+    # (first, last) patient names of the few-shot example pages; a page read equal to one is
+    # suspected of copying the example and is not shown when the second reader disagrees.
+    example_names: frozenset[tuple[str, str]] = frozenset()
 
 
 DEFAULT_MODELS_PATH = Path(__file__).resolve().parents[1] / "config" / "models.yaml"
@@ -152,8 +155,15 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
     learning.import_seed(load_learning_seed())
     vision: VisionLLMPort | None = None
     vision_verify: VisionLLMPort | None = None
+    names: frozenset[tuple[str, str]] = frozenset()
     if not settings.local_only:
         from backend.adapters.vision.chain import VisionChainAdapter  # T18
+        from backend.adapters.vision.config import DEFAULT_FEWSHOT_DIR
+        from backend.adapters.vision.fewshot import example_names
+
+        names = example_names(
+            Path(settings.vision_fewshot_dir) if settings.vision_fewshot_dir else DEFAULT_FEWSHOT_DIR
+        )
 
         # Two chains over the same keys: the page reader and the blind verifier try their models
         # in different orders, so the two readings of a value come from different models.
@@ -197,4 +207,5 @@ def build_container(settings: Settings, *, use_fakes: bool = False) -> Container
         logo=OrbLogoMatcher(storage),
         pipeline=load_pipeline_config(),
         vision_verify=vision_verify,
+        example_names=names,
     )

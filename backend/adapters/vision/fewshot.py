@@ -110,6 +110,20 @@ def load_examples(directory: Path | None) -> ExampleSet:
     return _load(directory, stamp)
 
 
+def example_names(directory: Path | None) -> frozenset[tuple[str, str]]:
+    """The (first, last) patient name of every example: a page read that returns one of them is
+    suspected of copying it from an example. Empty when there are no examples."""
+    names: set[tuple[str, str]] = set()
+    for ex in load_examples(directory).examples:
+        page = json.loads(ex.answer)["pages"][0]
+        first, last = (
+            str((page.get(k) or {}).get("value", "")) for k in ("first_name", "last_name")
+        )
+        if first or last:
+            names.add((first, last))
+    return frozenset(names)
+
+
 def main() -> int:
     """`python -m backend.adapters.vision.fewshot [dir]`: list what would be taught."""
     import sys
