@@ -391,6 +391,8 @@ class PageAnswer(Strict):
 
     page: int = Field(ge=1)
     page_role: str
+    # Clockwise turn (0/90/180/270) the model says makes the page upright; 0 when upright.
+    rotation: int = 0
     # The patient's address line as printed, used only to reject a "name" read from it (ADR-017).
     address: str = Field(default="", max_length=VISION_TEXT_MAX)
     answers: dict[FieldKey, VisionAnswer] = Field(

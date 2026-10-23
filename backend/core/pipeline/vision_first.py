@@ -29,7 +29,7 @@ from typing import Final, cast, get_args
 import structlog
 
 from backend.core.errors import ProviderExhausted, SafeLineError
-from backend.core.given_names import is_given_name
+from backend.core.given_names import is_family_name, is_given_name
 from backend.core.learning import NAME_FIELDS, reader_role, with_learned
 from backend.core.models import (
     REASON_TEXT,
@@ -144,6 +144,8 @@ class VisionServices:
     ocr: OcrPort | None = None
     # What review taught (counts, labels, shapes - never values). None: nothing is learned.
     learning: LearningStorePort | None = None
+    # (first, last) names of the few-shot example pages - see _drop_copied_example_name.
+    example_names: frozenset[tuple[str, str]] = frozenset()
 
 
 @dataclass
@@ -255,10 +257,15 @@ def _cloud_candidates(
 def _upright(raw: PageRaw, services: VisionServices) -> PageRaw:
     """The page turned upright when local OSD is sure it is not (the stored colour image is
     replaced, so every box, crop and evidence view refers to the upright page). Unchanged when
-    OSD abstains or the rotation fails - the model can still read a sideways page, only worse."""
+    OSD abstains or the rotation fails - the model then says how the page lies (_turned_by_model)."""
     if services.ocr is None:
         return raw
-    rotation = services.ocr.detect_orientation(raw.image)
+    return _turned(raw, services.ocr.detect_orientation(raw.image), services)
+
+
+def _turned(raw: PageRaw, rotation: int | None, services: VisionServices) -> PageRaw:
+    """`raw` with its stored image turned clockwise by `rotation`; unchanged for 0 / None or a
+    failed rotation."""
     if rotation not in (90, 180, 270):
         return raw
     try:
@@ -303,15 +310,7 @@ def _prepare(raw: PageRaw, services: VisionServices) -> _Page:
     """Barcodes and the JPEG page image of one page. Raises SafeLineError for an unreadable
     image (the orchestrator then fails just this page)."""
     started = time.perf_counter()
-    settings = services.settings
-    raw = _upright(raw, services)
-    pixels = services.storage.get(raw.image)
-    hits = services.barcode.sweep(raw.image)
-    pixels = _enhanced(raw, pixels, services)
-    image = services.imaging.thumbnail(
-        pixels, max_side=settings.vision_page_max_side, jpeg_quality=settings.vision_jpeg_quality
-    ).data
-    return _Page(raw=raw, pixels=pixels, hits=hits, image=image, started=started)
+    return _prepare_turned(_upright(raw, services), started, services)
 
 
 def _self_validated(key: FieldKey, values: Sequence[str], services: VisionServices) -> bool:
@@ -656,9 +655,18 @@ def _resolve_swapped_names(evaluations: dict[FieldKey, FieldEvaluation], page: _
         return  # no two readers saw the same two words, or two different pairs did
     sample = pairs[agreed[0][0]]
     given = [w for w in sample if is_given_name(w)]
-    if len(given) != 1:
-        return  # neither or both look like a first name: the order is not knowable
-    first_name = given[0]
+    family = [w for w in sample if is_family_name(w)]
+    if len(given) == 1:
+        first_name = given[0]
+    elif len(family) == 1:
+        first_name = sample[1] if sample[0] == family[0] else sample[0]
+    else:
+        # The order is not knowable from the words: if the readers put them in opposite orders,
+        # neither order may be shown as settled.
+        if len({normalize_name(pairs[role][0]) for role in agreed[0]}) > 1:
+            for key in NAME_FIELDS:
+                evaluations[key] = flag_for_review(evaluations[key], "readers_disagree")
+        return
     last_name = sample[1] if sample[0] == first_name else sample[0]
     shown = (
         evaluations[FieldKey.first_name].result.value,
@@ -680,6 +688,34 @@ def _resolve_swapped_names(evaluations: dict[FieldKey, FieldEvaluation], page: _
         evaluations[key] = FieldEvaluation(
             result=result, signals=evaluations[key].signals, evidence=None
         )
+
+
+def _drop_copied_example_name(
+    evaluations: dict[FieldKey, FieldEvaluation], examples: frozenset[tuple[str, str]]
+) -> None:
+    """A name the page reader returned that is exactly a few-shot example's name, while the
+    blind second reader (who never sees the examples) read something else, is most likely
+    copied from the example (an illegible name): it is not shown - both name fields are left
+    empty and orange. When the second reader read the same name it stands. In place."""
+    if not examples:
+        return
+    pairs = {
+        tuple(normalize_name(v) for v in order)
+        for first, last in examples
+        for order in ((first, last), (last, first))
+    }
+    page = tuple(
+        normalize_name(_role_names(evaluations[k].result).get("page", "")) for k in NAME_FIELDS
+    )
+    verify = tuple(
+        normalize_name(_role_names(evaluations[k].result).get("verify", "")) for k in NAME_FIELDS
+    )
+    if page not in pairs or verify in pairs:
+        return
+    for key in NAME_FIELDS:
+        flagged = flag_for_review(evaluations[key], "readers_disagree")
+        cleared = flagged.result.model_copy(update={"value": None, "display_value": None})
+        evaluations[key] = FieldEvaluation(result=cleared, signals=flagged.signals, evidence=None)
 
 
 # Structural: before a reader's record changes which disputed reading is SHOWN, it needs this many
@@ -837,6 +873,7 @@ def _outcome(
     _distrust(evaluations, evaluations[FieldKey.sender].result.value, services)
     for key in _SHOWN_WHEN_DISPUTED:
         evaluations[key] = _show_first_reading(evaluations[key], _trusted_reader(key, services))
+    _drop_copied_example_name(evaluations, services.example_names)
     answer = page.answer
     role = answer.page_role if answer is not None else "primary_form"
     # A SAP screen or a lab report that the model read is a sample of its own (the 48 samples
@@ -957,6 +994,36 @@ def _read_pages(group: Sequence[_Page], services: VisionServices) -> VisionRespo
     return response
 
 
+def _turned_by_model(pages: list[_Page], services: VisionServices) -> list[VisionResponse]:
+    """Every page the model says is not upright (OSD abstained, e.g. a blurred scan) is turned
+    as the model says and read again, once, so the names are read upright. In place: the page is
+    replaced by its upright read; a failed re-read keeps the first read."""
+    responses: list[VisionResponse] = []
+    for i, page in enumerate(pages):
+        rotation = page.answer.rotation if page.answer is not None else 0
+        turned = _turned(page.raw, rotation, services)
+        if turned is page.raw:
+            continue
+        again = _prepare_turned(turned, page.started, services)
+        response = _read_pages([again], services)
+        if response is not None and again.answer is not None:
+            pages[i] = again
+            responses.append(response)
+    return responses
+
+
+def _prepare_turned(raw: PageRaw, started: float, services: VisionServices) -> _Page:
+    """_prepare for a page already turned upright (no second OSD pass)."""
+    settings = services.settings
+    pixels = services.storage.get(raw.image)
+    hits = services.barcode.sweep(raw.image)
+    pixels = _enhanced(raw, pixels, services)
+    image = services.imaging.thumbnail(
+        pixels, max_side=settings.vision_page_max_side, jpeg_quality=settings.vision_jpeg_quality
+    ).data
+    return _Page(raw=raw, pixels=pixels, hits=hits, image=image, started=started)
+
+
 def _second_page_read(page: _Page, services: VisionServices) -> VisionResponse | None:
     """The blind second read of a whole page by the verify chain (a different model), for the
     fields still unconfirmed. Whole-page context avoids the misplaced-crop misreads measured on
@@ -1029,6 +1096,7 @@ def read_batch_vision(
     responses = [r for r in answered if r is not None]
     if not responses:
         return [None] * len(raws)
+    responses += _turned_by_model(pages, services)
     first = responses[0]
     read = [p for p in pages if p.answer is not None]
 

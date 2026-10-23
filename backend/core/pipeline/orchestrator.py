@@ -404,6 +404,7 @@ def _vision_services(services: PipelineServices) -> VisionServices | None:
         prompt_version=cfg.classify.prompt_version,
         ocr=services.ocr_printed,
         learning=services.learning if cfg.layers.learning else None,
+        example_names=getattr(services, "example_names", frozenset()),
         usd_per_million=(
             cfg.escalation.usd_per_million_input_tokens,
             cfg.escalation.usd_per_million_output_tokens,

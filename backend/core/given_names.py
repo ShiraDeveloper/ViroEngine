@@ -44,3 +44,26 @@ def is_given_name(value: str) -> bool:
     """True when the whole value is one common given name (finals and spacing normalized)."""
     name = normalize_name(value)
     return name is not None and " " not in name and name in GIVEN_NAMES
+
+
+# Common Israeli family names, the other half of the ordering rule: when neither or both words
+# are on the given-name list, the word on this list is the family name. Left out: family names
+# that are also common given names (אברהם, יוסף, דוד, מאיר, ברק, טל, אלון ...) - again the order
+# is not knowable from the word alone.
+_FAMILY_RAW: Final = """
+כהן לוי מזרחי פרץ ביטון דהן אזולאי אוחיון גבאי שפירא חדד עמר פרידמן קליין אלמליח סויסה נגר
+חורי גולדברג רוזנברג אשכנזי שטרן בוזגלו גרין סבג פרלמן רבינוביץ ויס כץ פישר וקנין אדרי
+טייב אמסלם מימון אוחנה אלבז ששון חזן בירנבאום שמואלי ברגר לנדאו הורוביץ זילברמן
+פולק אבוטבול מרקוביץ פלדמן רוזן גרוס קפלן שוורץ וייס אהרוני סלאמה עודה
+ג'אבר נסאר ח'טיב מנסור עבאס זועבי
+"""
+
+FAMILY_NAMES: Final = frozenset(
+    n for word in _FAMILY_RAW.split() if (n := normalize_name(word)) and n not in GIVEN_NAMES
+)
+
+
+def is_family_name(value: str) -> bool:
+    """True when the whole value is one common family name (finals and spacing normalized)."""
+    name = normalize_name(value)
+    return name is not None and " " not in name and name in FAMILY_NAMES
