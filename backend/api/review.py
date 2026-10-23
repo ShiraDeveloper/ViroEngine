@@ -24,7 +24,12 @@ from backend.api.errors import (
 from backend.api.schemas import FieldEditRequest, JobView
 from backend.container import Container
 from backend.core.errors import EditConflict
-from backend.core.learning import assert_pii_free, field_outcomes, observations_from_row
+from backend.core.learning import (
+    assert_pii_free,
+    field_outcomes,
+    observations_from_row,
+    reader_outcomes,
+)
 from backend.core.models import (
     CommitmentRow,
     ConfidenceLevel,
@@ -165,6 +170,9 @@ async def confirm_job(
     for row in entry.record.rows:
         for sender, key, corrected in field_outcomes(row):
             container.learning.record_outcome(sender, key.value, corrected=corrected)
+        # Which reader of a disputed name held the value the person chose (counts only).
+        for key, reader, right in reader_outcomes(row):
+            container.learning.record_reader_outcome(key.value, reader, right=right)
     now = container.clock.now()
     rows = []
     for row in entry.record.rows:

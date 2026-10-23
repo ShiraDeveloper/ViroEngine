@@ -480,6 +480,20 @@ class FieldStat(Strict):
         return self.corrected / self.total if self.total else 0.0
 
 
+class ReaderStat(Strict):
+    """How often one reader of a name (page / verify / zoom) held the value a PERSON chose when
+    the readers disagreed - counts only, never a value."""
+
+    field: FieldKey
+    reader: str
+    disputes: int = 0
+    right: int = 0
+
+    @property
+    def rate(self) -> float:
+        return self.right / self.disputes if self.disputes else 0.0
+
+
 class LayoutHint(Strict):
     """Approximate region location returned by the learning store."""
 

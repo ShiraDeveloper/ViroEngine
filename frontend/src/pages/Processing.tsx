@@ -100,10 +100,27 @@ export function Processing({ client, resilient }: ProcessingProps = {}) {
           </p>
         ) : null}
         <LivePipeline pages={state.pages} counters={counters} />
-        <div>
-          <Link to={reviewPath} className={buttonClasses(doneStatus ? 'primary' : 'secondary')}>
-            {processing.goToReview}
-          </Link>
+        <div className="flex flex-col items-start gap-1">
+          {/* Until the scan reaches 100% the review would show half a job: the button waits. */}
+          {doneStatus ? (
+            <Link to={reviewPath} className={buttonClasses('primary')}>
+              {processing.goToReview}
+            </Link>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled
+                aria-describedby="review-wait"
+                className={buttonClasses('secondary')}
+              >
+                {processing.goToReview}
+              </button>
+              <p id="review-wait" className="text-sm text-ink-muted">
+                {processing.reviewWhenDone}
+              </p>
+            </>
+          )}
         </div>
       </div>
     </>

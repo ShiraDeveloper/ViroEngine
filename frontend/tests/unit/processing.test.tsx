@@ -174,6 +174,20 @@ describe('processing screen', () => {
     expect(screen.getByText(processing.progress(2, 3))).toBeInTheDocument();
   });
 
+  it('keeps_the_review_button_disabled_until_the_scan_is_done', async () => {
+    const { client, emit } = harness();
+    renderProcessing(client);
+    await screen.findByLabelText(processing.countersLabel);
+    Object.defineProperty(window, 'scrollY', { value: 240, configurable: true });
+    fireEvent.scroll(window);
+    expect(screen.getByRole('button', { name: processing.goToReview })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: processing.goToReview })).toBeNull();
+    expect(screen.getByText(processing.reviewWhenDone)).toBeInTheDocument();
+    await emit({ event: 'done', data: { status: 'needs_review', flagged: 2, duration_ms: 1000 } });
+    expect(screen.getByRole('link', { name: processing.goToReview })).toBeInTheDocument();
+    expect(screen.queryByText(processing.reviewWhenDone)).toBeNull();
+  });
+
   it('navigates_to_review_on_done', async () => {
     const { client, emit } = harness();
     renderProcessing(client);
