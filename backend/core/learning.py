@@ -16,6 +16,7 @@ from typing import Final
 from pydantic import BaseModel
 
 from backend.core.models import (
+    Candidate,
     CommitmentRow,
     ConfidenceLevel,
     FieldKey,
@@ -27,7 +28,8 @@ from backend.core.models import (
 )
 from backend.core.pipeline.outcome import PageOutcome
 from backend.core.ports.learning import LearningStorePort
-from backend.core.scoring import SENDER_NOT_LISTED
+from backend.core.normalize import normalize_name
+from backend.core.scoring import SECOND_READ_NOTE, SENDER_NOT_LISTED, THIRD_READ_NOTE
 from backend.core.validators import shape_of
 
 # Structural: PLAN §7.1. A key like these in anything handed to the store is a bug, not input.
@@ -172,6 +174,46 @@ def field_outcomes(row: CommitmentRow) -> list[tuple[str, FieldKey, bool]]:
         if result.value is None and not corrected:
             continue  # nothing was read and nobody filled it: no evidence either way
         out.append((sender, key, corrected))
+    return out
+
+
+# Structural: the name fields whose readers are scored against what a person chose.
+NAME_FIELDS: Final = (FieldKey.first_name, FieldKey.last_name)
+
+
+def reader_role(candidate: Candidate) -> str | None:
+    """Which cloud reader produced a candidate: "page" (whole page, first read), "verify" (blind
+    second read) or "zoom" (the zoomed third read). None for any other reader."""
+    if "cloud_read" not in candidate.notes:
+        return None
+    if THIRD_READ_NOTE in candidate.notes:
+        return "zoom"
+    if SECOND_READ_NOTE in candidate.notes:
+        return "verify"
+    return "page"
+
+
+def reader_outcomes(row: CommitmentRow) -> list[tuple[FieldKey, str, bool]]:
+    """(field, reader, right) for every name of a confirmed row that a PERSON decided while its
+    readers disagreed. A value accepted without a human decision teaches nothing (it would only
+    confirm what the engine already showed). No value leaves this function."""
+    out: list[tuple[FieldKey, str, bool]] = []
+    for key in NAME_FIELDS:
+        result = row.fields.get(key)
+        if result is None or result.value is None:
+            continue
+        if not any(step.reader is ReaderName.human for step in result.trail):
+            continue
+        read: dict[str, str] = {}
+        for cand in result.candidates:
+            role = reader_role(cand)
+            name = normalize_name(cand.value)
+            if role is not None and name and role not in read:
+                read[role] = name
+        if len(set(read.values())) < 2:
+            continue  # no dispute between readers: nothing to learn about who is right
+        chosen = normalize_name(result.value)
+        out.extend((key, role, name == chosen) for role, name in read.items())
     return out
 
 

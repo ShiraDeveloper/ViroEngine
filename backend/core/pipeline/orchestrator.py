@@ -58,6 +58,7 @@ from backend.core.models import (
     PageRaw,
     PatternHint,
     ReaderName,
+    ReaderStat,
     ReadingTrailStep,
     RunMetric,
     SenderSpec,
@@ -223,6 +224,13 @@ class _NoLearning:
         """Discard the count."""
 
     def field_stats(self) -> list[FieldStat]:
+        """Nothing learned."""
+        return []
+
+    def record_reader_outcome(self, field: str, reader: str, *, right: bool) -> None:
+        """Discard the count."""
+
+    def reader_stats(self) -> list[ReaderStat]:
         """Nothing learned."""
         return []
 

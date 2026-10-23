@@ -29,7 +29,8 @@ from typing import Final, cast, get_args
 import structlog
 
 from backend.core.errors import ProviderExhausted, SafeLineError
-from backend.core.learning import with_learned
+from backend.core.given_names import is_given_name
+from backend.core.learning import NAME_FIELDS, reader_role, with_learned
 from backend.core.models import (
     REASON_TEXT,
     VISION_TEXT_MAX,
@@ -39,6 +40,7 @@ from backend.core.models import (
     ConfidenceLevel,
     CropPayload,
     FieldKey,
+    FieldResult,
     FieldStat,
     PageAnswer,
     PageRaw,
@@ -603,14 +605,129 @@ def _flag_unlabelled_names(evaluations: dict[FieldKey, FieldEvaluation], page: _
         evaluations[key] = FieldEvaluation(result=shown, signals=flagged.signals, evidence=None)
 
 
-def _show_first_reading(evaluation: FieldEvaluation) -> FieldEvaluation:
-    """A disputed name stays level D with its reason, but shows the page reading instead of an
-    empty cell, so the technician confirms or corrects it rather than retyping it. Numbers and
-    dates are never treated this way: for them an empty flagged cell beats a disputed value."""
+def _role_names(result: FieldResult) -> dict[str, str]:
+    """The name each cloud reader (page / verify / zoom) read for a field, first one per reader."""
+    read: dict[str, str] = {}
+    for cand in result.candidates:
+        role = reader_role(cand)
+        if role is not None and role not in read and normalize_name(cand.value):
+            read[role] = cand.value
+    return read
+
+
+def _separate_name_labels(page: _Page) -> bool:
+    """True when the page reader found the two names beside two separate labels ("שם פרטי" and
+    "שם משפחה", "First / Last Name"): the labels then decide the order, never the name list."""
+    answers = page.answer.answers if page.answer is not None else {}
+    first = answers.get(FieldKey.first_name)
+    last = answers.get(FieldKey.last_name)
+    first_label = (first.note or "").lower() if first is not None else ""
+    last_label = (last.note or "").lower() if last is not None else ""
+    return (
+        first_label != last_label
+        and any(w in first_label for w in ("פרטי", "first"))
+        and any(w in last_label for w in ("משפ", "last", "family"))
+    )
+
+
+def _resolve_swapped_names(evaluations: dict[FieldKey, FieldEvaluation], page: _Page) -> None:
+    """First and family name in the right order when the readers agree on the two WORDS but the
+    order is in question - a rotated page or an unlabelled sticker line, where readers put the
+    family name first (part 3: "טובה גרין" read as first="גרין", the zoom read swapping the two).
+
+    The two words must be read by at least two readers (in either order); the order then comes
+    from the list of common given names: exactly one of the two words must be on it, and it is
+    the first name. Never when the page has separate first / family labels (they decide), never
+    when neither or both words are on the list (the field keeps its readings). In place."""
+    if _separate_name_labels(page):
+        return
+    firsts = _role_names(evaluations[FieldKey.first_name].result)
+    lasts = _role_names(evaluations[FieldKey.last_name].result)
+    pairs = {
+        role: (firsts[role], lasts[role])
+        for role in firsts.keys() & lasts.keys()
+        if normalize_name(firsts[role]) != normalize_name(lasts[role])
+    }
+    words: dict[frozenset[str | None], list[str]] = {}
+    for role, (first, last) in pairs.items():
+        words.setdefault(frozenset((normalize_name(first), normalize_name(last))), []).append(role)
+    agreed = [roles for roles in words.values() if len(roles) >= 2]
+    if len(agreed) != 1:
+        return  # no two readers saw the same two words, or two different pairs did
+    sample = pairs[agreed[0][0]]
+    given = [w for w in sample if is_given_name(w)]
+    if len(given) != 1:
+        return  # neither or both look like a first name: the order is not knowable
+    first_name = given[0]
+    last_name = sample[1] if sample[0] == first_name else sample[0]
+    shown = (
+        evaluations[FieldKey.first_name].result.value,
+        evaluations[FieldKey.last_name].result.value,
+    )
+    if tuple(normalize_name(v or "") for v in shown) == (
+        normalize_name(first_name),
+        normalize_name(last_name),
+    ) and all(evaluations[k].result.level is not ConfidenceLevel.D for k in NAME_FIELDS):
+        return  # already right: S8's level stands
+    same_order = sum(
+        1 for role in agreed[0] if normalize_name(pairs[role][0]) == normalize_name(first_name)
+    )
+    level = ConfidenceLevel.B if same_order >= 2 else ConfidenceLevel.C
+    for key, value in ((FieldKey.first_name, first_name), (FieldKey.last_name, last_name)):
+        result = evaluations[key].result.model_copy(
+            update={"value": value, "display_value": value, "level": level, "reason": None}
+        )
+        evaluations[key] = FieldEvaluation(
+            result=result, signals=evaluations[key].signals, evidence=None
+        )
+
+
+# Structural: before a reader's record changes which disputed reading is SHOWN, it needs this many
+# person-decided disputes, this share right, and this lead over the page reader. Below that the
+# page reading is shown, as before. The field stays orange either way.
+_MIN_READER_DISPUTES: Final = 8
+_MIN_READER_RATE: Final = 0.7
+_MIN_READER_LEAD: Final = 0.15
+
+
+def _trusted_reader(key: FieldKey, services: VisionServices) -> str | None:
+    """The reader whose record on person-decided disputes of `key` is clearly the best, or None
+    (not enough evidence, or the page reader is as good)."""
+    if services.learning is None:
+        return None
+    try:
+        stats = {s.reader: s for s in services.learning.reader_stats() if s.field is key}
+    except Exception:  # learning is an aid: a broken or older store never stops a read
+        return None
+    page = stats.get("page")
+    page_rate = page.rate if page is not None and page.disputes >= _MIN_READER_DISPUTES else 0.0
+    best = max(
+        (
+            s
+            for s in stats.values()
+            if s.reader != "page"
+            and s.disputes >= _MIN_READER_DISPUTES
+            and s.rate >= _MIN_READER_RATE
+            and s.rate >= page_rate + _MIN_READER_LEAD
+        ),
+        key=lambda s: s.rate,
+        default=None,
+    )
+    return best.reader if best is not None else None
+
+
+def _show_first_reading(evaluation: FieldEvaluation, prefer: str | None = None) -> FieldEvaluation:
+    """A disputed name stays level D with its reason, but shows a reading instead of an empty
+    cell, so the technician confirms or corrects it rather than retyping it: the page reading, or
+    the reading of `prefer` (the reader review has proven best for this field) when it read one.
+    Numbers and dates are never treated this way: for them an empty flagged cell beats a disputed
+    value."""
     result = evaluation.result
     if result.value is not None or result.reason != REASON_TEXT["readers_disagree"]:
         return evaluation
-    first = next((c for c in result.candidates if SECOND_READ_NOTE not in c.notes), None)
+    first = next((c for c in result.candidates if prefer and reader_role(c) == prefer), None)
+    if first is None:
+        first = next((c for c in result.candidates if SECOND_READ_NOTE not in c.notes), None)
     if first is None:
         return evaluation
     shown = result.model_copy(update={"value": first.value, "display_value": first.value})
@@ -713,12 +830,13 @@ def _outcome(
         evaluations = _evaluate_all(page, services)
     for key in FieldKey:
         evaluations[key] = _settle(key, evaluations[key])
+    _resolve_swapped_names(evaluations, page)
     _flag_shared_numbers(evaluations)
     _flag_twin_names(evaluations)
     _flag_unlabelled_names(evaluations, page)
     _distrust(evaluations, evaluations[FieldKey.sender].result.value, services)
     for key in _SHOWN_WHEN_DISPUTED:
-        evaluations[key] = _show_first_reading(evaluations[key])
+        evaluations[key] = _show_first_reading(evaluations[key], _trusted_reader(key, services))
     answer = page.answer
     role = answer.page_role if answer is not None else "primary_form"
     # A SAP screen or a lab report that the model read is a sample of its own (the 48 samples

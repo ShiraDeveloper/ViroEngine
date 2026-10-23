@@ -27,6 +27,7 @@ from backend.core.models import (
     LayoutHint,
     LayoutObservation,
     PatternHint,
+    ReaderStat,
     RegionKind,
     RunMetric,
 )
@@ -191,6 +192,39 @@ class SqliteLearningStore:
                     corrected=r["corrected"],
                     label=labels.get(key),
                     shape=shapes.get(key),
+                )
+            )
+        return stats
+
+    def record_reader_outcome(self, field: str, reader: str, *, right: bool) -> None:
+        """Count one person-decided name dispute for `reader`. Counts only - nothing to leak."""
+        with self._connect() as db:
+            db.execute(
+                """
+                INSERT INTO reader_outcome (field, reader, disputes, right_count, last_seen)
+                VALUES (?, ?, 1, ?, ?)
+                ON CONFLICT (field, reader) DO UPDATE SET
+                    disputes = disputes + 1, right_count = right_count + excluded.right_count,
+                    last_seen = excluded.last_seen
+                """,
+                (field, reader, int(right), self._now()),
+            )
+
+    def reader_stats(self) -> list[ReaderStat]:
+        """One entry per (field, reader) with at least one decided dispute."""
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT field, reader, disputes, right_count FROM reader_outcome ORDER BY id"
+            ).fetchall()
+        stats: list[ReaderStat] = []
+        for r in rows:
+            try:
+                field = FieldKey(r["field"])
+            except ValueError:
+                continue
+            stats.append(
+                ReaderStat(
+                    field=field, reader=r["reader"], disputes=r["disputes"], right=r["right_count"]
                 )
             )
         return stats
