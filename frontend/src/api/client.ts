@@ -105,16 +105,16 @@ export function createHttpClient(options: HttpClientOptions): ApiClient {
       sessionStorage.setItem(ACCESS_CODE_KEY, trimmed);
       return Promise.resolve({ ok: true });
     },
-    uploadSingle(file, idempotencyKey) {
+uploadSingle(file, idempotencyKey) {
       const body = new FormData();
       body.append('file', file);
-      return request<UploadResponse>('/documents', {
+      return request<UploadResponse>('/documents/upload', { // <-- תיקון ל- /documents/upload
         method: 'POST',
         body,
         headers: uploadHeaders(idempotencyKey),
       });
     },
-    uploadBatch(files, idempotencyKey) {
+        uploadBatch(files, idempotencyKey) {
       const body = new FormData();
       files.forEach((file) => body.append('files', file));
       return request<UploadResponse>('/batches', {
