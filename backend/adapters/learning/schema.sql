@@ -44,6 +44,15 @@ CREATE TABLE IF NOT EXISTS field_outcome (
     UNIQUE (sender, field)
 );
 
+-- Which reader of a disputed name held the value a person chose: counts only, never the name.
+CREATE TABLE IF NOT EXISTS reader_outcome (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    field TEXT NOT NULL, reader TEXT NOT NULL,
+    disputes INTEGER NOT NULL DEFAULT 0, right_count INTEGER NOT NULL DEFAULT 0,
+    last_seen TEXT NOT NULL,
+    UNIQUE (field, reader)
+);
+
 CREATE TABLE IF NOT EXISTS sender_proposal (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     canonical TEXT NOT NULL UNIQUE, keywords TEXT NOT NULL,

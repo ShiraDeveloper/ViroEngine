@@ -238,6 +238,14 @@ export interface ProviderStatus {
 
 export type ReaderName = "zxing" | "tesseract" | "trocr" | "gemini" | "openrouter" | "groq" | "human";
 
+/** How often one reader of a name (page / verify / zoom) held the value a PERSON chose when the readers disagreed - counts only, never a value. */
+export interface ReaderStat {
+  field: FieldKey;
+  reader: string;
+  disputes?: number;
+  right?: number;
+}
+
 export interface ReadingTrailStep {
   stage: string;
   reader: ReaderName;

@@ -31,6 +31,7 @@ from backend.core.models import (
     PatternHint,
     ProviderHealth,
     ReaderName,
+    ReaderStat,
     Region,
     RunMetric,
     RunReport,
@@ -296,6 +297,13 @@ class FakeLearningStore:
         """Accept and discard the count."""
 
     def field_stats(self) -> list[FieldStat]:
+        """Nothing learned."""
+        return []
+
+    def record_reader_outcome(self, field: str, reader: str, *, right: bool) -> None:
+        """Accept and discard the count."""
+
+    def reader_stats(self) -> list[ReaderStat]:
         """Nothing learned."""
         return []
 

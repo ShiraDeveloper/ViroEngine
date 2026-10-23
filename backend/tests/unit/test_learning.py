@@ -478,3 +478,72 @@ def test_a_seed_with_an_unexpected_key_is_refused(
 
     with pytest.raises(ValueError, match="unexpected keys"):
         empty.import_seed(seed)
+
+
+def test_reader_outcomes_count_only_person_decided_name_disputes() -> None:
+    """Which reader held the name a person chose - a role and a bool, never the name."""
+    from backend.core.learning import reader_outcomes
+    from backend.core.models import Candidate, ReaderName, ReadingTrailStep, RegionKind, SourceKind
+    from backend.tests.unit.export_helpers import make_field, make_row
+
+    def cand(value: str, *notes: str) -> Candidate:
+        return Candidate(
+            value=value,
+            reader=ReaderName.gemini,
+            source=SourceKind.handwritten,
+            box=None,
+            reader_confidence=0.5,
+            label_distance=None,
+            region=RegionKind.patient_box,
+            notes=["cloud_read", *notes],
+        )
+
+    human = ReadingTrailStep(
+        stage="review",
+        reader=ReaderName.human,
+        outcome="value",
+        value=None,
+        reader_confidence=None,
+        duration_ms=0,
+        cloud=False,
+    )
+    disputed = make_field(FieldKey.first_name, "פינחסוביץ").model_copy(
+        update={
+            "candidates": [
+                cand("ויקטוריה"),
+                cand("ישראל", "second_read"),
+                cand("פינחסוביץ", "third_read"),
+            ],
+        }
+    )
+    row = make_row()
+    decided = disputed.model_copy(update={"trail": [*disputed.trail, human]})
+    with_person = row.model_copy(update={"fields": {**row.fields, FieldKey.first_name: decided}})
+    without = row.model_copy(update={"fields": {**row.fields, FieldKey.first_name: disputed}})
+
+    assert sorted(reader_outcomes(with_person)) == [
+        (FieldKey.first_name, "page", False),
+        (FieldKey.first_name, "verify", False),
+        (FieldKey.first_name, "zoom", True),
+    ]
+    assert reader_outcomes(without) == []  # accepted as shown: teaches nothing
+
+
+def test_reader_outcomes_are_counted_per_field_and_reader(store: SqliteLearningStore) -> None:
+    for right in (True, True, False):
+        store.record_reader_outcome("first_name", "zoom", right=right)
+    store.record_reader_outcome("first_name", "page", right=False)
+
+    stats = {(s.field, s.reader): (s.disputes, s.right) for s in store.reader_stats()}
+
+    assert stats == {(FieldKey.first_name, "zoom"): (3, 2), (FieldKey.first_name, "page"): (1, 0)}
+
+
+def test_reader_outcomes_are_counted_per_field_and_reader(store: SqliteLearningStore) -> None:
+    for right in (True, True, False):
+        store.record_reader_outcome("first_name", "zoom", right=right)
+    store.record_reader_outcome("first_name", "page", right=False)
+
+    stats = {(s.field, s.reader): (s.disputes, s.right) for s in store.reader_stats()}
+
+    assert stats == {(FieldKey.first_name, "zoom"): (3, 2), (FieldKey.first_name, "page"): (1, 0)}

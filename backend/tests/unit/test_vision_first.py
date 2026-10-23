@@ -9,7 +9,7 @@ cascade instead of inventing anything.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import json
 from pathlib import Path
 
@@ -25,11 +25,13 @@ from backend.core.models import (
     BarcodeHit,
     ConfidenceLevel,
     FieldKey,
+    FieldResult,
     FieldStat,
     ImageRef,
     PageRaw,
     ProviderHealth,
     ReaderName,
+    ReaderStat,
     VisionRequest,
     VisionResponse,
 )
@@ -530,3 +532,155 @@ def test_a_name_beside_a_foreign_looking_label_is_shown_but_reviewed(
     assert name.value == "ישראל"
     assert name.level is ConfidenceLevel.D
     assert name.reason == REASON_TEXT["name_label_unclear"]
+
+
+# --- name order and the reader review has proven best ------------------------------------------
+
+
+def _name(value: str, label: str = "") -> dict[str, object]:
+    return {"value": value, "label": label, "source": "handwritten", "box": BOX}
+
+
+def _read_names(
+    raw: PageRaw,
+    settings: Settings,
+    storage: TmpdirStorage,
+    imaging: CvImaging,
+    *,
+    page: tuple[str, str],
+    verify: tuple[str, str],
+    zoom: tuple[str, str] | None = None,
+    labels: tuple[str, str] = ("", ""),
+    learning: object | None = None,
+) -> tuple[FieldResult, FieldResult]:
+    """Names after a read whose page / verify / zoom readers saw the given (first, last)."""
+    reader = Scripted(
+        page=page_json(first_name=_name(page[0], labels[0]), last_name=_name(page[1], labels[1])),
+        verify={FieldKey.first_name: [zoom[0]], FieldKey.last_name: [zoom[1]]} if zoom else {},
+    )
+    second = Scripted(verify={FieldKey.first_name: [verify[0]], FieldKey.last_name: [verify[1]]})
+    svc = services(settings, storage, imaging, reader, second)
+    if learning is not None:
+        svc = replace(svc, learning=learning)  # type: ignore[arg-type]
+    [outcome] = read_batch_vision([raw], services=svc)
+    assert outcome is not None
+    return outcome.results[FieldKey.first_name], outcome.results[FieldKey.last_name]
+
+
+def test_two_readers_with_the_same_words_in_opposite_order_agree_on_the_name(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    """Part 3, page 2 (rotated): page reader echoed the examples, verify read the name, the zoomed
+    read swapped the two words. The words agree; "מאור" is a given name, so it is first."""
+    first, last = _read_names(
+        raw,
+        settings,
+        storage,
+        imaging,
+        page=("ישראל", "ישראלי"),
+        verify=("מאור", "אזולאי"),
+        zoom=("אזולאי", "מאור"),
+    )
+    assert (first.value, last.value) == ("מאור", "אזולאי")
+    assert first.level is ConfidenceLevel.C and first.reason is None
+
+
+def test_agreeing_readers_with_the_family_name_first_are_reordered(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    """Part 3, page 1: both readers put "גרין" first beside a combined "שם" label."""
+    first, last = _read_names(
+        raw,
+        settings,
+        storage,
+        imaging,
+        page=("גרין", "טובה"),
+        verify=("גרין", "טובה"),
+        labels=("שם", "שם"),
+    )
+    assert (first.value, last.value) == ("טובה", "גרין")
+
+
+def test_separate_first_and_family_labels_decide_the_order(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    first, last = _read_names(
+        raw,
+        settings,
+        storage,
+        imaging,
+        page=("גרין", "טובה"),
+        verify=("גרין", "טובה"),
+        labels=("שם פרטי", "שם משפחה"),
+    )
+    assert (first.value, last.value) == ("גרין", "טובה")
+
+
+def test_an_order_the_name_list_cannot_tell_stays_disputed(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    first, last = _read_names(
+        raw, settings, storage, imaging, page=("כהן", "לוי"), verify=("לוי", "כהן")
+    )
+    assert first.level is ConfidenceLevel.D and last.level is ConfidenceLevel.D
+
+
+def test_names_both_readers_agree_on_are_untouched(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    first, last = _read_names(
+        raw, settings, storage, imaging, page=("ישראל", "ישראלי"), verify=("ישראל", "ישראלי")
+    )
+    assert (first.value, last.value) == ("ישראל", "ישראלי")
+    assert first.level is ConfidenceLevel.B
+
+
+@dataclass
+class ReaderRecord(Learned):
+    readers: list[ReaderStat] = field(default_factory=list)
+
+    def reader_stats(self) -> list[ReaderStat]:
+        return self.readers
+
+
+def test_a_disputed_name_shows_the_reader_review_proved_best_and_stays_orange(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    proven = ReaderRecord(
+        stats=[],
+        readers=[
+            ReaderStat(field=FieldKey.first_name, reader="zoom", disputes=10, right=9),
+            ReaderStat(field=FieldKey.first_name, reader="page", disputes=10, right=2),
+        ],
+    )
+    kwargs = {
+        "page": ("ויקטוריה", "גלמן"),
+        "verify": ("ישראל", "ישראלי"),
+        "zoom": ("פינחסוביץ", "גדמון"),
+    }
+    before, _ = _read_names(raw, settings, storage, imaging, **kwargs)  # type: ignore[arg-type]
+    after, _ = _read_names(raw, settings, storage, imaging, learning=proven, **kwargs)  # type: ignore[arg-type]
+
+    assert before.value == "ויקטוריה"
+    assert after.value == "פינחסוביץ"
+    assert after.level is ConfidenceLevel.D  # shown first, never confirmed by the record
+
+
+def test_a_reader_with_too_little_evidence_changes_nothing(
+    raw: PageRaw, settings: Settings, storage: TmpdirStorage, imaging: CvImaging
+) -> None:
+    thin = ReaderRecord(
+        stats=[],
+        readers=[ReaderStat(field=FieldKey.first_name, reader="zoom", disputes=3, right=3)],
+    )
+    shown, _ = _read_names(
+        raw,
+        settings,
+        storage,
+        imaging,
+        learning=thin,
+        page=("ויקטוריה", "גלמן"),
+        verify=("ישראל", "ישראלי"),
+        zoom=("פינחסוביץ", "גדמון"),
+    )
+    assert shown.value == "ויקטוריה"

@@ -9,7 +9,14 @@ from __future__ import annotations
 
 from typing import Any, Literal, Protocol, runtime_checkable
 
-from backend.core.models import FieldStat, LayoutHint, LayoutObservation, PatternHint, RunMetric
+from backend.core.models import (
+    FieldStat,
+    LayoutHint,
+    LayoutObservation,
+    PatternHint,
+    ReaderStat,
+    RunMetric,
+)
 
 
 @runtime_checkable
@@ -51,6 +58,14 @@ class LearningStorePort(Protocol):
 
     def field_stats(self) -> list[FieldStat]:
         """Everything review has taught so far, one entry per (sender, field). Never a value."""
+        ...
+
+    def record_reader_outcome(self, field: str, reader: str, *, right: bool) -> None:
+        """Count one disputed name a person decided: whether `reader` had read that value."""
+        ...
+
+    def reader_stats(self) -> list[ReaderStat]:
+        """Per (field, reader): disputes a person decided and how many that reader got right."""
         ...
 
     def pattern_hints(self, sender: str, field: str) -> list[PatternHint]:

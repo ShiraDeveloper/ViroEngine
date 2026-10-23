@@ -102,6 +102,7 @@ export const processing = {
   cancel: 'ביטול',
   failedPage: 'עמוד שלא עובד',
   goToReview: 'למסך הבדיקה',
+  reviewWhenDone: 'יהיה זמין בסיום הסריקה (100%).',
   pagesTitle: 'עמודים',
   pipelineLabel: 'התקדמות לפי עמוד',
   countersLabel: 'מוני עיבוד',
